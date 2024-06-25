@@ -1,0 +1,32 @@
+name: "test8"
+description: "My first real add-on!"
+version: "1.2.4"
+slug: "hello_world"
+init: false
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+  - i386
+
+uart: true
+usb: true
+
+boot: "auto"
+options:
+  serial_port: "/dev/ttyUSB0"
+  baud_rate: 9600
+schema:
+  serial_port: "str"
+  baud_rate: "int"
+
+mqtt:
+  broker: localhost
+  username: gobel
+  password: 123456
+
+sensor:
+  - platform: mqtt
+    name: "BMS Raw Data"
+    state_topic: "homeassistant/sensor/bms_raw"
