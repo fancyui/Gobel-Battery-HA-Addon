@@ -1,4 +1,4 @@
-def parse_bms_ascii_response(response):
+def parse_all_pack_analog_ascii_response(response):
     """
     Parses the ASCII response string to extract pack analog data for multiple packs.
 
@@ -87,5 +87,5 @@ def parse_bms_ascii_response(response):
 
 # Example usage with a hypothetical ASCII response string
 response = "7E 32 35 30 30 34 36 30 30 46 30 37 00 02 03E8 03E8 03E8 02 1F4 1F4 07D0 07D0 07D0 03 1F4 1F4 07D0 07D0 07D0"
-data = parse_ascii_response(response)
+data = parse_all_pack_analog_ascii_response(response)
 print(data)
