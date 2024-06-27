@@ -1,60 +1,91 @@
-import serial
-import time
-import os
-import binascii
-import paho.mqtt.client as mqtt
+def parse_bms_ascii_response(response):
+    """
+    Parses the ASCII response string to extract pack analog data for multiple packs.
 
-# Load configuration from environment variables
-# serial_port = os.getenv('SERIAL_PORT', '/dev/ttyUSB0')
-# baud_rate = int(os.getenv('BAUD_RATE', 9600))
+    Args:
+    response (str): The ASCII response string from the BMS.
 
-serial_port = '/dev/ttyUSB0'
-baud_rate = 9600
+    Returns:
+    list: Parsed data containing pack analog information for each pack.
+    """
+    packs_data = []
+    
+    # Split the response into fields
+    fields = response.split()
+    
+    # Check the command and response validity
+    if fields[3] != '46' or fields[4] != '00':
+        raise ValueError("Invalid command or response code")
+    
+    # Extract the length of the data information
+    length = int(fields[5], 16)
+    
+    # Start parsing the data information
+    offset = 6  # Start after fixed header fields
 
-# MQTT settings
-broker = "homeassistant.local"  # Change to your MQTT broker address
-port = 1883
-topic = "homeassistant/sensor/bms_raw"
-client_id = "bms_client"
+    # Number of packs
+    num_packs = int(fields[offset], 16)
+    offset += 1
 
-# Initialize MQTT client
-client = mqtt.Client(client_id)
-client.connect(broker, port)
+    for _ in range(num_packs):
+        pack_data = {}
 
-def read_from_bms(ser):
-    if ser.in_waiting > 0:
-        line = ser.readline().decode('utf-8').rstrip()
-        print(f"Received: {line}")
+        # Number of cells
+        num_cells = int(fields[offset], 16)
+        offset += 1
+        pack_data['num_cells'] = num_cells
 
-        # Publish the raw data to the MQTT broker
-        client.publish(topic, line)
-        print(f"Published: {line}")
+        # Cell voltages
+        cell_voltages = []
+        for _ in range(num_cells):
+            voltage = int(fields[offset], 16) / 1000  # Convert mV to V
+            cell_voltages.append(voltage)
+            offset += 1
+        pack_data['cell_voltages'] = cell_voltages
 
-def send_to_bms(ser, data):
-    ser.write(data)
-    ser.flush()
-    print(f"Sent: {binascii.hexlify(data).decode('utf-8')}")
+        # Number of temperature sensors
+        num_temps = int(fields[offset], 16)
+        offset += 1
+        pack_data['num_temps'] = num_temps
 
-def main():
-    ser = serial.Serial(serial_port, baud_rate, timeout=1)
-    time.sleep(2)  # Wait for the serial connection to initialize
+        # Temperatures
+        temperatures = []
+        for _ in range(num_temps):
+            temperature = int(fields[offset], 16) / 10  # Convert tenths of degrees to degrees
+            temperatures.append(temperature)
+            offset += 1
+        pack_data['temperatures'] = temperatures
 
-    # The data to send to the BMS
-    data_to_send = '7E 32 35 30 30 34 36 34 32 45 30 30 32 46 46 46 44 30 36 0D'
-    # Convert the hex string to bytes
-    data_bytes = binascii.unhexlify(data_to_send.replace(' ', ''))
+        # Pack current
+        pack_current = int(fields[offset], 16) / 100  # Convert 10mA to A
+        offset += 1
+        pack_data['pack_current'] = pack_current
 
-    try:
-        while True:
-            # Send data to the BMS every 5 seconds
-            send_to_bms(ser, data_bytes)
-            
-            # Read data from the BMS
-            read_from_bms(ser)
-            
-            time.sleep(5)
-    except KeyboardInterrupt:
-        ser.close()
+        # Pack total voltage
+        pack_total_voltage = int(fields[offset], 16) / 100  # Convert mV to V
+        offset += 1
+        pack_data['pack_total_voltage'] = pack_total_voltage
 
-if __name__ == "__main__":
-    main()
+        # Pack remaining capacity
+        pack_remain_capacity = int(fields[offset], 16) * 10  # Convert 10mAH to mAH
+        offset += 1
+        pack_data['pack_remain_capacity'] = pack_remain_capacity
+
+        # Pack full capacity
+        pack_full_capacity = int(fields[offset], 16) * 10  # Convert 10mAH to mAH
+        offset += 1
+        pack_data['pack_full_capacity'] = pack_full_capacity
+
+        # Pack design capacity
+        pack_design_capacity = int(fields[offset], 16) * 10  # Convert 10mAH to mAH
+        offset += 1
+        pack_data['pack_design_capacity'] = pack_design_capacity
+
+        packs_data.append(pack_data)
+
+    return packs_data
+
+# Example usage with a hypothetical ASCII response string
+response = "7E 32 35 30 30 34 36 30 30 46 30 37 00 02 03E8 03E8 03E8 02 1F4 1F4 07D0 07D0 07D0 03 1F4 1F4 07D0 07D0 07D0"
+data = parse_ascii_response(response)
+print(data)
