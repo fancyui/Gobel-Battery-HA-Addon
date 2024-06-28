@@ -14,18 +14,18 @@ import logging
 def load_config():
     config_path = '/data/options.json'
     if os.path.exists(config_path):
-        logging.info("Loading options.json")
+        print("Loading options.json")
         try:
             with open(config_path) as file:
                 config = json.load(file)
-                logging.info("Config: " + json.dumps(config))
+                print("Config: " + json.dumps(config))
                 return config
         except Exception as e:
-            logging.error("Error loading configuration: %s", str(e))
+            print("Error loading configuration: %s", str(e))
             return None
     else:
-        logging.warning("No config file found.")
-        logging.warning("Please make a configuration in the panel")
+        print("No config file found.")
+        print("Please make a configuration in the panel")
         return None
 
 
@@ -33,8 +33,8 @@ def load_config():
 # Load the configuration
 config = load_config()
 
-bms_connected = False
-mqtt_connected = False
+
+socket_buffer_size = 1024
 # Accessing the parameters
 mqtt_broker = config.get('mqtt_broker')
 mqtt_port = config.get('mqtt_port')
@@ -59,10 +59,10 @@ def on_connect(client, userdata, flags, rc):
     if rc == 0:
         global mqtt_connected
         mqtt_connected = True
-        client.will_set(mqtt_topic + "/availability","online", qos=0, retain=False)
+        client.will_set(mqtt_base_topic + "/availability","online", qos=0, retain=False)
         print(f"Connected to MQTT Broker: {mqtt_broker}:{mqtt_port}")
     else:
-        client.will_set(mqtt_topic + "/availability","offline", qos=0, retain=True)
+        client.will_set(mqtt_base_topic + "/availability","offline", qos=0, retain=True)
         print(f"Failed to connect to MQTT Broker: {mqtt_broker}. Error code: {rc}")
 
 
@@ -98,9 +98,10 @@ def send_data_to_mqtt(data):
 
 
 def connect_to_bms(interface='serial', serial_port=None, baud_rate=None, ethernet_ip=None, ethernet_port=None):
-    if interface == 'serial' and serial_port:
+    if interface == 'serial' and serial_port and baud_rate:
         try:
-            ser = serial.Serial(serial_port, baud_rate)
+            print("Trying to connect " + serial_port + ":" + str(baud_rate))
+            ser = serial.Serial(serial_port, baud_rate, timeout = 1)
             print(f"Connected to BMS over serial port: {serial_port} with baud rate: {baud_rate}")
             return ser
         except serial.SerialException as e:
@@ -108,7 +109,9 @@ def connect_to_bms(interface='serial', serial_port=None, baud_rate=None, etherne
             return None
     elif interface == 'ethernet' and ethernet_ip and ethernet_port:
         try:
+            print("Trying to connect " + ethernet_ip + ":" + str(ethernet_port))
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(5)
             sock.connect((ethernet_ip, ethernet_port))
             print(f"Connected to BMS over Ethernet: {ethernet_ip}:{ethernet_port}")
             return sock
@@ -121,16 +124,37 @@ def connect_to_bms(interface='serial', serial_port=None, baud_rate=None, etherne
 
 def send_data_to_bms(bms_connection, data):
     try:
-        bms_connection.write(data.encode())  # Assuming data is a string, encode as needed
-        print(f"Sent data to BMS: {data}")
+        # Ensure data is in bytes format
+        if isinstance(data, str):
+            data = data.encode()  # Convert string to bytes if necessary
+
+        # Check if the connection is a socket (Ethernet)
+        if hasattr(bms_connection, 'send'):
+            bms_connection.send(data)
+        # Check if the connection is a serial connection
+        elif hasattr(bms_connection, 'write'):
+            bms_connection.write(data)
+        else:
+            raise ValueError("Unsupported connection type")
+
         return True
+
     except Exception as e:
         print(f"Error sending data to BMS: {e}")
         return False
 
 def receive_data_from_bms(bms_connection):
     try:
-        received_data = bms_connection.readline().decode().strip()  # Assuming data is ASCII-encoded and newline terminated
+        # Check if the connection is a serial connection
+        if hasattr(bms_connection, 'readline'):
+            received_data = bms_connection.readline().decode().strip()
+        # Check if the connection is a socket (Ethernet)
+        elif hasattr(bms_connection, 'recv'):
+            # Assuming a buffer size of 1024 bytes for demonstration purposes
+            received_data = bms_connection.recv(socket_buffer_size).decode().strip()
+        else:
+            raise ValueError("Unsupported connection type")
+
         print(f"Received data from BMS: {received_data}")
         return received_data
     except Exception as e:
@@ -141,71 +165,79 @@ def receive_data_from_bms(bms_connection):
 
 
 
-def calculate_checksum(data):
-    """
-    Calculates the checksum for the given data.
-    
-    Parameters:
-    data (bytes): The data for which to calculate the checksum.
-    
-    Returns:
-    int: The calculated checksum.
-    """
-    chk_sum = sum(data) & 0xFF
-    chk_sum = (0x100 - chk_sum) & 0xFF
-    return chk_sum
+def lchksum_calc(lenid):
+    try:
+        chksum = sum(int(chr(lenid[element]), 16) for element in range(len(lenid))) % 16
+        chksum_bin = '{0:04b}'.format(chksum)
+        flip_bits = ''.join('1' if b == '0' else '0' for b in chksum_bin)
+        chksum = (int(flip_bits, 2) + 1) % 16
+        return format(chksum, 'X')
+    except Exception as e:
+        print(f"Error calculating LCHKSUM using LENID: {lenid}")
+        print(f"Error details: {str(e)}")
+        return False
 
+def chksum_calc(data):
+    try:
+        chksum = sum(data[element] for element in range(1, len(data))) % 65536
+        chksum_bin = '{0:016b}'.format(chksum)
+        flip_bits = ''.join('1' if b == '0' else '0' for b in chksum_bin)
+        chksum = format(int(flip_bits, 2) + 1, 'X')
+        return chksum
+    except Exception as e:
+        print(f"Error calculating CHKSUM using data: {data}")
+        print(f"Error details: {str(e)}")
+        return False
 
-def generate_bms_request(command_type, pack_number=None):
-    """
-    Generates a request to send to the BMS to get specific data based on the command parameter.
-    
-    Parameters:
-    command_type (str): The type of command to send to the BMS.
-                        It can be one of the following:
-                        - 'analog' for getting all pack analog information.
-                        - 'warning' for getting pack warning information.
-                        - 'capacity' for getting pack capacity information.
-                        - 'time_date' for getting pack time and date information.
-                        - 'pack_number' for getting pack number.
-                        - 'software_version' for getting software version information.
-                        - 'product_info' for getting product information.
-    pack_number (int, optional): The pack number to get information from. Defaults to None for all packs.
-    
-    Returns:
-    bytes: The request message to be sent to the BMS.
-    """
-
-    
-    SOI = 0x7E
-    VER = 0x32
-    ADR = 0x35
-    EOI = 0x0D
-    
-    commands = {
-        'analog': (0x30, 0x42, 0x02),
-        'warning': (0x30, 0x44, 0x02),
-        'capacity': (0x30, 0xA6, 0x02),
-        'time_date': (0x30, 0xB1, 0x02),
-        'pack_number': (0x46, 0x41, 0x00),
-        'software_version': (0x46, 0xC1, 0x00),
-        'product_info': (0x46, 0xC2, 0x00)
+def generate_bms_request(command, pack_number=None):
+    commands_table = {
+        'pack_number': b"\x39\x30",
+        'analog': b"\x34\x32",
+        'software_version': b"\x43\x31",
+        'product_info': b"\x43\x32",
+        'capacity': b"\x41\x36",
+        'warning_info': b"\x34\x34",
     }
     
-    if command_type not in commands:
-        raise ValueError("Invalid command type")
+    lenids_table = {
+        'pack_number': b"000",
+        'analog': b"002",
+        'software_version': b"000",
+        'product_info': b"000",
+        'capacity': b"000",
+        'warning_info': b"002",
+    }
+
+    if command not in commands_table:
+        raise ValueError("Invalid command")
+
+    ver = b"\x32\x35"
+    adr = b"\x30\x30"
+    cid1 = b"\x34\x36"
+    cid2 = commands_table[command]
     
-    CID1, CID2, length = commands[command_type]
-    if pack_number is not None:
-        COMMAND = f'{pack_number:02X}'
-    else:
-        COMMAND = 'FF'
+    pack_number = pack_number if pack_number is not None else 255
+
+    info = f"{pack_number:02X}".encode('ascii')
     
-    len_id = struct.pack('B', length)
-    data = struct.pack('BBBBBB', SOI, VER, ADR, CID1, CID2, length) + struct.pack('BB', EOI)
-    chk_sum = calculate_checksum(data)
+    request = b'\x7e' + ver + adr + cid1 + cid2
     
-    request = data[:-1] + struct.pack('B', chk_sum) + data[-1:]
+    LENID =  lenids_table[command]
+    
+    LCHKSUM = lchksum_calc(LENID)
+
+    if LCHKSUM is False:
+        return None
+
+    request += LCHKSUM.encode('ascii') + LENID + info
+    
+
+    CHKSUM = chksum_calc(request)
+    if CHKSUM is False:
+        return None
+
+    request += CHKSUM.encode('ascii') + b'\x0d'
+
     return request
 
 
@@ -270,79 +302,118 @@ def parse_analog_data(response):
     list: Parsed data containing pack analog information for each pack.
     """
     packs_data = []
-    
-    # Split the response into fields
-    fields = response.split()
-    
+
+    # Ignore the first character if it is '~'
+    if response[0] == '~':
+        response = response[1:]
+
+    # Split the response into fields (assuming each field is 2 characters representing a byte)
+    fields = [response[i:i + 2] for i in range(0, len(response), 2)]
+
+    # Debug: Print the fields to verify their contents
+    print("Fields:", fields)
+
     # Check the command and response validity
-    if fields[3] != '46' or fields[4] != '00':
-        raise ValueError("Invalid command or response code")
-    
+    if fields[2] != '46' or fields[3] != '00':
+        raise ValueError(f"Invalid command or response code: {fields[2]} {fields[3]}")
+
     # Extract the length of the data information
-    length = int(fields[5], 16)
-    
+    length = int(fields[4] + fields[5], 16)
+    print(f"Data length: {length}")
+
     # Start parsing the data information
     offset = 6  # Start after fixed header fields
 
-    # Number of packs
-    num_packs = int(fields[offset], 16)
+    # INFOFLAG
+    infoflag = int(fields[offset], 16)
+    print(f"INFOFLAG: {infoflag}")
     offset += 1
 
-    for _ in range(num_packs):
+    # Number of packs
+    num_packs = int(fields[offset], 16)
+    print(f"Number of packs: {num_packs}")
+    offset += 1
+
+    for pack_index in range(num_packs):
         pack_data = {}
 
         # Number of cells
         num_cells = int(fields[offset], 16)
+        print(f"Pack {pack_index + 1} - Number of cells: {num_cells}")
         offset += 1
-        pack_data['num_cells'] = int(num_cells)
+        pack_data['num_cells'] = num_cells
 
         # Cell voltages
         cell_voltages = []
-        for _ in range(num_cells):
-            voltage = int(fields[offset], 16) # mV
+        for cell_index in range(num_cells):
+            voltage = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for voltage
+            print(f"Pack {pack_index + 1} - Cell {cell_index + 1} voltage: {voltage}")
             cell_voltages.append(voltage)
-            offset += 1
+            offset += 2
         pack_data['cell_voltages'] = cell_voltages
 
         # Number of temperature sensors
         num_temps = int(fields[offset], 16)
+        print(f"Pack {pack_index + 1} - Number of temperature sensors: {num_temps}")
         offset += 1
         pack_data['num_temps'] = num_temps
 
         # Temperatures
         temperatures = []
-        for _ in range(num_temps):
-            temperature = round(float(fields[offset])  / 10 - 273.15, 2)  # Convert tenths of degrees Kelvin to degrees Celsius
-
+        for temp_index in range(num_temps):
+            temperature = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for temperature
+            temperature = round(temperature / 10 - 273.15, 2)  # Convert tenths of degrees Kelvin to degrees Celsius
+            print(f"Pack {pack_index + 1} - Temperature sensor {temp_index + 1} temperature: {temperature}")
             temperatures.append(temperature)
-            offset += 1
+            offset += 2
         pack_data['temperatures'] = temperatures
 
         # Pack current
-        pack_current = round(float(fields[offset]) / 100, 2)  # Convert 10mA to A
+        pack_current = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for current
+        pack_current = round(pack_current / 100, 2)  # Convert 10mA to A
         if pack_current > 32767:
             pack_current -= 65536
-        offset += 1
+        print(f"Pack {pack_index + 1} - Pack current: {pack_current}")
+        offset += 2
         pack_data['pack_current'] = pack_current
 
         # Pack total voltage
-        pack_total_voltage = round(float(fields[offset]) / 1000, 2)  # Convert mV to V
-        offset += 1
+        pack_total_voltage = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for total voltage
+        pack_total_voltage = round(pack_total_voltage / 1000, 2)  # Convert mV to V
+        print(f"Pack {pack_index + 1} - Pack total voltage: {pack_total_voltage}")
+        offset += 2
         pack_data['pack_total_voltage'] = pack_total_voltage
 
-        # Pack remaining capacity
-        pack_remain_capacity = round(float(fields[offset]) / 100, 2)  # Convert 10mAH to AH
-        offset += 1
+        # Pack remain capacity
+        pack_remain_capacity = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for remaining capacity
+        pack_remain_capacity = round(pack_remain_capacity / 100, 2)  # Convert 10mAH to AH
+        print(f"Pack {pack_index + 1} - Pack remaining capacity: {pack_remain_capacity}")
+        offset += 2
         pack_data['pack_remain_capacity'] = pack_remain_capacity
 
-        # Pack full capacity
-        pack_full_capacity = round(float(fields[offset]) / 100, 2)  # Convert 10mAH to AH
+        # Define number P
+        define_number_p = int(fields[offset], 16)
+        print(f"Pack {pack_index + 1} - Define number P: {define_number_p}")
         offset += 1
+
+        # Pack full capacity
+        pack_full_capacity = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for full capacity
+        pack_full_capacity = round(pack_full_capacity / 100, 2)  # Convert 10mAH to AH
+        print(f"Pack {pack_index + 1} - Pack full capacity: {pack_full_capacity}")
+        offset += 2
         pack_data['pack_full_capacity'] = pack_full_capacity
 
+        # Cycle number
+        cycle_number = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for cycle number
+        print(f"Pack {pack_index + 1} - Cycle number: {cycle_number}")
+        offset += 2
+        pack_data['cycle_number'] = cycle_number
+
         # Pack design capacity
-        pack_design_capacity = round(float(fields[offset]) / 100, 2)  # Convert 10mAH to AH
-        offset += 1
+        pack_design_capacity = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for design capacity
+        pack_design_capacity = round(pack_design_capacity / 100, 2)  # Convert 10mAH to AH
+        print(f"Pack {pack_index + 1} - Pack design capacity: {pack_design_capacity}")
+        offset += 2
         pack_data['pack_design_capacity'] = pack_design_capacity
 
         packs_data.append(pack_data)
@@ -353,27 +424,219 @@ def parse_analog_data(response):
 
 
 
+
+def extract_datainfo(data):
+    # Ensure the data starts with the SOI character (~)
+    if data[0] != '~':
+        raise ValueError("Data does not start with SOI (~)")
+
+    # Remove SOI (~)
+    data = data[1:]
+    
+    # Fixed positions from the start
+    ver = data[0:2]
+    adr = data[2:4]
+    command = data[4:6]
+    rtn = data[6:8]
+    length_high_byte = data[8:10]
+    length_low_byte = data[10:12]
+    
+    # Calculate LENGTH in bytes
+    length = int(length_high_byte + length_low_byte, 16)
+    
+    # DATAINFO starts after LENGTH field (6th byte position)
+    data_start_position = 12
+    data_end_position = data_start_position + length * 2
+    
+    # Extract DATAINFO
+    datainfo = data[data_start_position:data_end_position]
+    
+    return datainfo
+
+def extract_warnstate(data):
+    # Ensure the data starts with the SOI character (~)
+    if data[0] != '~':
+        raise ValueError("Data does not start with SOI (~)")
+
+    # Remove SOI (~)
+    data = data[1:]
+    
+    # Extract relevant positions
+    ver = data[0:2]
+    adr = data[2:4]
+    command = data[4:6]
+    rtn = data[6:8]
+    length_high_byte = data[8:10]
+    length_low_byte = data[10:12]
+    
+    # Calculate LENGTH in bytes
+    length = int(length_high_byte + length_low_byte, 16)
+    
+    # DATAINFO starts after LENGTH field (6th byte position)
+    data_start_position = 12
+    data_end_position = data_start_position + length * 2
+    
+    # Extract DATAINFO
+    datainfo = data[data_start_position:data_end_position]
+    
+    # Extract INFOFLAG and WARNSTATE from DATAINFO
+    INFOFLAG = datainfo[0:2]
+    WARNSTATE = datainfo[2:]  # Remaining part is WARNSTATE
+    
+    return INFOFLAG, WARNSTATE
+
+# Interpret function for warnings
+def interpret_warning(value):
+    if value == 0x00:
+        return 'normal'
+    elif value == 0x01:
+        return 'below lower limit'
+    elif value == 0x02:
+        return 'above upper limit'
+    elif 0x80 <= value <= 0xEF:
+        return 'user defined'
+    elif value == 0xF0:
+        return 'other fault'
+    else:
+        return 'unknown'
+
+def parse_warnstate(warnstate):
+    warnstate_bytes = bytes.fromhex(warnstate)
+    index = 0
+
+    # Get PACKnumber
+    pack_number = warnstate_bytes[index]
+    index += 1
+
+    packs_info = []
+
+    for _ in range(pack_number):
+        pack_info = {}
+
+        # Parse 1. Cell number
+        cell_number = warnstate_bytes[index]
+        pack_info['cell_number'] = cell_number
+        index += 1
+
+        # Parse 2. Cell voltage warnings
+        cell_voltage_warnings = []
+        for _ in range(cell_number):
+            cell_voltage_warn = warnstate_bytes[index]
+            cell_voltage_warnings.append(interpret_warning(cell_voltage_warn))
+            index += 1
+        pack_info['cell_voltage_warnings'] = cell_voltage_warnings
+
+        # Parse 3. Temperature sensor number
+        temp_sensor_number = warnstate_bytes[index]
+        pack_info['temp_sensor_number'] = temp_sensor_number
+        index += 1
+
+        # Parse 4. Temperature sensor warnings
+        temp_sensor_warnings = []
+        for _ in range(temp_sensor_number):
+            temp_sensor_warn = warnstate_bytes[index]
+            temp_sensor_warnings.append(interpret_warning(temp_sensor_warn))
+            index += 1
+        pack_info['temp_sensor_warnings'] = temp_sensor_warnings
+
+        # Parse 5. PACK charge current warning
+        pack_info['charge_current_warn'] = interpret_warning(warnstate_bytes[index])
+        index += 1
+
+        # Parse 6. PACK total voltage warning
+        pack_info['total_voltage_warn'] = interpret_warning(warnstate_bytes[index])
+        index += 1
+
+        # Parse 7. PACK discharge current warning
+        pack_info['discharge_current_warn'] = interpret_warning(warnstate_bytes[index])
+        index += 1
+
+        # Detailed interpretation for Protect State 1 based on Char A.19
+        protect_state_1 = warnstate_bytes[index]
+        pack_info['protect_state_1'] = {
+            'short_circuit_protect': bool(protect_state_1 & 0b01000000),
+            'discharge_current_protect': bool(protect_state_1 & 0b00100000),
+            'charge_current_protect': bool(protect_state_1 & 0b00010000),
+            'lower_total_voltage_protect': bool(protect_state_1 & 0b00001000),
+            'above_total_voltage_protect': bool(protect_state_1 & 0b00000100),
+            'lower_cell_voltage_protect': bool(protect_state_1 & 0b00000010),
+            'above_cell_voltage_protect': bool(protect_state_1 & 0b00000001),
+        }
+        index += 1
+
+        # Detailed interpretation for Protect State 2 based on Char A.20
+        protect_state_2 = warnstate_bytes[index]
+        pack_info['protect_state_2'] = {
+            'fully_protect': bool(protect_state_2 & 0b10000000),
+            'lower_env_temperature_protect': bool(protect_state_2 & 0b01000000),
+            'above_env_temperature_protect': bool(protect_state_2 & 0b00100000),
+            'above_MOS_temperature_protect': bool(protect_state_2 & 0b00010000),
+            'lower_discharge_temperature_protect': bool(protect_state_2 & 0b00001000),
+            'lower_charge_temperature_protect': bool(protect_state_2 & 0b00000100),
+            'above_discharge_temperature_protect': bool(protect_state_2 & 0b00000010),
+            'above_charge_temperature_protect': bool(protect_state_2 & 0b00000001),
+        }
+        index += 1
+
+        # Detailed interpretation for Warn State 1 based on Char A.24
+        warn_state_1 = warnstate_bytes[index]
+        pack_info['warn_state_1'] = {
+            'discharge_current_warn': bool(warn_state_1 & 0b00100000),
+            'charge_current_warn': bool(warn_state_1 & 0b00010000),
+            'lower_total_voltage_warn': bool(warn_state_1 & 0b00001000),
+            'above_total_voltage_warn': bool(warn_state_1 & 0b00000100),
+            'lower_cell_voltage_warn': bool(warn_state_1 & 0b00000010),
+            'above_cell_voltage_warn': bool(warn_state_1 & 0b00000001),
+        }
+        index += 1
+
+        # Detailed interpretation for Warn State 2 based on Char A.25
+        warn_state_2 = warnstate_bytes[index]
+        pack_info['warn_state_2'] = {
+            'low_power_warn': bool(warn_state_2 & 0b10000000),
+            'high_MOS_temperature_warn': bool(warn_state_2 & 0b01000000),
+            'low_env_temperature_warn': bool(warn_state_2 & 0b00100000),
+            'high_env_temperature_warn': bool(warn_state_2 & 0b00010000),
+            'low_discharge_temperature_warn': bool(warn_state_2 & 0b00001000),
+            'low_charge_temperature_warn': bool(warn_state_2 & 0b00000100),
+            'above_discharge_temperature_warn': bool(warn_state_2 & 0b00000010),
+            'above_charge_temperature_warn': bool(warn_state_2 & 0b00000001),
+        }
+        index += 1
+
+        packs_info.append(pack_info)
+
+    return packs_info
+
+
+
 def parse_warning_data(data):
-    """
-    Parses the warning data received from the BMS.
-    
-    Parameters:
-    data (str): The raw data string received from the BMS.
-    
-    Returns:
-    dict: Parsed warning information.
-    """
-    fields = data.split()
-    warnings = {
-        'over_voltage': fields[0],
-        'under_voltage': fields[1],
-        'over_temperature': fields[2],
-        'under_temperature': fields[3],
-        'over_current': fields[4],
-        'short_circuit': fields[5],
-        'communication_error': fields[6]
-    }
-    return warnings
+    datainfo = extract_datainfo(data)
+    infoflag, warnstate = extract_warnstate(data)
+    packs_info = parse_warnstate(warnstate)
+
+    packs_data = []
+    for pack in packs_info:
+        pack_data = {
+            'cell_number': pack['cell_number'],
+            'cell_voltage_warnings': pack['cell_voltage_warnings'],
+            'temp_sensor_number': pack['temp_sensor_number'],
+            'temp_sensor_warnings': pack['temp_sensor_warnings'],
+            'charge_current_warn': pack['charge_current_warn'],
+            'total_voltage_warn': pack['total_voltage_warn'],
+            'discharge_current_warn': pack['discharge_current_warn'],
+            'protect_state_1': pack['protect_state_1'],
+            'protect_state_2': pack['protect_state_2'],
+            'warn_state_1': pack['warn_state_1'],
+            'warn_state_2': pack['warn_state_2']
+        }
+        packs_data.append(pack_data)
+
+    return packs_data
+
+
+
+
 
 def parse_capacity_data(data):
     """
@@ -467,19 +730,28 @@ def get_analog_data(bms_connection, pack_number=None):
     
     try:
         # Generate request
+        print(f"Trying to prepare analog request")
         request = generate_bms_request("analog",pack_number)
+        print(f"Analog request: {request}")
         
         # Send request to BMS
+        print(f"Trying to send analog request")
         if not send_data_to_bms(bms_connection, request):
             return None
-        
+        print(f"Analog request sent")
+
         # Receive response from BMS
+        print(f"Trying to receive analog data")
         response = receive_data_from_bms(bms_connection)
         if response is None:
             return None
+        print(f"Analog data recieved: {response}")
         
         # Parse analog data from response
+        print(f"Trying to parse analog data")
         analog_data = parse_analog_data(response)
+        print(f"Analog data parsed: {analog_data}")
+
         return analog_data
 
     except Exception as e:
@@ -487,23 +759,33 @@ def get_analog_data(bms_connection, pack_number=None):
         return None
 
 
+
 def get_warning_data(bms_connection, pack_number=None):
     
     try:
         # Generate request
-        request = generate_bms_request("warning",pack_number)
+        print(f"Trying to prepare warning request")
+        request = generate_bms_request("warning_info",pack_number)
+        print(f"warning request: {request}")
         
         # Send request to BMS
+        print(f"Trying to send analog request")
         if not send_data_to_bms(bms_connection, request):
             return None
+        print(f"warning request sent")
         
         # Receive response from BMS
+        print(f"Trying to receive warning data")
         response = receive_data_from_bms(bms_connection)
+        print(f"warning data recieved: {response}")
         if response is None:
             return None
         
         # Parse analog data from response
+        print(f"Trying to parse warning data")
         warning_data = parse_warning_data(response)
+        print(f"warning data parsed: {analog_data}")
+
         return warning_data
 
     except Exception as e:
@@ -513,10 +795,9 @@ def get_warning_data(bms_connection, pack_number=None):
 
 
 def get_capacity_data(bms_connection, pack_number=None):
-    
     try:
         # Generate request
-        request = generate_bms_request("capacity",pack_number)
+        request = generate_bms_request("capacity", pack_number)
         
         # Send request to BMS
         if not send_data_to_bms(bms_connection, request):
@@ -527,10 +808,10 @@ def get_capacity_data(bms_connection, pack_number=None):
         if response is None:
             return None
         
-        # Parse analog data from response
+        # Parse capacity data from response
         capacity_data = parse_capacity_data(response)
         return capacity_data
-
+    
     except Exception as e:
         print(f"An error occurred: {e}")
         return None
@@ -555,7 +836,6 @@ def get_time_date_data(bms_connection, pack_number=None):
         # Parse analog data from response
         time_date_data = parse_time_date_data(response)
         return time_date_data
-
     except Exception as e:
         print(f"An error occurred: {e}")
         return None
@@ -580,12 +860,11 @@ def get_product_info_data(bms_connection, pack_number=None):
         # Parse analog data from response
         product_info_data = parse_product_info_data(response)
         return product_info_data
-
     except Exception as e:
         print(f"An error occurred: {e}")
         return None
 
-        
+
 
 def publish_data_to_mqtt(mqtt_base_topic, packs_data):
     for pack_index, pack_data in enumerate(packs_data):
@@ -603,8 +882,16 @@ def publish_data_to_mqtt(mqtt_base_topic, packs_data):
 
 
 def run():
+
+    print(f"interface: {interface}")
+    print(f"serial_port: {serial_port}")
+    print(f"baud_rate: {baud_rate}")
+    print(f"ethernet_ip: {ethernet_ip}")
+    print(f"ethernet_port: {ethernet_port}")
+
     # Connect to BMS
     bms_connection = connect_to_bms(interface, serial_port, baud_rate, ethernet_ip, ethernet_port)
+    
     if bms_connection is None:
         return
     
