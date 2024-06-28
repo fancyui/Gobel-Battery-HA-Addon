@@ -784,7 +784,7 @@ def get_warning_data(bms_connection, pack_number=None):
         # Parse analog data from response
         print(f"Trying to parse warning data")
         warning_data = parse_warning_data(response)
-        print(f"warning data parsed: {analog_data}")
+        print(f"warning data parsed: {warning_data}")
 
         return warning_data
 
