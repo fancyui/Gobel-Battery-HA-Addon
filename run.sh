@@ -3,4 +3,4 @@ set -e
 
 echo "Pace BMS Monitor Starting..."
 
-python3 -u /bms.py
+python3 -u /bms_script.py
