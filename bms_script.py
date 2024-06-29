@@ -880,6 +880,25 @@ def publish_data_to_mqtt(mqtt_base_topic, packs_data):
 
             publish_to_mqtt(field_topic, value_str)
 
+def ha_discovery(client, data_payload):
+
+    print("Publishing HA Discovery topic...")
+
+    device = {
+        'manufacturer': "Gobel",
+        'model': "GP200",
+        'identifiers': "Gobel-GP200",
+        'name': "GP200",
+        'sw_version': 1.1
+    }
+
+    combined_payload = [ {**data, 'device': device} for data in data_payload]
+
+    # Convert the payload to JSON string
+    json_payload = json.dumps(combined_payload)
+
+    # Publish the JSON payload to the MQTT topic
+    client.publish(config['mqtt_ha_discovery_topic'] + "/sensor/BMSconfig", json_payload, qos=0, retain=True)
 
 def run():
 
@@ -911,8 +930,9 @@ def run():
                 initial_data_fetched = True  # Set the flag to True after fetching initial data
             
             # Fetch analog and warning data every 5 seconds
-            get_analog_data(bms_connection, pack_number=None)
-            get_warning_data(bms_connection, pack_number=None)
+            analog_data = get_analog_data(bms_connection, pack_number=None)
+            warning_data = get_warning_data(bms_connection, pack_number=None)
+            ha_discovery(mqtt_client, warning_data)
             time.sleep(5)  # Sleep for 5 seconds between each iteration
 
     except KeyboardInterrupt:
