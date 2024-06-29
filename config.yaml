@@ -1,7 +1,8 @@
-name: "test8"
-description: "My first real add-on!"
-version: "1.2.4"
-slug: "hello_world"
+name: "Pace BMS Monitor"
+description: "Pace BMS Monitor"
+version: "1.1.46"
+slug: "pace_bms_monitr"
+url: "https://github.com/fancyui/HomeAssistant-PaceBMS"
 init: false
 arch:
   - aarch64
@@ -13,20 +14,33 @@ arch:
 uart: true
 usb: true
 
-boot: "auto"
 options:
-  serial_port: "/dev/ttyUSB0"
-  baud_rate: 9600
+  mqtt_broker: homeassistant.local
+  mqtt_port: 1883
+  mqtt_username: gobel
+  mqtt_password: "123456"
+  mqtt_ha_discovery: true
+  mqtt_ha_discovery_topic: "homeassistant"
+  mqtt_base_topic: "bmspace"
+  connection_type: ""
+  bms_ip_address: "10.0.0.5"
+  bms_ip_port: 9999
+  bms_usb_port: "/dev/ttyUSB0"
+  bms_baud_rate: 115200
+  data_refresh_interval: 5
+  debug_output: 0
 schema:
-  serial_port: "str"
-  baud_rate: "int"
-
-mqtt:
-  broker: localhost
-  username: gobel
-  password: 123456
-
-sensor:
-  - platform: mqtt
-    name: "BMS Raw Data"
-    state_topic: "homeassistant/sensor/bms_raw"
+  mqtt_broker: str
+  mqtt_port: int
+  mqtt_username: str
+  mqtt_password: str
+  mqtt_ha_discovery: bool
+  mqtt_ha_discovery_topic: str
+  mqtt_base_topic: str
+  connection_type: list(ethernet|wifi|serial)
+  bms_ip_address: str
+  bms_ip_port: int
+  bms_usb_port: str
+  bms_baud_rate: int
+  data_refresh_interval: int
+  debug_output: int
