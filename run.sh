@@ -1,4 +1,6 @@
 #!/usr/bin/with-contenv bashio
+set -e
 
-echo "Hello world!"
-python /bms_script.py
+echo "Hello BMS Pace"
+
+python3 -u /bms.py
