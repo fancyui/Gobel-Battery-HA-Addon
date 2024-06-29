@@ -1,6 +1,6 @@
 #!/usr/bin/with-contenv bashio
 set -e
 
-echo "Hello BMS Pace"
+echo "Pace BMS Monitor Starting..."
 
 python3 -u /bms.py
