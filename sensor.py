@@ -173,33 +173,6 @@ def receive_data_from_bms(bms_connection):
         return None
 
 
-
-
-
-def lchksum_calc(lenid):
-    try:
-        chksum = sum(int(chr(lenid[element]), 16) for element in range(len(lenid))) % 16
-        chksum_bin = '{0:04b}'.format(chksum)
-        flip_bits = ''.join('1' if b == '0' else '0' for b in chksum_bin)
-        chksum = (int(flip_bits, 2) + 1) % 16
-        return format(chksum, 'X')
-    except Exception as e:
-        print(f"Error calculating LCHKSUM using LENID: {lenid}")
-        print(f"Error details: {str(e)}")
-        return False
-
-def chksum_calc(data):
-    try:
-        chksum = sum(data[element] for element in range(1, len(data))) % 65536
-        chksum_bin = '{0:016b}'.format(chksum)
-        flip_bits = ''.join('1' if b == '0' else '0' for b in chksum_bin)
-        chksum = format(int(flip_bits, 2) + 1, 'X')
-        return chksum
-    except Exception as e:
-        print(f"Error calculating CHKSUM using data: {data}")
-        print(f"Error details: {str(e)}")
-        return False
-
 def publish_data_to_mqtt(mqtt_base_topic, packs_data):
     for pack_index, pack_data in enumerate(packs_data):
         pack_topic = f"{mqtt_base_topic}/pack_{pack_index}"  # Secondary topic for each pack's data
