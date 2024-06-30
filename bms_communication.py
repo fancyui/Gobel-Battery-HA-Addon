@@ -56,7 +56,7 @@ class BMSCommunication:
             print(f"Error sending data to BMS: {e}")
             return False
 
-    def receive_data(self):
+    def receive_data(self,buffer_size):
         try:
             # Check if the connection is a serial connection
             if hasattr(self.bms_connection, 'readline'):
@@ -64,7 +64,7 @@ class BMSCommunication:
             # Check if the connection is a socket (Ethernet)
             elif hasattr(self.bms_connection, 'recv'):
                 # Assuming a buffer size of 1024 bytes for demonstration purposes
-                received_data = self.bms_connection.recv(1024).decode().strip()
+                received_data = self.bms_connection.recv(buffer_size).decode().strip()
             else:
                 raise ValueError("Unsupported connection type")
 
