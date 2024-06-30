@@ -1,3 +1,5 @@
+from bms_communication import send_data_to_bms, receive_data_from_bms
+
 def lchksum_calc(lenid):
     try:
         chksum = sum(int(chr(lenid[element]), 16) for element in range(len(lenid))) % 16
