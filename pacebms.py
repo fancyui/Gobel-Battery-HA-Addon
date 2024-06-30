@@ -2,8 +2,8 @@ import struct
 
 class PACEBMS:
 
-    def __init__(self,BMSComm):
-        self.BMSComm = BMSComm
+    def __init__(self,bms_comm):
+        self.BMSComm = bms_comm
 
     def lchksum_calc(self, lenid):
         try:
@@ -546,13 +546,13 @@ class PACEBMS:
             
             # Send request to BMS
             print(f"Trying to send analog request")
-            if not self.BMSComm.send_data(request):
+            if not self.bms_comm.send_data(request):
                 return None
             print(f"Analog request sent")
     
             # Receive response from BMS
             print(f"Trying to receive analog data")
-            response = self.BMSComm.receive_data()
+            response = self.bms_comm.receive_data()
             if response is None:
                 return None
             print(f"Analog data recieved: {response}")
@@ -580,13 +580,13 @@ class PACEBMS:
             
             # Send request to BMS
             print(f"Trying to send analog request")
-            if not self.BMSComm.send_data(request):
+            if not self.bms_comm.send_data(request):
                 return None
             print(f"warning request sent")
             
             # Receive response from BMS
             print(f"Trying to receive warning data")
-            response = self.BMSComm.receive_data()
+            response = self.bms_comm.receive_data()
             print(f"warning data recieved: {response}")
             if response is None:
                 return None
