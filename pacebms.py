@@ -2,7 +2,8 @@ import struct
 
 class PACEBMS:
 
-    def __init__(self):
+    def __init__(self,BMSComm):
+        self.BMSComm = BMSComm
 
     def lchksum_calc(self, lenid):
         try:
@@ -535,30 +536,30 @@ class PACEBMS:
     
     
     
-    def get_analog_data(bms_connection, pack_number=None):
+    def get_analog_data(self, pack_number=None):
         
         try:
             # Generate request
             print(f"Trying to prepare analog request")
-            request = generate_bms_request("analog",pack_number)
+            request = self.generate_bms_request("analog",pack_number)
             print(f"Analog request: {request}")
             
             # Send request to BMS
             print(f"Trying to send analog request")
-            if not send_data_to_bms(bms_connection, request):
+            if not self.BMSComm.send_data(request):
                 return None
             print(f"Analog request sent")
     
             # Receive response from BMS
             print(f"Trying to receive analog data")
-            response = receive_data_from_bms(bms_connection)
+            response = self.BMSComm.receive_data()
             if response is None:
                 return None
             print(f"Analog data recieved: {response}")
             
             # Parse analog data from response
             print(f"Trying to parse analog data")
-            analog_data = parse_analog_data(response)
+            analog_data = self.parse_analog_data(response)
             print(f"Analog data parsed: {analog_data}")
     
             return analog_data
@@ -569,30 +570,30 @@ class PACEBMS:
     
     
     
-    def get_warning_data(bms_connection, pack_number=None):
+    def get_warning_data(self, pack_number=None):
         
         try:
             # Generate request
             print(f"Trying to prepare warning request")
-            request = generate_bms_request("warning_info",pack_number)
+            request = self.generate_bms_request("warning_info",pack_number)
             print(f"warning request: {request}")
             
             # Send request to BMS
             print(f"Trying to send analog request")
-            if not send_data_to_bms(bms_connection, request):
+            if not self.BMSComm.send_data(request):
                 return None
             print(f"warning request sent")
             
             # Receive response from BMS
             print(f"Trying to receive warning data")
-            response = receive_data_from_bms(bms_connection)
+            response = self.BMSComm.receive_data()
             print(f"warning data recieved: {response}")
             if response is None:
                 return None
             
             # Parse analog data from response
             print(f"Trying to parse warning data")
-            warning_data = parse_warning_data(response)
+            warning_data = self.parse_warning_data(response)
             print(f"warning data parsed: {warning_data}")
     
             return warning_data
