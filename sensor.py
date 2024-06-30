@@ -153,7 +153,7 @@ def run():
     BMSComm = BMSCommunication(interface, serial_port, baud_rate, ethernet_ip, ethernet_port, buffer_size)
     BMSComm.connect()
     
-    if bms_connection is None:
+    if BMSComm is None:
         return
 
     bms = PACEBMS(BMSComm)
