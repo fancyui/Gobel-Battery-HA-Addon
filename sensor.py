@@ -6,7 +6,8 @@ import json
 import sys
 import logging
 import requests
-import pacebms
+from bms_communication import BMSCommunication
+from pacebms import PACEBMS
 
 
 
