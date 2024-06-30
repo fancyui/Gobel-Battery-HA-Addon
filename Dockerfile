@@ -21,9 +21,8 @@ WORKDIR /data
 
 # Copy data for add-on
 COPY run.sh /
-COPY bms.py /
+COPY bms_script.py /
 COPY config.yaml /
-COPY constants.py /
 RUN chmod +x /run.sh
 
 # Set the default command
