@@ -1,3 +1,5 @@
+import serial
+import socket
 
 def connect_to_bms(interface='serial', serial_port=None, baud_rate=None, ethernet_ip=None, ethernet_port=None):
     if interface == 'serial' and serial_port and baud_rate:
