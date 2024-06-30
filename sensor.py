@@ -44,6 +44,7 @@ mqtt_enable_discovery = config.get('mqtt_enable_discovery')
 mqtt_discovery_topic = config.get('mqtt_discovery_topic')
 mqtt_base_topic = config.get('mqtt_base_topic')
 interface = config.get('connection_type')
+bms_brand = config.get('bms_brand')
 ethernet_ip = config.get('bms_ip_address')
 ethernet_port = config.get('bms_ip_port')
 serial_port = config.get('bms_usb_port')
@@ -148,10 +149,13 @@ def run():
     print(f"ethernet_port: {ethernet_port}")
 
     # Connect to BMS
-    bms_connection = connect_to_bms(interface, serial_port, baud_rate, ethernet_ip, ethernet_port)
+    bms_connection = BMSCommunication(interface, serial_port, baud_rate, ethernet_ip, ethernet_port, buffer_size)
+    bms_connection.connect()
     
     if bms_connection is None:
         return
+
+    bms = PACEBMS(bms_connection)
     
     # Connect to MQTT
     mqtt_client = setup_mqtt_client()
@@ -163,19 +167,19 @@ def run():
         while True:  # Run continuously
             if not initial_data_fetched:
                 # Get initial data
-                pacebms.get_capacity_data(bms_connection, pack_number=None)
-                pacebms.get_time_date_data(bms_connection, pack_number=None)
-                pacebms.get_product_info_data(bms_connection, pack_number=None)
+                bms.get_capacity_data(pack_number=None)
+                bms.get_time_date_data(pack_number=None)
+                bms.get_product_info_data(pack_number=None)
                 initial_data_fetched = True  # Set the flag to True after fetching initial data
             
             # Fetch analog and warning data every 5 seconds
-            analog_data = pacebms.get_analog_data(bms_connection, pack_number=None)
-            warning_data = pacebms.get_warning_data(bms_connection, pack_number=None)
-            analog_topic = 'pacebms/analog'
+            analog_data = bms.get_analog_data(pack_number=None)
+            warning_data = bms.get_warning_data(pack_number=None)
+            analog_topic = f"{bms_brand}/analog"
             analog_topic = f"{mqtt_base_topic}/{analog_topic}"
             mqtt_client.publish(analog_topic, json.dumps(analog_data))
             print('analog data published to mqtt')
-            warning_topic = 'pacebms/warning'
+            warning_topic = f"{bms_brand}/warning"
             warning_topic = f"{mqtt_base_topic}/{warning_topic}"
             mqtt_client.publish(warning_topic, json.dumps(warning_data))
             print('warning data published to mqtt')
