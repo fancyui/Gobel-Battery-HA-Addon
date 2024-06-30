@@ -2,12 +2,13 @@ import serial
 import socket
 
 class BMSCommunication:
-    def __init__(self, interface='serial', serial_port=None, baud_rate=None, ethernet_ip=None, ethernet_port=None):
+    def __init__(self, interface='serial', serial_port=None, baud_rate=None, ethernet_ip=None, ethernet_port=None,buffer_size=1024):
         self.interface = interface
         self.serial_port = serial_port
         self.baud_rate = baud_rate
         self.ethernet_ip = ethernet_ip
         self.ethernet_port = ethernet_port
+        self.buffer_size = buffer_size
         self.bms_connection = None
 
     def connect(self):
@@ -56,7 +57,7 @@ class BMSCommunication:
             print(f"Error sending data to BMS: {e}")
             return False
 
-    def receive_data(self,buffer_size):
+    def receive_data(self):
         try:
             # Check if the connection is a serial connection
             if hasattr(self.bms_connection, 'readline'):
@@ -64,7 +65,7 @@ class BMSCommunication:
             # Check if the connection is a socket (Ethernet)
             elif hasattr(self.bms_connection, 'recv'):
                 # Assuming a buffer size of 1024 bytes for demonstration purposes
-                received_data = self.bms_connection.recv(buffer_size).decode().strip()
+                received_data = self.bms_connection.recv(self.buffer_size).decode().strip()
             else:
                 raise ValueError("Unsupported connection type")
 
