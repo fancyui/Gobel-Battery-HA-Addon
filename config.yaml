@@ -21,8 +21,9 @@ options:
   mqtt_password: "123456"
   mqtt_ha_discovery: true
   mqtt_ha_discovery_topic: "homeassistant"
-  mqtt_base_topic: "bmspace"
+  mqtt_base_topic: "gobel"
   connection_type: ""
+  bms_brand: "PACE"
   bms_ip_address: "10.0.0.5"
   bms_ip_port: 9999
   bms_usb_port: "/dev/ttyUSB0"
@@ -38,6 +39,7 @@ schema:
   mqtt_ha_discovery_topic: str
   mqtt_base_topic: str
   connection_type: list(ethernet|wifi|serial)
+  bms_brand: list(PACE|JK-ESS|RN200)
   bms_ip_address: str
   bms_ip_port: int
   bms_usb_port: str
