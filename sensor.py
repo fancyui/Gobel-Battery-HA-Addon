@@ -1,5 +1,3 @@
-import serial
-import socket
 import struct
 import paho.mqtt.client as mqtt
 import time
