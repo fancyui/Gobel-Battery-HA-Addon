@@ -150,13 +150,13 @@ def run():
     print(f"ethernet_port: {ethernet_port}")
 
     # Connect to BMS
-    bms_connection = BMSCommunication(interface, serial_port, baud_rate, ethernet_ip, ethernet_port, buffer_size)
-    bms_connection.connect()
+    BMSComm = BMSCommunication(interface, serial_port, baud_rate, ethernet_ip, ethernet_port, buffer_size)
+    BMSComm.connect()
     
     if bms_connection is None:
         return
 
-    bms = PACEBMS(bms_connection)
+    bms = PACEBMS(BMSComm)
     
     # Connect to MQTT
     mqtt_client = setup_mqtt_client()
