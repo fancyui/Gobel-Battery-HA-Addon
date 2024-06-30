@@ -21,7 +21,8 @@ WORKDIR /data
 
 # Copy data for add-on
 COPY run.sh /
-COPY bms_script.py /
+COPY sensor.py /
+COPY pacebms.py /
 COPY config.yaml /
 RUN chmod +x /run.sh
 
