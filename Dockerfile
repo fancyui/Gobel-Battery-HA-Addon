@@ -23,6 +23,7 @@ WORKDIR /data
 COPY run.sh /
 COPY sensor.py /
 COPY pacebms.py /
+COPY bms_communication.py /
 COPY config.yaml /
 RUN chmod +x /run.sh
 

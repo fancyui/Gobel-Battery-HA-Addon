@@ -1,8 +1,8 @@
-name: "Pace BMS Monitor"
-description: "Pace BMS Monitor"
-version: "1.1.46"
-slug: "pace_bms_monitr"
-url: "https://github.com/fancyui/HomeAssistant-PaceBMS"
+name: "Gobel Pace BMS Monitor"
+description: "Gobel Pace BMS Monitor"
+version: "1.0.0"
+slug: "gobel_pace_bms_monitr"
+url: "https://github.com/fancyui/HomeAssistant-PaceBMS-Addon"
 init: false
 arch:
   - aarch64
