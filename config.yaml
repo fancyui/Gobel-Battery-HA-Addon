@@ -1,9 +1,11 @@
 name: "Gobel Pace BMS Monitor"
 description: "Gobel Pace BMS Monitor"
-version: "1.0.25"
+version: "1.0.27"
 slug: "gobel_pace_bms_monitr"
 url: "https://20.205.243.166/fancyui/HomeAssistant-PaceBMS-Addon"
 init: false
+homeassistant_api: true
+
 arch:
   - aarch64
   - amd64

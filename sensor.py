@@ -53,15 +53,23 @@ data_refresh_interval = config.get('data_refresh_interval')
 long_lived_access_token = config.get('long_lived_access_token')
 debug_output = config.get('debug_output')
 
+device_info = {
+    "identifiers": ["unique_device_id"],
+    "name": "Battery Pack Monitor",
+    "manufacturer": "Your Manufacturer",
+    "model": "Your Model",
+    "sw_version": "1.0"
+}
+
 
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
         global mqtt_connected
         mqtt_connected = True
-        client.will_set(mqtt_base_topic + "/availability","online", qos=0, retain=False)
+        client.will_set(base_topic + "/availability","online", qos=0, retain=False)
         print(f"Connected to MQTT Broker: {mqtt_broker}:{mqtt_port}")
     else:
-        client.will_set(mqtt_base_topic + "/availability","offline", qos=0, retain=True)
+        client.will_set(base_topic + "/availability","offline", qos=0, retain=True)
         print(f"Failed to connect to MQTT Broker: {mqtt_broker}. Error code: {rc}")
 
 
@@ -179,7 +187,7 @@ def run():
             # mqtt_client.publish(warning_topic, json.dumps(warning_data))
             # print('warning data published to mqtt')
 
-            time.sleep(5)  # Sleep for 5 seconds between each iteration
+            time.sleep(data_refresh_interval)  # Sleep for 5 seconds between each iteration
 
     except KeyboardInterrupt:
         print("Stopping the program...")
