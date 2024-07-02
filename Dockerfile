@@ -7,13 +7,14 @@ RUN apk update && apk add --no-cache \
     py3-pip \
     py3-pyserial \
     py3-paho-mqtt \
+    py3-requests \
     build-base
 
 
 # RUN apk update && apk add --no-cache libyaml build-base
 
 # Copy requirements.txt and install Python dependencies
-COPY requirements.txt /tmp/
+# COPY requirements.txt /tmp/
 # RUN pip3 install --no-cache-dir -r /tmp/requirements.txt
 
 # Set working directory to our add-on persistent data directory
@@ -24,6 +25,7 @@ COPY run.sh /
 COPY sensor.py /
 COPY pacebms.py /
 COPY bms_communication.py /
+COPY ha_rest_api.py /
 COPY config.yaml /
 RUN chmod +x /run.sh
 

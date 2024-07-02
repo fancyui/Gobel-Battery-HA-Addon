@@ -1,8 +1,8 @@
 name: "Gobel Pace BMS Monitor"
 description: "Gobel Pace BMS Monitor"
-version: "1.0.0"
+version: "1.0.25"
 slug: "gobel_pace_bms_monitr"
-url: "https://github.com/fancyui/HomeAssistant-PaceBMS-Addon"
+url: "https://20.205.243.166/fancyui/HomeAssistant-PaceBMS-Addon"
 init: false
 arch:
   - aarch64
@@ -21,7 +21,7 @@ options:
   mqtt_password: "123456"
   mqtt_ha_discovery: true
   mqtt_ha_discovery_topic: "homeassistant"
-  mqtt_base_topic: "gobel"
+  base_topic: "gobel"
   connection_type: ""
   bms_brand: "PACE"
   bms_ip_address: "10.0.0.5"
@@ -29,6 +29,7 @@ options:
   bms_usb_port: "/dev/ttyUSB0"
   bms_baud_rate: 115200
   data_refresh_interval: 5
+  long_lived_access_token: ""
   debug_output: 0
 schema:
   mqtt_broker: str
@@ -37,7 +38,7 @@ schema:
   mqtt_password: str
   mqtt_ha_discovery: bool
   mqtt_ha_discovery_topic: str
-  mqtt_base_topic: str
+  base_topic: str
   connection_type: list(ethernet|wifi|serial)
   bms_brand: list(PACE|JK-ESS|RN200)
   bms_ip_address: str
@@ -45,4 +46,5 @@ schema:
   bms_usb_port: str
   bms_baud_rate: int
   data_refresh_interval: int
+  long_lived_access_token: password
   debug_output: int

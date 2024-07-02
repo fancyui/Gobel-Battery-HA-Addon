@@ -1,13 +1,12 @@
-import struct
 import paho.mqtt.client as mqtt
 import time
 import os
 import json
 import sys
 import logging
-import requests
 from bms_communication import BMSCommunication
 from pacebms import PACEBMS
+from ha_rest_api import HA_REST_API
 
 
 
@@ -35,7 +34,7 @@ def load_config():
 config = load_config()
 
 
-socket_buffer_size = 1024
+buffer_size = 1024
 # Accessing the parameters
 mqtt_broker = config.get('mqtt_broker')
 mqtt_port = config.get('mqtt_port')
@@ -43,7 +42,7 @@ mqtt_username = config.get('mqtt_username')
 mqtt_password = config.get('mqtt_password')
 mqtt_enable_discovery = config.get('mqtt_enable_discovery')
 mqtt_discovery_topic = config.get('mqtt_discovery_topic')
-mqtt_base_topic = config.get('mqtt_base_topic')
+base_topic = config.get('base_topic')
 interface = config.get('connection_type')
 bms_brand = config.get('bms_brand')
 ethernet_ip = config.get('bms_ip_address')
@@ -53,17 +52,6 @@ baud_rate = config.get('bms_baud_rate')
 data_refresh_interval = config.get('data_refresh_interval')
 long_lived_access_token = config.get('long_lived_access_token')
 debug_output = config.get('debug_output')
-
-
-url = "http://homeassistant.local:8123/api/states/sensor.kitchen_temperature"
-headers = {
-    "Authorization": f"Bearer {long_lived_access_token}",
-    "content-type": "application/json",
-}
-data = {"state": "125", "attributes": {"unit_of_measurement": "°C"}}
-response = post(url, headers=headers, json=data)
-
-print(response.text)
 
 
 def on_connect(client, userdata, flags, rc):
@@ -100,7 +88,7 @@ def send_data_to_mqtt(data):
     client.connect(mqtt_broker, mqtt_port, 60)
     client.loop_start()
 
-    client.publish(mqtt_base_topic, data)
+    client.publish(base_topic, data)
     print(f"Data sent to MQTT Broker: {data}")
 
     client.loop_stop()
@@ -149,6 +137,10 @@ def run():
     print(f"ethernet_ip: {ethernet_ip}")
     print(f"ethernet_port: {ethernet_port}")
 
+
+    # Connect to MQTT
+    mqtt_client = setup_mqtt_client()
+    mqtt_client.loop_start()
     # Connect to BMS
     bms_comm = BMSCommunication(interface, serial_port, baud_rate, ethernet_ip, ethernet_port, buffer_size)
 
@@ -156,11 +148,12 @@ def run():
         print("Connection failed")
         return
 
-    bms = PACEBMS(bms_comm)
+    # Connect to HA_REST_API
+    ha_rest_api = HA_REST_API(long_lived_access_token)
+
+    bms = PACEBMS(bms_comm, ha_rest_api, base_topic)
     
-    # Connect to MQTT
-    mqtt_client = setup_mqtt_client()
-    mqtt_client.loop_start()
+
 
     initial_data_fetched = False  # Flag to track if initial data has been fetched
 
@@ -175,15 +168,17 @@ def run():
             
             # Fetch analog and warning data every 5 seconds
             analog_data = bms.get_analog_data(pack_number=None)
-            warning_data = bms.get_warning_data(pack_number=None)
-            analog_topic = f"{bms_brand}/analog"
-            analog_topic = f"{mqtt_base_topic}/{analog_topic}"
-            mqtt_client.publish(analog_topic, json.dumps(analog_data))
-            print('analog data published to mqtt')
-            warning_topic = f"{bms_brand}/warning"
-            warning_topic = f"{mqtt_base_topic}/{warning_topic}"
-            mqtt_client.publish(warning_topic, json.dumps(warning_data))
-            print('warning data published to mqtt')
+            bms.publish_analog_data()
+            # warning_data = bms.get_warning_data(pack_number=None)
+            # analog_topic = f"{bms_brand}/analog"
+            # analog_topic = f"{base_topic}/{analog_topic}"
+            # mqtt_client.publish(analog_topic, json.dumps(analog_data))
+            # print('analog data published to mqtt')
+            # warning_topic = f"{bms_brand}/warning"
+            # warning_topic = f"{base_topic}/{warning_topic}"
+            # mqtt_client.publish(warning_topic, json.dumps(warning_data))
+            # print('warning data published to mqtt')
+
             time.sleep(5)  # Sleep for 5 seconds between each iteration
 
     except KeyboardInterrupt:

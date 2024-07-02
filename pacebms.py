@@ -2,8 +2,10 @@ import struct
 
 class PACEBMS:
 
-    def __init__(self,bms_comm):
-        self.BMSComm = bms_comm
+    def __init__(self, bms_comm, ha_rest_api, base_topic):
+        self.bms_comm = bms_comm
+        self.ha_rest_api = ha_rest_api
+        self.base_topic = base_topic
 
     def lchksum_calc(self, lenid):
         try:
@@ -65,7 +67,7 @@ class PACEBMS:
         
         LENID =  lenids_table[command]
         
-        LCHKSUM = lchksum_calc(LENID)
+        LCHKSUM = self.lchksum_calc(LENID)
     
         if LCHKSUM is False:
             return None
@@ -73,7 +75,7 @@ class PACEBMS:
         request += LCHKSUM.encode('ascii') + LENID + info
         
     
-        CHKSUM = chksum_calc(request)
+        CHKSUM = self.chksum_calc(request)
         if CHKSUM is False:
             return None
     
@@ -160,19 +162,16 @@ class PACEBMS:
     
         # Extract the length of the data information
         length = int(fields[4] + fields[5], 16)
-        print(f"Data length: {length}")
     
         # Start parsing the data information
         offset = 6  # Start after fixed header fields
     
         # INFOFLAG
         infoflag = int(fields[offset], 16)
-        print(f"INFOFLAG: {infoflag}")
         offset += 1
     
         # Number of packs
         num_packs = int(fields[offset], 16)
-        print(f"Number of packs: {num_packs}")
         offset += 1
     
         for pack_index in range(num_packs):
@@ -180,7 +179,6 @@ class PACEBMS:
     
             # Number of cells
             num_cells = int(fields[offset], 16)
-            print(f"Pack {pack_index + 1} - Number of cells: {num_cells}")
             offset += 1
             pack_data['num_cells'] = num_cells
     
@@ -188,14 +186,12 @@ class PACEBMS:
             cell_voltages = []
             for cell_index in range(num_cells):
                 voltage = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for voltage
-                print(f"Pack {pack_index + 1} - Cell {cell_index + 1} voltage: {voltage}")
                 cell_voltages.append(voltage)
                 offset += 2
             pack_data['cell_voltages'] = cell_voltages
     
             # Number of temperature sensors
             num_temps = int(fields[offset], 16)
-            print(f"Pack {pack_index + 1} - Number of temperature sensors: {num_temps}")
             offset += 1
             pack_data['num_temps'] = num_temps
     
@@ -204,7 +200,6 @@ class PACEBMS:
             for temp_index in range(num_temps):
                 temperature = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for temperature
                 temperature = round(temperature / 10 - 273.15, 2)  # Convert tenths of degrees Kelvin to degrees Celsius
-                print(f"Pack {pack_index + 1} - Temperature sensor {temp_index + 1} temperature: {temperature}")
                 temperatures.append(temperature)
                 offset += 2
             pack_data['temperatures'] = temperatures
@@ -214,46 +209,39 @@ class PACEBMS:
             pack_current = round(pack_current / 100, 2)  # Convert 10mA to A
             if pack_current > 32767:
                 pack_current -= 65536
-            print(f"Pack {pack_index + 1} - Pack current: {pack_current}")
             offset += 2
             pack_data['pack_current'] = pack_current
     
             # Pack total voltage
             pack_total_voltage = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for total voltage
             pack_total_voltage = round(pack_total_voltage / 1000, 2)  # Convert mV to V
-            print(f"Pack {pack_index + 1} - Pack total voltage: {pack_total_voltage}")
             offset += 2
             pack_data['pack_total_voltage'] = pack_total_voltage
     
             # Pack remain capacity
             pack_remain_capacity = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for remaining capacity
             pack_remain_capacity = round(pack_remain_capacity / 100, 2)  # Convert 10mAH to AH
-            print(f"Pack {pack_index + 1} - Pack remaining capacity: {pack_remain_capacity}")
             offset += 2
             pack_data['pack_remain_capacity'] = pack_remain_capacity
     
             # Define number P
             define_number_p = int(fields[offset], 16)
-            print(f"Pack {pack_index + 1} - Define number P: {define_number_p}")
             offset += 1
     
             # Pack full capacity
             pack_full_capacity = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for full capacity
             pack_full_capacity = round(pack_full_capacity / 100, 2)  # Convert 10mAH to AH
-            print(f"Pack {pack_index + 1} - Pack full capacity: {pack_full_capacity}")
             offset += 2
             pack_data['pack_full_capacity'] = pack_full_capacity
     
             # Cycle number
             cycle_number = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for cycle number
-            print(f"Pack {pack_index + 1} - Cycle number: {cycle_number}")
             offset += 2
             pack_data['cycle_number'] = cycle_number
     
             # Pack design capacity
             pack_design_capacity = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for design capacity
             pack_design_capacity = round(pack_design_capacity / 100, 2)  # Convert 10mAH to AH
-            print(f"Pack {pack_index + 1} - Pack design capacity: {pack_design_capacity}")
             offset += 2
             pack_data['pack_design_capacity'] = pack_design_capacity
     
@@ -333,7 +321,7 @@ class PACEBMS:
             cell_voltage_warnings = []
             for _ in range(cell_number):
                 cell_voltage_warn = warnstate_bytes[index]
-                cell_voltage_warnings.append(interpret_warning(cell_voltage_warn))
+                cell_voltage_warnings.append(self.interpret_warning(cell_voltage_warn))
                 index += 1
             pack_info['cell_voltage_warnings'] = cell_voltage_warnings
     
@@ -346,20 +334,20 @@ class PACEBMS:
             temp_sensor_warnings = []
             for _ in range(temp_sensor_number):
                 temp_sensor_warn = warnstate_bytes[index]
-                temp_sensor_warnings.append(interpret_warning(temp_sensor_warn))
+                temp_sensor_warnings.append(self.interpret_warning(temp_sensor_warn))
                 index += 1
             pack_info['temp_sensor_warnings'] = temp_sensor_warnings
     
             # Parse 5. PACK charge current warning
-            pack_info['charge_current_warn'] = interpret_warning(warnstate_bytes[index])
+            pack_info['charge_current_warn'] = self.interpret_warning(warnstate_bytes[index])
             index += 1
     
             # Parse 6. PACK total voltage warning
-            pack_info['total_voltage_warn'] = interpret_warning(warnstate_bytes[index])
+            pack_info['total_voltage_warn'] = self.interpret_warning(warnstate_bytes[index])
             index += 1
     
             # Parse 7. PACK discharge current warning
-            pack_info['discharge_current_warn'] = interpret_warning(warnstate_bytes[index])
+            pack_info['discharge_current_warn'] = self.interpret_warning(warnstate_bytes[index])
             index += 1
     
             # Detailed interpretation for Protect State 1 based on Char A.19
@@ -422,8 +410,8 @@ class PACEBMS:
     
     
     def parse_warning_data(self, data):
-        infoflag, warnstate = extract_warnstate(data)
-        packs_info = parse_warnstate(warnstate)
+        infoflag, warnstate = self.extract_warnstate(data)
+        packs_info = self.parse_warnstate(warnstate)
     
         packs_data = []
         for pack in packs_info:
@@ -540,27 +528,20 @@ class PACEBMS:
         
         try:
             # Generate request
-            print(f"Trying to prepare analog request")
             request = self.generate_bms_request("analog",pack_number)
-            print(f"Analog request: {request}")
             
             # Send request to BMS
-            print(f"Trying to send analog request")
             if not self.bms_comm.send_data(request):
                 return None
-            print(f"Analog request sent")
     
             # Receive response from BMS
-            print(f"Trying to receive analog data")
             response = self.bms_comm.receive_data()
             if response is None:
                 return None
-            print(f"Analog data recieved: {response}")
             
             # Parse analog data from response
-            print(f"Trying to parse analog data")
+
             analog_data = self.parse_analog_data(response)
-            print(f"Analog data parsed: {analog_data}")
     
             return analog_data
     
@@ -673,3 +654,35 @@ class PACEBMS:
         except Exception as e:
             print(f"An error occurred: {e}")
             return None
+
+    def publish_analog_data(self, pack_number=None):
+
+        analog_data = self.get_analog_data(pack_number)
+
+        total_packs_num = len(analog_data)
+        self.ha_rest_api.publish_data(total_packs_num, 'packs', f"{self.base_topic}.total_packs_num")
+        import random
+        random_number = random.randint(1, 100)
+        self.ha_rest_api.publish_data(random_number, 'p', f"{self.base_topic}.random")
+        pack_i = 0
+
+        for pack in analog_data:
+            pack_i = pack_i + 1
+            for key, value in pack.items():
+                if key == 'cell_voltages':
+                    cell_i = 0
+                    for cell_voltage in value:
+                        cell_i = cell_i + 1
+                        self.ha_rest_api.publish_data(cell_voltage, 'mV', f"{self.base_topic}.pack_{pack_i:02}_cell_voltage_{cell_i:02}")
+                        
+                elif key == 'temperatures':
+                    temperature_i = 0
+                    for temperature in value:
+                        temperature_i = temperature_i + 1
+                        self.ha_rest_api.publish_data(temperature, '℃', f"{self.base_topic}.pack_{pack_i:02}_temperature_{temperature_i:02}")
+                        
+                else:
+                    self.ha_rest_api.publish_data(value, 'V', f"{self.base_topic}.pack_{pack_i:02}_{key}")
+
+
+
