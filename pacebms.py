@@ -2,10 +2,9 @@ import struct
 
 class PACEBMS:
 
-    def __init__(self, bms_comm, ha_rest_api, base_topic):
+    def __init__(self, bms_comm, ha_comm):
         self.bms_comm = bms_comm
-        self.ha_rest_api = ha_rest_api
-        self.base_topic = base_topic
+        self.ha_comm = ha_comm
 
     def lchksum_calc(self, lenid):
         try:
@@ -654,7 +653,7 @@ class PACEBMS:
             print(f"An error occurred: {e}")
             return None
 
-    def publish_analog_data(self, pack_number=None):
+    def publish_analog_data_api(self, pack_number=None):
 
         units = {
             'num_cells': 'cells',
@@ -672,23 +671,23 @@ class PACEBMS:
         analog_data = self.get_analog_data(pack_number)
 
         total_packs_num = len(analog_data)
-        self.ha_rest_api.publish_data(total_packs_num, 'packs', f"{self.base_topic}.total_packs_num")
+        self.ha_comm.publish_data(total_packs_num, 'packs', f"{self.base_topic}.total_packs_num")
 
         total_pack_full_capacity = round(sum(d.get('pack_full_capacity', 0) for d in analog_data),2)
-        self.ha_rest_api.publish_data(total_pack_full_capacity, 'Ah', f"{self.base_topic}.total_pack_full_capacity")
+        self.ha_comm.publish_data(total_pack_full_capacity, 'Ah', f"{self.base_topic}.total_pack_full_capacity")
 
         total_pack_remain_capacity = round(sum(d.get('pack_remain_capacity', 0) for d in analog_data),2)
-        self.ha_rest_api.publish_data(total_pack_remain_capacity, 'Ah', f"{self.base_topic}.total_pack_remain_capacity")
+        self.ha_comm.publish_data(total_pack_remain_capacity, 'Ah', f"{self.base_topic}.total_pack_remain_capacity")
 
         total_pack_current = round(sum(d.get('pack_current', 0) for d in analog_data),2)
-        self.ha_rest_api.publish_data(total_pack_current, 'A', f"{self.base_topic}.total_pack_current")
+        self.ha_comm.publish_data(total_pack_current, 'A', f"{self.base_topic}.total_pack_current")
 
         total_soc = round(total_pack_remain_capacity / total_pack_full_capacity * 100, 1) 
-        self.ha_rest_api.publish_data(total_soc, '%', f"{self.base_topic}.total_soc")
+        self.ha_comm.publish_data(total_soc, '%', f"{self.base_topic}.total_soc")
 
         import random
         random_number = random.randint(1, 100)
-        self.ha_rest_api.publish_data(random_number, 'p', f"{self.base_topic}.random")
+        self.ha_comm.publish_data(random_number, 'p', f"{self.base_topic}.random")
 
         pack_i = 0
 
@@ -700,14 +699,99 @@ class PACEBMS:
                     cell_i = 0
                     for cell_voltage in value:
                         cell_i = cell_i + 1
-                        self.ha_rest_api.publish_data(cell_voltage, unit, f"{self.base_topic}.pack_{pack_i:02}_cell_voltage_{cell_i:02}")
+                        self.ha_comm.publish_data(cell_voltage, unit, f"{self.base_topic}.pack_{pack_i:02}_cell_voltage_{cell_i:02}")
                         
                 elif key == 'temperatures':
                     temperature_i = 0
                     for temperature in value:
                         temperature_i = temperature_i + 1
-                        self.ha_rest_api.publish_data(temperature, unit, f"{self.base_topic}.pack_{pack_i:02}_temperature_{temperature_i:02}")
+                        self.ha_comm.publish_data(temperature, unit, f"{self.base_topic}.pack_{pack_i:02}_temperature_{temperature_i:02}")
                         
                 else:
-                    self.ha_rest_api.publish_data(value, unit, f"{self.base_topic}.pack_{pack_i:02}_{key}")
+                    self.ha_comm.publish_data(value, unit, f"{self.base_topic}.pack_{pack_i:02}_{key}")
+
+
+    def publish_analog_data_mqtt(self, pack_number=None):
+
+        units = {
+            'num_cells': 'cells',
+            'cell_voltages': 'mV',
+            'num_temps': 'NTCs',
+            'temperatures': '℃',
+            'pack_current': 'A',
+            'pack_total_voltage': 'V',
+            'pack_remain_capacity': 'Ah',
+            'pack_full_capacity': 'Ah',
+            'cycle_number': 'cycles',
+            'pack_design_capacity': 'Ah',
+        }
+
+        dclasses = {
+            'num_cells': 'data_size',
+            'cell_voltages': 'voltage',
+            'num_temps': 'data_size',
+            'temperatures': 'temperature',
+            'pack_current': 'current',
+            'pack_total_voltage': 'voltage',
+            'pack_remain_capacity': 'energy_storage',
+            'pack_full_capacity': 'energy_storage',
+            'cycle_number': 'data_size',
+            'pack_design_capacity': 'energy_storage',
+        }
+
+        analog_data = self.get_analog_data(pack_number)
+
+        total_packs_num = len(analog_data)
+        self.ha_comm.publish_data(total_packs_num, 'packs', "total_packs_num")
+        self.ha_comm.publish_discovery("total_packs_num", "packs", "data_size")
+
+        total_pack_full_capacity = round(sum(d.get('pack_full_capacity', 0) for d in analog_data),2)
+        self.ha_comm.publish_data(total_pack_full_capacity, 'Ah', "total_pack_full_capacity")
+        self.ha_comm.publish_discovery("total_pack_full_capacity", "Ah", "energy_storage")
+
+        total_pack_remain_capacity = round(sum(d.get('pack_remain_capacity', 0) for d in analog_data),2)
+        self.ha_comm.publish_data(total_pack_remain_capacity, 'Ah', "total_pack_remain_capacity")
+        self.ha_comm.publish_discovery("total_pack_remain_capacity", "Ah", "energy_storage")
+
+        total_pack_current = round(sum(d.get('pack_current', 0) for d in analog_data),2)
+        self.ha_comm.publish_data(total_pack_current, 'A', "total_pack_current")
+        self.ha_comm.publish_discovery("total_pack_current", "A", "current")
+
+        total_soc = round(total_pack_remain_capacity / total_pack_full_capacity * 100, 1) 
+        self.ha_comm.publish_data(total_soc, '%', "total_soc")
+        self.ha_comm.publish_discovery("total_soc", "%", "battery")
+
+        # import random
+        # random_number = random.randint(1, 100)
+        # self.ha_comm.publish_data(random_number, 'p', "random")
+        # self.ha_comm.publish_discovery("random", "p", "current")
+
+        pack_i = 0
+
+        for pack in analog_data:
+            pack_i = pack_i + 1
+            for key, value in pack.items():
+                unit = units.get(key, '')
+                dclass = dclasses.get(key, '')
+                if key == 'cell_voltages':
+                    cell_i = 0
+                    for cell_voltage in value:
+                        cell_i = cell_i + 1
+                        self.ha_comm.publish_data(cell_voltage, unit, f"pack_{pack_i:02}_cell_voltage_{cell_i:02}")
+                        self.ha_comm.publish_discovery(f"pack_{pack_i:02}_cell_voltage_{cell_i:02}", unit, dclass)
+                        
+                elif key == 'temperatures':
+                    temperature_i = 0
+                    for temperature in value:
+                        temperature_i = temperature_i + 1
+                        self.ha_comm.publish_data(temperature, unit, f"pack_{pack_i:02}_temperature_{temperature_i:02}")
+                        self.ha_comm.publish_discovery(f"pack_{pack_i:02}_temperature_{temperature_i:02}", unit, dclass)
+                        
+                else:
+                    self.ha_comm.publish_data(value, unit, f"pack_{pack_i:02}_{key}")
+                    self.ha_comm.publish_discovery(f"pack_{pack_i:02}_{key}", unit, dclass)
+
+
+
+
 

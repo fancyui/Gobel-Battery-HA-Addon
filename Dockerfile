@@ -26,6 +26,7 @@ COPY sensor.py /
 COPY pacebms.py /
 COPY bms_communication.py /
 COPY ha_rest_api.py /
+COPY ha_mqtt.py /
 COPY config.yaml /
 RUN chmod +x /run.sh
 

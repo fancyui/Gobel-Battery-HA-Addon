@@ -1,6 +1,6 @@
 name: "Gobel Pace BMS Monitor"
 description: "Gobel Pace BMS Monitor"
-version: "1.0.27"
+version: "1.0.51"
 slug: "gobel_pace_bms_monitr"
 url: "https://20.205.243.166/fancyui/HomeAssistant-PaceBMS-Addon"
 init: false
@@ -23,7 +23,7 @@ options:
   mqtt_password: "123456"
   mqtt_ha_discovery: true
   mqtt_ha_discovery_topic: "homeassistant"
-  base_topic: "gobel"
+  base_topic: "sensor"
   connection_type: ""
   bms_brand: "PACE"
   bms_ip_address: "10.0.0.5"

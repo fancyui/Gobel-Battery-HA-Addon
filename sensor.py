@@ -7,7 +7,7 @@ import logging
 from bms_communication import BMSCommunication
 from pacebms import PACEBMS
 from ha_rest_api import HA_REST_API
-
+from ha_mqtt import HA_MQTT
 
 
 # Define the load_config function
@@ -54,10 +54,10 @@ long_lived_access_token = config.get('long_lived_access_token')
 debug_output = config.get('debug_output')
 
 device_info = {
-    "identifiers": ["unique_device_id"],
+    "identifiers": "gobel_power_battery_2",
     "name": "Battery Pack Monitor",
-    "manufacturer": "Your Manufacturer",
-    "model": "Your Model",
+    "manufacturer": "Gobel Power",
+    "model": "GP-SR1-PC200",
     "sw_version": "1.0"
 }
 
@@ -147,21 +147,24 @@ def run():
 
 
     # Connect to MQTT
-    mqtt_client = setup_mqtt_client()
+    # mqtt_client = setup_mqtt_client()
+    # Connect to HA_REST_API
+    # ha_comm = HA_REST_API(long_lived_access_token)
+    ha_comm = HA_MQTT(mqtt_broker, mqtt_port, mqtt_username, mqtt_password, base_topic, device_info)
+    mqtt_client = ha_comm.connect()
+    if not mqtt_client:
+        print("HA Connection failed")
+        return
     mqtt_client.loop_start()
+
     # Connect to BMS
     bms_comm = BMSCommunication(interface, serial_port, baud_rate, ethernet_ip, ethernet_port, buffer_size)
 
     if not bms_comm.connect():
-        print("Connection failed")
+        print("BMS Connection failed")
         return
 
-    # Connect to HA_REST_API
-    ha_rest_api = HA_REST_API(long_lived_access_token)
-
-    bms = PACEBMS(bms_comm, ha_rest_api, base_topic)
-    
-
+    bms = PACEBMS(bms_comm, ha_comm)
 
     initial_data_fetched = False  # Flag to track if initial data has been fetched
 
@@ -169,14 +172,14 @@ def run():
         while True:  # Run continuously
             if not initial_data_fetched:
                 # Get initial data
-                bms.get_capacity_data(pack_number=None)
-                bms.get_time_date_data(pack_number=None)
-                bms.get_product_info_data(pack_number=None)
+                # bms.get_capacity_data(pack_number=None)
+                # bms.get_time_date_data(pack_number=None)
+                # bms.get_product_info_data(pack_number=None)
                 initial_data_fetched = True  # Set the flag to True after fetching initial data
             
             # Fetch analog and warning data every 5 seconds
             analog_data = bms.get_analog_data(pack_number=None)
-            bms.publish_analog_data()
+            bms.publish_analog_data_mqtt()
             # warning_data = bms.get_warning_data(pack_number=None)
             # analog_topic = f"{bms_brand}/analog"
             # analog_topic = f"{base_topic}/{analog_topic}"
