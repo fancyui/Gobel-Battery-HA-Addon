@@ -178,17 +178,8 @@ def run():
                 initial_data_fetched = True  # Set the flag to True after fetching initial data
             
             # Fetch analog and warning data every 5 seconds
-            analog_data = bms.get_analog_data(pack_number=None)
             bms.publish_analog_data_mqtt()
-            # warning_data = bms.get_warning_data(pack_number=None)
-            # analog_topic = f"{bms_brand}/analog"
-            # analog_topic = f"{base_topic}/{analog_topic}"
-            # mqtt_client.publish(analog_topic, json.dumps(analog_data))
-            # print('analog data published to mqtt')
-            # warning_topic = f"{bms_brand}/warning"
-            # warning_topic = f"{base_topic}/{warning_topic}"
-            # mqtt_client.publish(warning_topic, json.dumps(warning_data))
-            # print('warning data published to mqtt')
+            bms.publish_warning_data_mqtt()
 
             time.sleep(data_refresh_interval)  # Sleep for 5 seconds between each iteration
 

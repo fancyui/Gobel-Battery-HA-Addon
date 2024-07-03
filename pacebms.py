@@ -742,24 +742,24 @@ class PACEBMS:
         analog_data = self.get_analog_data(pack_number)
 
         total_packs_num = len(analog_data)
-        self.ha_comm.publish_data(total_packs_num, 'packs', "total_packs_num")
-        self.ha_comm.publish_discovery("total_packs_num", "packs", "data_size")
+        self.ha_comm.publish_sensor_state(total_packs_num, 'packs', "total_packs_num")
+        self.ha_comm.publish_sensor_discovery("total_packs_num", "packs", "data_size")
 
         total_pack_full_capacity = round(sum(d.get('pack_full_capacity', 0) for d in analog_data),2)
-        self.ha_comm.publish_data(total_pack_full_capacity, 'Ah', "total_pack_full_capacity")
-        self.ha_comm.publish_discovery("total_pack_full_capacity", "Ah", "energy_storage")
+        self.ha_comm.publish_sensor_state(total_pack_full_capacity, 'Ah', "total_pack_full_capacity")
+        self.ha_comm.publish_sensor_discovery("total_pack_full_capacity", "Ah", "energy_storage")
 
         total_pack_remain_capacity = round(sum(d.get('pack_remain_capacity', 0) for d in analog_data),2)
-        self.ha_comm.publish_data(total_pack_remain_capacity, 'Ah', "total_pack_remain_capacity")
-        self.ha_comm.publish_discovery("total_pack_remain_capacity", "Ah", "energy_storage")
+        self.ha_comm.publish_sensor_state(total_pack_remain_capacity, 'Ah', "total_pack_remain_capacity")
+        self.ha_comm.publish_sensor_discovery("total_pack_remain_capacity", "Ah", "energy_storage")
 
         total_pack_current = round(sum(d.get('pack_current', 0) for d in analog_data),2)
-        self.ha_comm.publish_data(total_pack_current, 'A', "total_pack_current")
-        self.ha_comm.publish_discovery("total_pack_current", "A", "current")
+        self.ha_comm.publish_sensor_state(total_pack_current, 'A', "total_pack_current")
+        self.ha_comm.publish_sensor_discovery("total_pack_current", "A", "current")
 
         total_soc = round(total_pack_remain_capacity / total_pack_full_capacity * 100, 1) 
-        self.ha_comm.publish_data(total_soc, '%', "total_soc")
-        self.ha_comm.publish_discovery("total_soc", "%", "battery")
+        self.ha_comm.publish_sensor_state(total_soc, '%', "total_soc")
+        self.ha_comm.publish_sensor_discovery("total_soc", "%", "battery")
 
         # import random
         # random_number = random.randint(1, 100)
@@ -777,19 +777,80 @@ class PACEBMS:
                     cell_i = 0
                     for cell_voltage in value:
                         cell_i = cell_i + 1
-                        self.ha_comm.publish_data(cell_voltage, unit, f"pack_{pack_i:02}_cell_voltage_{cell_i:02}")
-                        self.ha_comm.publish_discovery(f"pack_{pack_i:02}_cell_voltage_{cell_i:02}", unit, dclass)
+                        self.ha_comm.publish_sensor_state(cell_voltage, unit, f"pack_{pack_i:02}_cell_voltage_{cell_i:02}")
+                        self.ha_comm.publish_sensor_discovery(f"pack_{pack_i:02}_cell_voltage_{cell_i:02}", unit, dclass)
                         
                 elif key == 'temperatures':
                     temperature_i = 0
                     for temperature in value:
                         temperature_i = temperature_i + 1
-                        self.ha_comm.publish_data(temperature, unit, f"pack_{pack_i:02}_temperature_{temperature_i:02}")
-                        self.ha_comm.publish_discovery(f"pack_{pack_i:02}_temperature_{temperature_i:02}", unit, dclass)
+                        self.ha_comm.publish_sensor_state(temperature, unit, f"pack_{pack_i:02}_temperature_{temperature_i:02}")
+                        self.ha_comm.publish_sensor_discovery(f"pack_{pack_i:02}_temperature_{temperature_i:02}", unit, dclass)
                         
                 else:
-                    self.ha_comm.publish_data(value, unit, f"pack_{pack_i:02}_{key}")
-                    self.ha_comm.publish_discovery(f"pack_{pack_i:02}_{key}", unit, dclass)
+                    self.ha_comm.publish_sensor_state(value, unit, f"pack_{pack_i:02}_{key}")
+                    self.ha_comm.publish_sensor_discovery(f"pack_{pack_i:02}_{key}", unit, dclass)
+
+
+    def publish_warning_data_mqtt(self, pack_number=None):
+
+        warn_data = self.get_warning_data(pack_number)
+
+        total_packs_num = len(warn_data)
+
+        pack_i = 0
+
+        for pack in warn_data:
+            pack_i = pack_i + 1
+            print(f"pack_{pack_i:02}: {pack_i}")
+            for key, value in pack.items():
+                unit = None
+                dclass = None
+                if key == 'cell_voltage_warnings':
+                    cell_i = 0
+                    icon = "mdi:battery-heart-variant"
+                    for cell_voltage_warning in value:
+                        cell_i = cell_i + 1
+                        # print(f"{base_topic}.pack_{pack_i:02}_cell_voltage_warning_{cell_i:02}: {cell_voltage_warning}")
+                        self.ha_comm.publish_warn_state(cell_voltage_warning, f"pack_{pack_i:02}_cell_voltage_warning_{cell_i:02}")
+                        self.ha_comm.publish_warn_discovery(f"pack_{pack_i:02}_cell_voltage_warning_{cell_i:02}",icon)
+                elif key == 'temp_sensor_warnings':
+                    temp_i = 0
+                    icon = "mdi:battery-heart-variant"
+                    for temp_sensor_warning in value:
+                        temp_i = temp_i + 1
+                        # print(f"{base_topic}.pack_{pack_i:02}_temp_sensor_warning_{temp_i:02}: {temp_sensor_warning}")
+                        self.ha_comm.publish_warn_state(temp_sensor_warning, f"pack_{pack_i:02}_temperature_warning_{temp_i:02}")
+                        self.ha_comm.publish_warn_discovery(f"pack_{pack_i:02}_temperature_warning_{temp_i:02}",icon)
+                elif key == 'protect_state_1':
+                    icon = "mdi:battery-alert"
+                    for sub_key, sub_value in value.items():
+                        # print(f"{base_topic}.pack_{pack_i:02}_{sub_key}: {sub_value}")
+                        self.ha_comm.publish_binary_sensor_state(sub_value, f"pack_{pack_i:02}_{sub_key}")
+                        self.ha_comm.publish_binary_sensor_discovery(f"pack_{pack_i:02}_{sub_key}",icon)
+                elif key == 'protect_state_2':
+                    icon = "mdi:battery-alert"
+                    for sub_key, sub_value in value.items():
+                        # print(f"{base_topic}.pack_{pack_i:02}_{sub_key}: {sub_value}")
+                        self.ha_comm.publish_binary_sensor_state(sub_value, f"pack_{pack_i:02}_{sub_key}")
+                        self.ha_comm.publish_binary_sensor_discovery(f"pack_{pack_i:02}_{sub_key}",icon)
+                elif key == 'warn_state_1':
+                    icon = "mdi:battery-heart-variant"
+                    for sub_key, sub_value in value.items():
+                        # print(f"{base_topic}.pack_{pack_i:02}_{sub_key}: {sub_value}")
+                        self.ha_comm.publish_binary_sensor_state(sub_value, f"pack_{pack_i:02}_{sub_key}")
+                        self.ha_comm.publish_binary_sensor_discovery(f"pack_{pack_i:02}_{sub_key}",icon)
+                elif key == 'warn_state_2':
+                    icon = "mdi:battery-heart-variant"
+                    for sub_key, sub_value in value.items():
+                        # print(f"{base_topic}.pack_{pack_i:02}_{sub_key}: {sub_value}")
+                        self.ha_comm.publish_binary_sensor_state(sub_value, f"pack_{pack_i:02}_{sub_key}")
+                        self.ha_comm.publish_binary_sensor_discovery(f"pack_{pack_i:02}_{sub_key}",icon)
+                elif key not in ['cell_number', 'temp_sensor_number']:
+                    icon = "mdi:battery-heart-variant"
+                    # print(f"{base_topic}.pack_{pack_i:02}_{key}: {value}")
+                    self.ha_comm.publish_warn_state(value, f"pack_{pack_i:02}_{key}")
+                    self.ha_comm.publish_warn_discovery(f"pack_{pack_i:02}_{key}",icon)
 
 
 

@@ -30,13 +30,14 @@ class HA_MQTT:
             self.logger.error(f"Failed to connect to MQTT broker: {e}")
         return self.mqtt_client
 
-    def publish_discovery(self, entity_id, unit, device_class=None):
-        topic = f"homeassistant/{self.base_topic}/gobel_{entity_id}/config"
+    def publish_sensor_discovery(self, entity_id, unit, device_class):
+        main_topic = 'sensor'
+        topic = f"homeassistant/{main_topic}/{self.base_topic}_{entity_id}/config"
         self.logger.debug(f"Publishing discovery to topic: {topic}")
         payload = {
             "name": " ".join(word.capitalize() for word in entity_id.split("_")),
-            "state_topic": f"{self.base_topic}/gobel_{entity_id}/state",
-            "unique_id": f"gobel_{entity_id}",
+            "state_topic": f"{main_topic}/{self.base_topic}_{entity_id}/state",
+            "unique_id": f"{self.base_topic}_{entity_id}",
             "unit_of_measurement": unit,
             "device_class": device_class,
             "value_template": "{{ value_json.state }}",
@@ -49,8 +50,9 @@ class HA_MQTT:
         except Exception as e:
             self.logger.error(f"Failed to publish discovery for {topic}: {e}")
 
-    def publish_data(self, value, unit, entity_id):
-        topic = f"{self.base_topic}/gobel_{entity_id}/state"
+    def publish_sensor_state(self, value, unit, entity_id):
+        main_topic = 'sensor'
+        topic = f"{main_topic}/{self.base_topic}_{entity_id}/state"
         self.logger.debug(f"Publishing data to topic: {topic}")
         payload = {
             "state": value,
@@ -62,4 +64,120 @@ class HA_MQTT:
             self.logger.info(f"Published data for {topic}")
         except Exception as e:
             self.logger.error(f"Failed to publish data for {topic}: {e}")
+
+    def publish_event_discovery(self, entity_id):
+        main_topic = 'event'
+        topic = f"homeassistant/{main_topic}/{self.base_topic}_{entity_id}/config"
+        self.logger.debug(f"Publishing discovery to topic: {topic}")
+        payload = {
+            "name": " ".join(word.capitalize() for word in entity_id.split("_")),
+            "state_topic": f"{main_topic}/{self.base_topic}_{entity_id}/state",
+            "unique_id": f"{self.base_topic}_{entity_id}",
+            "event_types": ["normal", 
+                            "below lower limit", 
+                            "above upper limit", 
+                            "other fault", 
+                            "unknown"
+                            ],
+            "icon":  "mdi:battery-heart-variant",
+            "device": self.device_info
+        }
+        self.logger.debug(f"Discovery payload: {json.dumps(payload)}")
+        try:
+            self.mqtt_client.publish(topic, json.dumps(payload), retain=True)
+            self.logger.info(f"Published discovery for {topic}")
+        except Exception as e:
+            self.logger.error(f"Failed to publish discovery for {topic}: {e}")
+
+
+    def publish_event_state(self, value, entity_id):
+        main_topic = 'event'
+        topic = f"{main_topic}/{self.base_topic}_{entity_id}/state"
+        self.logger.debug(f"Publishing data to topic: {topic}")
+        payload = {
+            "event_type": value
+        }
+        self.logger.debug(f"Data payload: {json.dumps(payload)}")
+        try:
+            self.mqtt_client.publish(topic, json.dumps(payload))
+            self.logger.info(f"Published data for {topic}")
+        except Exception as e:
+            self.logger.error(f"Failed to publish data for {topic}: {e}")
+
+    def publish_binary_sensor_discovery(self, entity_id, icon):
+        main_topic = 'binary_sensor'
+        topic = f"homeassistant/{main_topic}/{self.base_topic}_{entity_id}/config"
+        self.logger.debug(f"Publishing discovery to topic: {topic}")
+        payload = {
+            "name": " ".join(word.capitalize() for word in entity_id.split("_")),
+            "state_topic": f"{main_topic}/{self.base_topic}_{entity_id}/state",
+            "unique_id": f"{self.base_topic}_{entity_id}",
+            "payload_on": True,
+            "payload_off": False,
+            "icon": icon,
+            "value_template": "{{ value_json.state }}",
+            "device": self.device_info
+        }
+        self.logger.debug(f"Discovery payload: {json.dumps(payload)}")
+        try:
+            self.mqtt_client.publish(topic, json.dumps(payload), retain=True)
+            self.logger.info(f"Published discovery for {topic}")
+        except Exception as e:
+            self.logger.error(f"Failed to publish discovery for {topic}: {e}")
+
+
+    def publish_binary_sensor_state(self, value, entity_id):
+        main_topic = 'binary_sensor'
+        topic = f"{main_topic}/{self.base_topic}_{entity_id}/state"
+        self.logger.debug(f"Publishing data to topic: {topic}")
+        payload = {
+            "state": value
+        }
+        self.logger.debug(f"Data payload: {json.dumps(payload)}")
+        try:
+            self.mqtt_client.publish(topic, json.dumps(payload))
+            self.logger.info(f"Published data for {topic}")
+        except Exception as e:
+            self.logger.error(f"Failed to publish data for {topic}: {e}")
+
+
+    def publish_warn_discovery(self, entity_id, icon):
+        main_topic = 'sensor'
+        topic = f"homeassistant/{main_topic}/{self.base_topic}_{entity_id}/config"
+        self.logger.debug(f"Publishing discovery to topic: {topic}")
+        payload = {
+            "name": " ".join(word.capitalize() for word in entity_id.split("_")),
+            "state_topic": f"{main_topic}/{self.base_topic}_{entity_id}/state",
+            "unique_id": f"{self.base_topic}_{entity_id}",
+            "icon": icon,
+            "value_template": "{{ value_json.state }}",
+            "device": self.device_info
+        }
+        self.logger.debug(f"Discovery payload: {json.dumps(payload)}")
+        try:
+            self.mqtt_client.publish(topic, json.dumps(payload), retain=True)
+            self.logger.info(f"Published discovery for {topic}")
+        except Exception as e:
+            self.logger.error(f"Failed to publish discovery for {topic}: {e}")
+
+
+    def publish_warn_state(self, value, entity_id):
+        main_topic = 'sensor'
+        topic = f"{main_topic}/{self.base_topic}_{entity_id}/state"
+        self.logger.debug(f"Publishing data to topic: {topic}")
+
+        payload = {
+            "state": value,
+        }
+
+        self.logger.debug(f"Data payload: {json.dumps(payload)}")
+        try:
+            self.mqtt_client.publish(topic, json.dumps(payload))
+            self.logger.info(f"Published data for {topic}")
+        except Exception as e:
+            self.logger.error(f"Failed to publish data for {topic}: {e}")
+
+
+
+
 
