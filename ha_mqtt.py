@@ -34,7 +34,7 @@ class HA_MQTT:
         topic = f"homeassistant/{self.base_topic}/gobel_{entity_id}/config"
         self.logger.debug(f"Publishing discovery to topic: {topic}")
         payload = {
-            "name": entity_id,
+            "name": " ".join(word.capitalize() for word in entity_id.split("_")),
             "state_topic": f"{self.base_topic}/gobel_{entity_id}/state",
             "unique_id": f"gobel_{entity_id}",
             "unit_of_measurement": unit,

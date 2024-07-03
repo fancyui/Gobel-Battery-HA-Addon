@@ -54,8 +54,8 @@ long_lived_access_token = config.get('long_lived_access_token')
 debug_output = config.get('debug_output')
 
 device_info = {
-    "identifiers": "gobel_power_battery_2",
-    "name": "Battery Pack Monitor",
+    "identifiers": "gobel_power_battery_3",
+    "name": "Gobel Monitor",
     "manufacturer": "Gobel Power",
     "model": "GP-SR1-PC200",
     "sw_version": "1.0"
