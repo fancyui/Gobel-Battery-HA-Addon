@@ -25,7 +25,7 @@ WORKDIR /data
 COPY run.sh /
 COPY sensor.py /
 COPY pacebms.py /
-COPY bms_communication.py /
+COPY bms_comm.py /
 COPY ha_rest_api.py /
 COPY ha_mqtt.py /
 COPY config.yaml /

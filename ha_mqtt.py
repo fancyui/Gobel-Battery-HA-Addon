@@ -14,7 +14,7 @@ class HA_MQTT:
         self.mqtt_client = None
 
         # Configure logging
-        logging.basicConfig(level=logging.DEBUG if debug else logging.WARNING,
+        logging.basicConfig(level=logging.DEBUG if debug else logging.INFO,
                             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         self.logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ class HA_MQTT:
         self.logger.debug(f"Discovery payload: {json.dumps(payload)}")
         try:
             self.mqtt_client.publish(topic, json.dumps(payload), retain=True)
-            self.logger.info(f"Published discovery for {topic}")
+            self.logger.debug(f"Published discovery for {topic}")
         except Exception as e:
             self.logger.error(f"Failed to publish discovery for {topic}: {e}")
 
@@ -66,7 +66,7 @@ class HA_MQTT:
         self.logger.debug(f"Data payload: {json.dumps(payload)}")
         try:
             self.mqtt_client.publish(topic, json.dumps(payload))
-            self.logger.info(f"Published data for {topic}")
+            self.logger.debug(f"Published data for {topic}")
         except Exception as e:
             self.logger.error(f"Failed to publish data for {topic}: {e}")
 
@@ -90,7 +90,7 @@ class HA_MQTT:
         self.logger.debug(f"Discovery payload: {json.dumps(payload)}")
         try:
             self.mqtt_client.publish(topic, json.dumps(payload), retain=True)
-            self.logger.info(f"Published discovery for {topic}")
+            self.logger.debug(f"Published discovery for {topic}")
         except Exception as e:
             self.logger.error(f"Failed to publish discovery for {topic}: {e}")
 
@@ -105,7 +105,7 @@ class HA_MQTT:
         self.logger.debug(f"Data payload: {json.dumps(payload)}")
         try:
             self.mqtt_client.publish(topic, json.dumps(payload))
-            self.logger.info(f"Published data for {topic}")
+            self.logger.debug(f"Published data for {topic}")
         except Exception as e:
             self.logger.error(f"Failed to publish data for {topic}: {e}")
 
@@ -126,7 +126,7 @@ class HA_MQTT:
         self.logger.debug(f"Discovery payload: {json.dumps(payload)}")
         try:
             self.mqtt_client.publish(topic, json.dumps(payload), retain=True)
-            self.logger.info(f"Published discovery for {topic}")
+            self.logger.debug(f"Published discovery for {topic}")
         except Exception as e:
             self.logger.error(f"Failed to publish discovery for {topic}: {e}")
 
@@ -141,7 +141,7 @@ class HA_MQTT:
         self.logger.debug(f"Data payload: {json.dumps(payload)}")
         try:
             self.mqtt_client.publish(topic, json.dumps(payload))
-            self.logger.info(f"Published data for {topic}")
+            self.logger.debug(f"Published data for {topic}")
         except Exception as e:
             self.logger.error(f"Failed to publish data for {topic}: {e}")
 
@@ -161,7 +161,7 @@ class HA_MQTT:
         self.logger.debug(f"Discovery payload: {json.dumps(payload)}")
         try:
             self.mqtt_client.publish(topic, json.dumps(payload), retain=True)
-            self.logger.info(f"Published discovery for {topic}")
+            self.logger.debug(f"Published discovery for {topic}")
         except Exception as e:
             self.logger.error(f"Failed to publish discovery for {topic}: {e}")
 
@@ -178,7 +178,7 @@ class HA_MQTT:
         self.logger.debug(f"Data payload: {json.dumps(payload)}")
         try:
             self.mqtt_client.publish(topic, json.dumps(payload))
-            self.logger.info(f"Published data for {topic}")
+            self.logger.debug(f"Published data for {topic}")
         except Exception as e:
             self.logger.error(f"Failed to publish data for {topic}: {e}")
 

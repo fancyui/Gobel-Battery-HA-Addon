@@ -1,10 +1,16 @@
 import struct
+import logging
 
 class PACEBMS:
 
-    def __init__(self, bms_comm, ha_comm):
+    def __init__(self, bms_comm, ha_comm, debug):
         self.bms_comm = bms_comm
         self.ha_comm = ha_comm
+
+        # Configure logging
+        logging.basicConfig(level=logging.DEBUG if debug else logging.INFO,
+                            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        self.logger = logging.getLogger(__name__)
 
     def lchksum_calc(self, lenid):
         try:
@@ -14,8 +20,8 @@ class PACEBMS:
             chksum = (int(flip_bits, 2) + 1) % 16
             return format(chksum, 'X')
         except Exception as e:
-            print(f"Error calculating LCHKSUM using LENID: {lenid}")
-            print(f"Error details: {str(e)}")
+            self.logger.error(f"Error calculating LCHKSUM using LENID: {lenid}")
+            self.logger.error(f"Error details: {str(e)}")
             return False
     
     def chksum_calc(self, data):
@@ -26,8 +32,8 @@ class PACEBMS:
             chksum = format(int(flip_bits, 2) + 1, 'X')
             return chksum
         except Exception as e:
-            print(f"Error calculating CHKSUM using data: {data}")
-            print(f"Error details: {str(e)}")
+            self.logger.error(f"Error calculating CHKSUM using data: {data}")
+            self.logger.error(f"Error details: {str(e)}")
             return False
     
     
@@ -153,7 +159,7 @@ class PACEBMS:
         fields = [response[i:i + 2] for i in range(0, len(response), 2)]
     
         # Debug: Print the fields to verify their contents
-    
+        self.logger.debug(f"fields: {fields}")
         # Check the command and response validity
         if fields[2] != '46' or fields[3] != '00':
             raise ValueError(f"Invalid command or response code: {fields[2]} {fields[3]}")
@@ -567,25 +573,31 @@ class PACEBMS:
         
         try:
             # Generate request
+            self.logger.debug(f"Trying to prepare analog request")
             request = self.generate_bms_request("analog",pack_number)
-            
+            self.logger.debug(f"analog request: {request}")
+
             # Send request to BMS
+            self.logger.debug(f"Trying to send analog request")
             if not self.bms_comm.send_data(request):
                 return None
+            self.logger.debug(f"analog request sent")
     
             # Receive response from BMS
+            self.logger.debug(f"Trying to receive analog data")
             response = self.bms_comm.receive_data()
+            self.logger.debug(f"analog data recieved: {response}")
             if response is None:
                 return None
             
             # Parse analog data from response
-
+            self.logger.debug(f"Trying to parse analog data")
             analog_data = self.parse_analog_data(response)
-    
+            self.logger.debug(f"analog data parsed: {analog_data}")
             return analog_data
     
         except Exception as e:
-            print(f"An error occurred: {e}")
+            self.logger.error(f"An error occurred: {e}")
             return None
     
     
@@ -594,32 +606,32 @@ class PACEBMS:
         
         try:
             # Generate request
-            print(f"Trying to prepare warning request")
+            self.logger.debug(f"Trying to prepare warning request")
             request = self.generate_bms_request("warning_info",pack_number)
-            print(f"warning request: {request}")
+            self.logger.debug(f"warning request: {request}")
             
             # Send request to BMS
-            print(f"Trying to send analog request")
+            self.logger.debug(f"Trying to send warning request")
             if not self.bms_comm.send_data(request):
                 return None
-            print(f"warning request sent")
+            self.logger.debug(f"warning request sent")
             
             # Receive response from BMS
-            print(f"Trying to receive warning data")
+            self.logger.debug(f"Trying to receive warning data")
             response = self.bms_comm.receive_data()
-            print(f"warning data recieved: {response}")
+            self.logger.debug(f"warning data recieved: {response}")
             if response is None:
                 return None
             
             # Parse analog data from response
-            print(f"Trying to parse warning data")
+            self.logger.debug(f"Trying to parse warning data")
             warning_data = self.parse_warning_data(response)
-            print(f"warning data parsed: {warning_data}")
+            self.logger.debug(f"warning data parsed: {warning_data}")
     
             return warning_data
     
         except Exception as e:
-            print(f"An error occurred: {e}")
+            self.logger.error(f"An error occurred: {e}")
             return None
     
     
@@ -643,7 +655,7 @@ class PACEBMS:
             return capacity_data
         
         except Exception as e:
-            print(f"An error occurred: {e}")
+            self.logger.error(f"An error occurred: {e}")
             return None
     
     
@@ -667,7 +679,7 @@ class PACEBMS:
             time_date_data = parse_time_date_data(response)
             return time_date_data
         except Exception as e:
-            print(f"An error occurred: {e}")
+            self.logger.error(f"An error occurred: {e}")
             return None
     
     
@@ -691,7 +703,7 @@ class PACEBMS:
             product_info_data = parse_product_info_data(response)
             return product_info_data
         except Exception as e:
-            print(f"An error occurred: {e}")
+            self.logger.error(f"An error occurred: {e}")
             return None
 
     def publish_analog_data_api(self, pack_number=None):
@@ -852,7 +864,7 @@ class PACEBMS:
 
         for pack in warn_data:
             pack_i = pack_i + 1
-            print(f"pack_{pack_i:02}: {pack_i}")
+            self.logger.debug(f"pack_{pack_i:02}: {pack_i}")
             for key, value in pack.items():
                 unit = None
                 dclass = None
@@ -861,7 +873,6 @@ class PACEBMS:
                     icon = "mdi:battery-heart-variant"
                     for cell_voltage_warning in value:
                         cell_i = cell_i + 1
-                        # print(f"{base_topic}.pack_{pack_i:02}_cell_voltage_warning_{cell_i:02}: {cell_voltage_warning}")
                         self.ha_comm.publish_warn_state(cell_voltage_warning, f"pack_{pack_i:02}_cell_voltage_warning_{cell_i:02}")
                         self.ha_comm.publish_warn_discovery(f"pack_{pack_i:02}_cell_voltage_warning_{cell_i:02}",icon)
                 elif key == 'temp_sensor_warnings':
@@ -869,49 +880,41 @@ class PACEBMS:
                     icon = "mdi:battery-heart-variant"
                     for temp_sensor_warning in value:
                         temp_i = temp_i + 1
-                        # print(f"{base_topic}.pack_{pack_i:02}_temp_sensor_warning_{temp_i:02}: {temp_sensor_warning}")
                         self.ha_comm.publish_warn_state(temp_sensor_warning, f"pack_{pack_i:02}_temperature_warning_{temp_i:02}")
                         self.ha_comm.publish_warn_discovery(f"pack_{pack_i:02}_temperature_warning_{temp_i:02}",icon)
                 elif key == 'protect_state_1':
                     icon = "mdi:battery-alert"
                     for sub_key, sub_value in value.items():
-                        # print(f"{base_topic}.pack_{pack_i:02}_{sub_key}: {sub_value}")
                         self.ha_comm.publish_binary_sensor_state(sub_value, f"pack_{pack_i:02}_{sub_key}")
                         self.ha_comm.publish_binary_sensor_discovery(f"pack_{pack_i:02}_{sub_key}",icon)
                 elif key == 'protect_state_2':
                     icon = "mdi:battery-alert"
                     for sub_key, sub_value in value.items():
-                        # print(f"{base_topic}.pack_{pack_i:02}_{sub_key}: {sub_value}")
                         self.ha_comm.publish_binary_sensor_state(sub_value, f"pack_{pack_i:02}_{sub_key}")
                         self.ha_comm.publish_binary_sensor_discovery(f"pack_{pack_i:02}_{sub_key}",icon)
                 elif key == 'instruction_state':
                     icon = "mdi:battery-check"
                     for sub_key, sub_value in value.items():
-                        # print(f"{base_topic}.pack_{pack_i:02}_{sub_key}: {sub_value}")
                         self.ha_comm.publish_binary_sensor_state(sub_value, f"pack_{pack_i:02}_{sub_key}")
                         self.ha_comm.publish_binary_sensor_discovery(f"pack_{pack_i:02}_{sub_key}",icon)
                 
                 elif key == 'fault_state':
                     icon = "mdi:alert"
                     for sub_key, sub_value in value.items():
-                        # print(f"{base_topic}.pack_{pack_i:02}_{sub_key}: {sub_value}")
                         self.ha_comm.publish_binary_sensor_state(sub_value, f"pack_{pack_i:02}_{sub_key}")
                         self.ha_comm.publish_binary_sensor_discovery(f"pack_{pack_i:02}_{sub_key}",icon)
                 elif key == 'warn_state_1':
                     icon = "mdi:battery-heart-variant"
                     for sub_key, sub_value in value.items():
-                        # print(f"{base_topic}.pack_{pack_i:02}_{sub_key}: {sub_value}")
                         self.ha_comm.publish_binary_sensor_state(sub_value, f"pack_{pack_i:02}_{sub_key}")
                         self.ha_comm.publish_binary_sensor_discovery(f"pack_{pack_i:02}_{sub_key}",icon)
                 elif key == 'warn_state_2':
                     icon = "mdi:battery-heart-variant"
                     for sub_key, sub_value in value.items():
-                        # print(f"{base_topic}.pack_{pack_i:02}_{sub_key}: {sub_value}")
                         self.ha_comm.publish_binary_sensor_state(sub_value, f"pack_{pack_i:02}_{sub_key}")
                         self.ha_comm.publish_binary_sensor_discovery(f"pack_{pack_i:02}_{sub_key}",icon)
                 elif key not in ['cell_number', 'temp_sensor_number', 'control_state', 'balance_state_1', 'balance_state_2']:
                     icon = "mdi:battery-heart-variant"
-                    # print(f"{base_topic}.pack_{pack_i:02}_{key}: {value}")
                     self.ha_comm.publish_warn_state(value, f"pack_{pack_i:02}_{key}")
                     self.ha_comm.publish_warn_discovery(f"pack_{pack_i:02}_{key}",icon)
 

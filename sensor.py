@@ -4,10 +4,11 @@ import os
 import json
 import sys
 import logging
-from bms_communication import BMSCommunication
+from bms_comm import BMSCommunication
 from pacebms import PACEBMS
 from ha_rest_api import HA_REST_API
 from ha_mqtt import HA_MQTT
+
 
 
 # Define the load_config function
@@ -61,110 +62,38 @@ device_info = {
     "sw_version": "1.0"
 }
 
-
-def on_connect(client, userdata, flags, rc):
-    if rc == 0:
-        global mqtt_connected
-        mqtt_connected = True
-        client.will_set(base_topic + "/availability","online", qos=0, retain=False)
-        print(f"Connected to MQTT Broker: {mqtt_broker}:{mqtt_port}")
-    else:
-        client.will_set(base_topic + "/availability","offline", qos=0, retain=True)
-        print(f"Failed to connect to MQTT Broker: {mqtt_broker}. Error code: {rc}")
-
-
-def setup_mqtt_client():
-    client = mqtt.Client()
-    client.username_pw_set(username=mqtt_username, password=mqtt_password)
-    client.on_connect = on_connect
-    client.connect(mqtt_broker, mqtt_port, 60)
-    return client
-
-
-
-def send_data_to_mqtt(data):
-    def on_connect(client, userdata, flags, rc):
-        print(f"Connected to MQTT Broker with result code {rc}")
-
-    def on_publish(client, userdata, mid):
-        print(f"Data published to MQTT Broker with message id {mid}")
-
-    client = mqtt.Client()
-    client.on_connect = on_connect
-    client.on_publish = on_publish
-
-    client.connect(mqtt_broker, mqtt_port, 60)
-    client.loop_start()
-
-    client.publish(base_topic, data)
-    print(f"Data sent to MQTT Broker: {data}")
-
-    client.loop_stop()
-    client.disconnect()
-
-
-def publish_data_to_mqtt(mqtt_base_topic, packs_data):
-    for pack_index, pack_data in enumerate(packs_data):
-        pack_topic = f"{mqtt_base_topic}/pack_{pack_index}"  # Secondary topic for each pack's data
-
-        for key, value in pack_data.items():
-            field_topic = f"{pack_topic}/{key}"  # Topic for each field in the pack data
-
-            if isinstance(value, list):
-                value_str = ','.join(str(val) for val in value)
-            else:
-                value_str = str(value)
-
-            publish_to_mqtt(field_topic, value_str)
-
-def ha_discovery(client, data_payload):
-
-    print("Publishing HA Discovery topic...")
-
-    device = {
-        'manufacturer': "Gobel",
-        'model': "GP200",
-        'identifiers': "Gobel-GP200",
-        'name': "GP200",
-        'sw_version': 1.1
-    }
-
-    combined_payload = [ {**data, 'device': device} for data in data_payload]
-
-    # Convert the payload to JSON string
-    json_payload = json.dumps(combined_payload)
-
-    # Publish the JSON payload to the MQTT topic
-    client.publish(config['mqtt_ha_discovery_topic'] + "/sensor/BMSconfig", json_payload, qos=0, retain=True)
+# Configure logging
+logging.basicConfig(level=logging.DEBUG if debug else logging.INFO,
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 def run():
 
-    print(f"interface: {interface}")
-    print(f"serial_port: {serial_port}")
-    print(f"baud_rate: {baud_rate}")
-    print(f"ethernet_ip: {ethernet_ip}")
-    print(f"ethernet_port: {ethernet_port}")
+    logger.info(f"interface: {interface}")
+    logger.info(f"serial_port: {serial_port}")
+    logger.info(f"baud_rate: {baud_rate}")
+    logger.info(f"ethernet_ip: {ethernet_ip}")
+    logger.info(f"ethernet_port: {ethernet_port}")
 
 
-    # Connect to MQTT
-    # mqtt_client = setup_mqtt_client()
     # Connect to HA_REST_API
     # ha_comm = HA_REST_API(long_lived_access_token)
+    # Connect to HA_MQTT
     ha_comm = HA_MQTT(mqtt_broker, mqtt_port, mqtt_username, mqtt_password, base_topic, device_info, debug)
     mqtt_client = ha_comm.connect()
     if not mqtt_client:
-        print("HA Connection failed")
+        logger.info("HA Connection failed")
         return
     mqtt_client.loop_start()
 
     # Connect to BMS
-    bms_comm = BMSCommunication(interface, serial_port, baud_rate, ethernet_ip, ethernet_port, buffer_size)
+    bms_comm = BMSCommunication(interface, serial_port, baud_rate, ethernet_ip, ethernet_port, buffer_size, debug)
 
     if not bms_comm.connect():
-        print("BMS Connection failed")
+        logger.info("BMS Connection failed")
         return
 
-    bms = PACEBMS(bms_comm, ha_comm)
+    bms = PACEBMS(bms_comm, ha_comm, debug)
 
     initial_data_fetched = False  # Flag to track if initial data has been fetched
 
@@ -172,9 +101,6 @@ def run():
         while True:  # Run continuously
             if not initial_data_fetched:
                 # Get initial data
-                # bms.get_capacity_data(pack_number=None)
-                # bms.get_time_date_data(pack_number=None)
-                # bms.get_product_info_data(pack_number=None)
                 initial_data_fetched = True  # Set the flag to True after fetching initial data
             
             # Fetch analog and warning data every 5 seconds
@@ -184,7 +110,7 @@ def run():
             time.sleep(data_refresh_interval)  # Sleep for 5 seconds between each iteration
 
     except KeyboardInterrupt:
-        print("Stopping the program...")
+        logger.info("Stopping the program...")
     
     finally:
         mqtt_client.loop_stop()

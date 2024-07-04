@@ -1,8 +1,9 @@
 import serial
 import socket
+import logging
 
 class BMSCommunication:
-    def __init__(self, interface='serial', serial_port=None, baud_rate=None, ethernet_ip=None, ethernet_port=None,buffer_size=1024):
+    def __init__(self, interface='serial', serial_port=None, baud_rate=None, ethernet_ip=None, ethernet_port=None,buffer_size=1024,debug=0):
         self.interface = interface
         self.serial_port = serial_port
         self.baud_rate = baud_rate
@@ -11,29 +12,34 @@ class BMSCommunication:
         self.buffer_size = buffer_size
         self.bms_connection = None
 
+        # Configure logging
+        logging.basicConfig(level=logging.DEBUG if debug else logging.INFO,
+                            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        self.logger = logging.getLogger(__name__)
+
     def connect(self):
         if self.interface == 'serial' and self.serial_port and self.baud_rate:
             try:
-                print(f"Trying to connect {self.serial_port}:{self.baud_rate}")
+                self.logger.info(f"Trying to connect {self.serial_port}:{self.baud_rate}")
                 self.bms_connection = serial.Serial(self.serial_port, self.baud_rate, timeout=1)
-                print(f"Connected to BMS over serial port: {self.serial_port} with baud rate: {self.baud_rate}")
+                self.logger.info(f"Connected to BMS over serial port: {self.serial_port} with baud rate: {self.baud_rate}")
                 return self.bms_connection
             except serial.SerialException as e:
-                print(f"Serial connection error: {e}")
+                self.logger.error(f"Serial connection error: {e}")
                 return None
         elif self.interface == 'ethernet' and self.ethernet_ip and self.ethernet_port:
             try:
-                print(f"Trying to connect {self.ethernet_ip}:{self.ethernet_port}")
+                self.logger.info(f"Trying to connect {self.ethernet_ip}:{self.ethernet_port}")
                 self.bms_connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 self.bms_connection.settimeout(5)
                 self.bms_connection.connect((self.ethernet_ip, self.ethernet_port))
-                print(f"Connected to BMS over Ethernet: {self.ethernet_ip}:{self.ethernet_port}")
+                self.logger.info(f"Connected to BMS over Ethernet: {self.ethernet_ip}:{self.ethernet_port}")
                 return self.bms_connection
             except socket.error as e:
-                print(f"Ethernet connection error: {e}")
+                self.logger.error(f"Ethernet connection error: {e}")
                 return None
         else:
-            print("Invalid parameters or interface selection.")
+            self.logger.error("Invalid parameters or interface selection.")
             return None
 
     def send_data(self, data):
@@ -69,8 +75,8 @@ class BMSCommunication:
             else:
                 raise ValueError("Unsupported connection type")
 
-            print(f"Received data from BMS: {received_data}")
+            self.logger.info(f"Received data from BMS: {received_data}")
             return received_data
         except Exception as e:
-            print(f"Error receiving data from BMS: {e}")
+            self.logger.error(f"Error receiving data from BMS: {e}")
             return None
