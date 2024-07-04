@@ -375,6 +375,44 @@ class PACEBMS:
             }
             index += 1
     
+            instruction_state = warnstate_bytes[index]
+            pack_info['instruction_state'] = {
+                'hert_indicate': bool(instruction_state & 0b10000000),
+                'acin': bool(instruction_state & 0b00100000),
+                'reverse_indicate': bool(instruction_state & 0b00010000),
+                'pack_indicate': bool(instruction_state & 0b00001000),
+                'dfet_indicate': bool(instruction_state & 0b00000100),
+                'cfet_indicate': bool(instruction_state & 0b00000010),
+                'current_limit_indicate': bool(instruction_state & 0b00000001),
+            }
+            index += 1
+            
+            control_state = warnstate_bytes[index]
+            pack_info['control_state'] = {
+                'led_warn_function': bool(control_state & 0b00100000),
+                'current_limit_function': bool(control_state & 0b00010000),
+                'current_limit_gear': bool(control_state & 0b00001000),
+                'buzzer_warn_function': bool(control_state & 0b00000001),
+            }
+            index += 1
+            
+            fault_state = warnstate_bytes[index]
+            pack_info['fault_state'] = {
+                'sample_fault': bool(fault_state & 0b00100000),
+                'cell_fault': bool(fault_state & 0b00010000),
+                'ntc_fault': bool(fault_state & 0b00000100),
+                'discharge_mos_fault': bool(fault_state & 0b00000010),
+                'charge_mos_fault': bool(fault_state & 0b00000001),
+            }
+            index += 1
+            
+            pack_info['balance_state_1'] = warnstate_bytes[index]
+            index += 1
+            
+            pack_info['balance_state_2'] = warnstate_bytes[index]
+            index += 1
+
+
             # Detailed interpretation for Warn State 1 based on Char A.24
             warn_state_1 = warnstate_bytes[index]
             pack_info['warn_state_1'] = {
@@ -423,6 +461,11 @@ class PACEBMS:
                 'discharge_current_warn': pack['discharge_current_warn'],
                 'protect_state_1': pack['protect_state_1'],
                 'protect_state_2': pack['protect_state_2'],
+                'instruction_state': pack['instruction_state'],
+                'control_state': pack['control_state'],
+                'fault_state': pack['fault_state'],
+                'balance_state_1': pack['balance_state_1'],
+                'balance_state_2': pack['balance_state_2'],
                 'warn_state_1': pack['warn_state_1'],
                 'warn_state_2': pack['warn_state_2']
             }
@@ -834,6 +877,19 @@ class PACEBMS:
                         # print(f"{base_topic}.pack_{pack_i:02}_{sub_key}: {sub_value}")
                         self.ha_comm.publish_binary_sensor_state(sub_value, f"pack_{pack_i:02}_{sub_key}")
                         self.ha_comm.publish_binary_sensor_discovery(f"pack_{pack_i:02}_{sub_key}",icon)
+                elif key == 'instruction_state':
+                    icon = "mdi:battery-check"
+                    for sub_key, sub_value in value.items():
+                        # print(f"{base_topic}.pack_{pack_i:02}_{sub_key}: {sub_value}")
+                        self.ha_comm.publish_binary_sensor_state(sub_value, f"pack_{pack_i:02}_{sub_key}")
+                        self.ha_comm.publish_binary_sensor_discovery(f"pack_{pack_i:02}_{sub_key}",icon)
+                
+                elif key == 'fault_state':
+                    icon = "mdi:alert"
+                    for sub_key, sub_value in value.items():
+                        # print(f"{base_topic}.pack_{pack_i:02}_{sub_key}: {sub_value}")
+                        self.ha_comm.publish_binary_sensor_state(sub_value, f"pack_{pack_i:02}_{sub_key}")
+                        self.ha_comm.publish_binary_sensor_discovery(f"pack_{pack_i:02}_{sub_key}",icon)
                 elif key == 'warn_state_1':
                     icon = "mdi:battery-heart-variant"
                     for sub_key, sub_value in value.items():
@@ -846,7 +902,7 @@ class PACEBMS:
                         # print(f"{base_topic}.pack_{pack_i:02}_{sub_key}: {sub_value}")
                         self.ha_comm.publish_binary_sensor_state(sub_value, f"pack_{pack_i:02}_{sub_key}")
                         self.ha_comm.publish_binary_sensor_discovery(f"pack_{pack_i:02}_{sub_key}",icon)
-                elif key not in ['cell_number', 'temp_sensor_number']:
+                elif key not in ['cell_number', 'temp_sensor_number', 'control_state', 'balance_state_1', 'balance_state_2']:
                     icon = "mdi:battery-heart-variant"
                     # print(f"{base_topic}.pack_{pack_i:02}_{key}: {value}")
                     self.ha_comm.publish_warn_state(value, f"pack_{pack_i:02}_{key}")
