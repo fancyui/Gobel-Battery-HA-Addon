@@ -352,38 +352,36 @@ class PACEBMS:
             protect_state_1 = warnstate_bytes[index]
             pack_info['protect_state_1'] = {
                 'short_circuit_protect': bool(protect_state_1 & 0b01000000),
-                'discharge_current_protect': bool(protect_state_1 & 0b00100000),
-                'charge_current_protect': bool(protect_state_1 & 0b00010000),
-                'lower_total_voltage_protect': bool(protect_state_1 & 0b00001000),
-                'above_total_voltage_protect': bool(protect_state_1 & 0b00000100),
-                'lower_cell_voltage_protect': bool(protect_state_1 & 0b00000010),
-                'above_cell_voltage_protect': bool(protect_state_1 & 0b00000001),
+                'high_discharge_current_protect': bool(protect_state_1 & 0b00100000),
+                'high_charge_current_protect': bool(protect_state_1 & 0b00010000),
+                'low_total_voltage_protect': bool(protect_state_1 & 0b00001000),
+                'high_total_voltage_protect': bool(protect_state_1 & 0b00000100),
+                'low_cell_voltage_protect': bool(protect_state_1 & 0b00000010),
+                'high_cell_voltage_protect': bool(protect_state_1 & 0b00000001),
             }
             index += 1
     
             # Detailed interpretation for Protect State 2 based on Char A.20
             protect_state_2 = warnstate_bytes[index]
             pack_info['protect_state_2'] = {
-                'fully_protect': bool(protect_state_2 & 0b10000000),
-                'lower_env_temperature_protect': bool(protect_state_2 & 0b01000000),
-                'above_env_temperature_protect': bool(protect_state_2 & 0b00100000),
-                'above_MOS_temperature_protect': bool(protect_state_2 & 0b00010000),
-                'lower_discharge_temperature_protect': bool(protect_state_2 & 0b00001000),
-                'lower_charge_temperature_protect': bool(protect_state_2 & 0b00000100),
-                'above_discharge_temperature_protect': bool(protect_state_2 & 0b00000010),
-                'above_charge_temperature_protect': bool(protect_state_2 & 0b00000001),
+                'fully_charged': bool(protect_state_2 & 0b10000000),
+                'low_env_temp_protect': bool(protect_state_2 & 0b01000000),
+                'high_env_temp_protect': bool(protect_state_2 & 0b00100000),
+                'high_MOS_temp_protect': bool(protect_state_2 & 0b00010000),
+                'low_discharge_temp_protect': bool(protect_state_2 & 0b00001000),
+                'low_charge_temp_protect': bool(protect_state_2 & 0b00000100),
+                'high_discharge_temp_protect': bool(protect_state_2 & 0b00000010),
+                'high_charge_temp_protect': bool(protect_state_2 & 0b00000001),
             }
             index += 1
     
             instruction_state = warnstate_bytes[index]
             pack_info['instruction_state'] = {
-                'hert_indicate': bool(instruction_state & 0b10000000),
-                'acin': bool(instruction_state & 0b00100000),
-                'reverse_indicate': bool(instruction_state & 0b00010000),
-                'pack_indicate': bool(instruction_state & 0b00001000),
-                'dfet_indicate': bool(instruction_state & 0b00000100),
-                'cfet_indicate': bool(instruction_state & 0b00000010),
-                'current_limit_indicate': bool(instruction_state & 0b00000001),
+                'charger_avaliable': bool(instruction_state & 0b00100000),
+                'reverse_connected': bool(instruction_state & 0b00010000),
+                'discharge_enabled': bool(instruction_state & 0b00000100),
+                'charge_enabled': bool(instruction_state & 0b00000010),
+                'current_limit_enabled': bool(instruction_state & 0b00000001),
             }
             index += 1
             
@@ -398,11 +396,11 @@ class PACEBMS:
             
             fault_state = warnstate_bytes[index]
             pack_info['fault_state'] = {
-                'sample_fault': bool(fault_state & 0b00100000),
+                'sampling_fault': bool(fault_state & 0b00100000),
                 'cell_fault': bool(fault_state & 0b00010000),
-                'ntc_fault': bool(fault_state & 0b00000100),
-                'discharge_mos_fault': bool(fault_state & 0b00000010),
-                'charge_mos_fault': bool(fault_state & 0b00000001),
+                'NTC_fault': bool(fault_state & 0b00000100),
+                'discharge_MOS_fault': bool(fault_state & 0b00000010),
+                'charge_MOS_fault': bool(fault_state & 0b00000001),
             }
             index += 1
             
@@ -416,26 +414,26 @@ class PACEBMS:
             # Detailed interpretation for Warn State 1 based on Char A.24
             warn_state_1 = warnstate_bytes[index]
             pack_info['warn_state_1'] = {
-                'discharge_current_warn': bool(warn_state_1 & 0b00100000),
-                'charge_current_warn': bool(warn_state_1 & 0b00010000),
-                'lower_total_voltage_warn': bool(warn_state_1 & 0b00001000),
-                'above_total_voltage_warn': bool(warn_state_1 & 0b00000100),
-                'lower_cell_voltage_warn': bool(warn_state_1 & 0b00000010),
-                'above_cell_voltage_warn': bool(warn_state_1 & 0b00000001),
+                'high_discharge_current_warn': bool(warn_state_1 & 0b00100000),
+                'high_charge_current_warn': bool(warn_state_1 & 0b00010000),
+                'low_total_voltage_warn': bool(warn_state_1 & 0b00001000),
+                'high_total_voltage_warn': bool(warn_state_1 & 0b00000100),
+                'low_cell_voltage_warn': bool(warn_state_1 & 0b00000010),
+                'high_cell_voltage_warn': bool(warn_state_1 & 0b00000001),
             }
             index += 1
     
             # Detailed interpretation for Warn State 2 based on Char A.25
             warn_state_2 = warnstate_bytes[index]
             pack_info['warn_state_2'] = {
-                'low_power_warn': bool(warn_state_2 & 0b10000000),
-                'high_MOS_temperature_warn': bool(warn_state_2 & 0b01000000),
-                'low_env_temperature_warn': bool(warn_state_2 & 0b00100000),
-                'high_env_temperature_warn': bool(warn_state_2 & 0b00010000),
-                'low_discharge_temperature_warn': bool(warn_state_2 & 0b00001000),
-                'low_charge_temperature_warn': bool(warn_state_2 & 0b00000100),
-                'above_discharge_temperature_warn': bool(warn_state_2 & 0b00000010),
-                'above_charge_temperature_warn': bool(warn_state_2 & 0b00000001),
+                'low_SOC_warn': bool(warn_state_2 & 0b10000000),
+                'high_MOS_temp_warn': bool(warn_state_2 & 0b01000000),
+                'low_env_temp_warn': bool(warn_state_2 & 0b00100000),
+                'high_env_temp_warn': bool(warn_state_2 & 0b00010000),
+                'low_discharge_temp_warn': bool(warn_state_2 & 0b00001000),
+                'low_charge_temp_warn': bool(warn_state_2 & 0b00000100),
+                'high_discharge_temp_warn': bool(warn_state_2 & 0b00000010),
+                'low_charge_temp_warn': bool(warn_state_2 & 0b00000001),
             }
             index += 1
     
@@ -769,40 +767,45 @@ class PACEBMS:
             'pack_design_capacity': 'Ah',
         }
 
-        dclasses = {
-            'num_cells': 'data_size',
-            'cell_voltages': 'voltage',
-            'num_temps': 'data_size',
-            'temperatures': 'temperature',
-            'pack_current': 'current',
-            'pack_total_voltage': 'voltage',
-            'pack_remain_capacity': 'energy_storage',
-            'pack_full_capacity': 'energy_storage',
-            'cycle_number': 'data_size',
-            'pack_design_capacity': 'energy_storage',
+        icons = {
+            'total_packs_num': 'mdi:database',
+            'total_pack_full_capacity': 'mdi:battery-high',
+            'total_pack_remain_capacity': 'mdi:battery-clock',
+            'total_pack_current': 'mdi:current-dc',
+            'total_soc': 'mdi:battery-70',
+            'num_cells': 'mdi:database',
+            'cell_voltages': 'mdi:sine-wave',
+            'num_temps': 'mdi:database',
+            'temperatures': 'mdi:thermometer',
+            'pack_current': 'mdi:current-dc',
+            'pack_total_voltage': 'mdi:sine-wave',
+            'pack_remain_capacity': 'mdi:battery-clock',
+            'pack_full_capacity': 'mdi:battery-high',
+            'cycle_number': 'mdi:battery-sync',
+            'pack_design_capacity': 'mdi:battery-high',
         }
 
         analog_data = self.get_analog_data(pack_number)
 
         total_packs_num = len(analog_data)
         self.ha_comm.publish_sensor_state(total_packs_num, 'packs', "total_packs_num")
-        self.ha_comm.publish_sensor_discovery("total_packs_num", "packs", "data_size")
+        self.ha_comm.publish_sensor_discovery("total_packs_num", "packs", icons['total_packs_num'])
 
         total_pack_full_capacity = round(sum(d.get('pack_full_capacity', 0) for d in analog_data),2)
         self.ha_comm.publish_sensor_state(total_pack_full_capacity, 'Ah', "total_pack_full_capacity")
-        self.ha_comm.publish_sensor_discovery("total_pack_full_capacity", "Ah", "energy_storage")
+        self.ha_comm.publish_sensor_discovery("total_pack_full_capacity", "Ah", icons['total_pack_full_capacity'])
 
         total_pack_remain_capacity = round(sum(d.get('pack_remain_capacity', 0) for d in analog_data),2)
         self.ha_comm.publish_sensor_state(total_pack_remain_capacity, 'Ah', "total_pack_remain_capacity")
-        self.ha_comm.publish_sensor_discovery("total_pack_remain_capacity", "Ah", "energy_storage")
+        self.ha_comm.publish_sensor_discovery("total_pack_remain_capacity", "Ah", icons['total_pack_remain_capacity'])
 
         total_pack_current = round(sum(d.get('pack_current', 0) for d in analog_data),2)
         self.ha_comm.publish_sensor_state(total_pack_current, 'A', "total_pack_current")
-        self.ha_comm.publish_sensor_discovery("total_pack_current", "A", "current")
+        self.ha_comm.publish_sensor_discovery("total_pack_current", "A", icons['total_pack_current'])
 
         total_soc = round(total_pack_remain_capacity / total_pack_full_capacity * 100, 1) 
         self.ha_comm.publish_sensor_state(total_soc, '%', "total_soc")
-        self.ha_comm.publish_sensor_discovery("total_soc", "%", "battery")
+        self.ha_comm.publish_sensor_discovery("total_soc", "%", icons['total_soc'])
 
         # import random
         # random_number = random.randint(1, 100)
@@ -815,24 +818,24 @@ class PACEBMS:
             pack_i = pack_i + 1
             for key, value in pack.items():
                 unit = units.get(key, '')
-                dclass = dclasses.get(key, '')
+                icon = icons.get(key, '')
                 if key == 'cell_voltages':
                     cell_i = 0
                     for cell_voltage in value:
                         cell_i = cell_i + 1
                         self.ha_comm.publish_sensor_state(cell_voltage, unit, f"pack_{pack_i:02}_cell_voltage_{cell_i:02}")
-                        self.ha_comm.publish_sensor_discovery(f"pack_{pack_i:02}_cell_voltage_{cell_i:02}", unit, dclass)
+                        self.ha_comm.publish_sensor_discovery(f"pack_{pack_i:02}_cell_voltage_{cell_i:02}", unit, icon)
                         
                 elif key == 'temperatures':
                     temperature_i = 0
                     for temperature in value:
                         temperature_i = temperature_i + 1
                         self.ha_comm.publish_sensor_state(temperature, unit, f"pack_{pack_i:02}_temperature_{temperature_i:02}")
-                        self.ha_comm.publish_sensor_discovery(f"pack_{pack_i:02}_temperature_{temperature_i:02}", unit, dclass)
+                        self.ha_comm.publish_sensor_discovery(f"pack_{pack_i:02}_temperature_{temperature_i:02}", unit, icon)
                         
                 else:
                     self.ha_comm.publish_sensor_state(value, unit, f"pack_{pack_i:02}_{key}")
-                    self.ha_comm.publish_sensor_discovery(f"pack_{pack_i:02}_{key}", unit, dclass)
+                    self.ha_comm.publish_sensor_discovery(f"pack_{pack_i:02}_{key}", unit, icon)
 
 
     def publish_warning_data_mqtt(self, pack_number=None):
@@ -840,6 +843,10 @@ class PACEBMS:
         warn_data = self.get_warning_data(pack_number)
 
         total_packs_num = len(warn_data)
+
+        names = {
+
+        }
 
         pack_i = 0
 

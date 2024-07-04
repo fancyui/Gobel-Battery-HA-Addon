@@ -4,7 +4,7 @@ import logging
 
 class HA_MQTT:
 
-    def __init__(self, mqtt_broker, mqtt_port, mqtt_user, mqtt_password, base_topic, device_info):
+    def __init__(self, mqtt_broker, mqtt_port, mqtt_user, mqtt_password, base_topic, device_info, debug):
         self.mqtt_broker = mqtt_broker
         self.mqtt_port = mqtt_port
         self.mqtt_user = mqtt_user
@@ -14,9 +14,14 @@ class HA_MQTT:
         self.mqtt_client = None
 
         # Configure logging
-        logging.basicConfig(level=logging.DEBUG,
+        logging.basicConfig(level=logging.DEBUG if debug else logging.WARNING,
                             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         self.logger = logging.getLogger(__name__)
+
+    def cap_first(self,s):
+        if not s:
+            return s  # Return the empty string if input is empty
+        return s[0].upper() + s[1:]
 
     def connect(self):
         self.logger.debug("Initializing MQTT client")
@@ -30,16 +35,16 @@ class HA_MQTT:
             self.logger.error(f"Failed to connect to MQTT broker: {e}")
         return self.mqtt_client
 
-    def publish_sensor_discovery(self, entity_id, unit, device_class):
+    def publish_sensor_discovery(self, entity_id, unit, icon):
         main_topic = 'sensor'
         topic = f"homeassistant/{main_topic}/{self.base_topic}_{entity_id}/config"
         self.logger.debug(f"Publishing discovery to topic: {topic}")
         payload = {
-            "name": " ".join(word.capitalize() for word in entity_id.split("_")),
+            "name": " ".join(self.cap_first(word) for word in entity_id.split("_")),
             "state_topic": f"{main_topic}/{self.base_topic}_{entity_id}/state",
             "unique_id": f"{self.base_topic}_{entity_id}",
             "unit_of_measurement": unit,
-            "device_class": device_class,
+            "icon": icon,
             "value_template": "{{ value_json.state }}",
             "device": self.device_info
         }
@@ -70,7 +75,7 @@ class HA_MQTT:
         topic = f"homeassistant/{main_topic}/{self.base_topic}_{entity_id}/config"
         self.logger.debug(f"Publishing discovery to topic: {topic}")
         payload = {
-            "name": " ".join(word.capitalize() for word in entity_id.split("_")),
+            "name": " ".join(self.cap_first(word) for word in entity_id.split("_")),
             "state_topic": f"{main_topic}/{self.base_topic}_{entity_id}/state",
             "unique_id": f"{self.base_topic}_{entity_id}",
             "event_types": ["normal", 
@@ -109,7 +114,7 @@ class HA_MQTT:
         topic = f"homeassistant/{main_topic}/{self.base_topic}_{entity_id}/config"
         self.logger.debug(f"Publishing discovery to topic: {topic}")
         payload = {
-            "name": " ".join(word.capitalize() for word in entity_id.split("_")),
+            "name": " ".join(self.cap_first(word) for word in entity_id.split("_")),
             "state_topic": f"{main_topic}/{self.base_topic}_{entity_id}/state",
             "unique_id": f"{self.base_topic}_{entity_id}",
             "payload_on": True,
@@ -146,7 +151,7 @@ class HA_MQTT:
         topic = f"homeassistant/{main_topic}/{self.base_topic}_{entity_id}/config"
         self.logger.debug(f"Publishing discovery to topic: {topic}")
         payload = {
-            "name": " ".join(word.capitalize() for word in entity_id.split("_")),
+            "name": " ".join(self.cap_first(word) for word in entity_id.split("_")),
             "state_topic": f"{main_topic}/{self.base_topic}_{entity_id}/state",
             "unique_id": f"{self.base_topic}_{entity_id}",
             "icon": icon,

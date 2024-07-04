@@ -51,7 +51,7 @@ serial_port = config.get('bms_usb_port')
 baud_rate = config.get('bms_baud_rate')
 data_refresh_interval = config.get('data_refresh_interval')
 long_lived_access_token = config.get('long_lived_access_token')
-debug_output = config.get('debug_output')
+debug = config.get('debug_output')
 
 device_info = {
     "identifiers": "gobel_power_battery_3",
@@ -150,7 +150,7 @@ def run():
     # mqtt_client = setup_mqtt_client()
     # Connect to HA_REST_API
     # ha_comm = HA_REST_API(long_lived_access_token)
-    ha_comm = HA_MQTT(mqtt_broker, mqtt_port, mqtt_username, mqtt_password, base_topic, device_info)
+    ha_comm = HA_MQTT(mqtt_broker, mqtt_port, mqtt_username, mqtt_password, base_topic, device_info, debug)
     mqtt_client = ha_comm.connect()
     if not mqtt_client:
         print("HA Connection failed")
