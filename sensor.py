@@ -8,6 +8,7 @@ from bms_comm import BMSCommunication
 from pacebms import PACEBMS
 from ha_rest_api import HA_REST_API
 from ha_mqtt import HA_MQTT
+from dashboard_generator import generate_dashboard_template
 
 
 
@@ -19,7 +20,7 @@ def load_config():
         try:
             with open(config_path) as file:
                 config = json.load(file)
-                print("Config: " + json.dumps(config))
+                # print("Config: " + json.dumps(config))
                 return config
         except Exception as e:
             print("Error loading configuration: %s", str(e))
@@ -43,16 +44,16 @@ mqtt_username = config.get('mqtt_username')
 mqtt_password = config.get('mqtt_password')
 mqtt_enable_discovery = config.get('mqtt_enable_discovery')
 mqtt_discovery_topic = config.get('mqtt_discovery_topic')
-base_topic = config.get('base_topic')
+device_name = config.get('device_name')
 interface = config.get('connection_type')
+battery_port = config.get('battery_port')
 bms_brand = config.get('bms_brand')
 ethernet_ip = config.get('bms_ip_address')
 ethernet_port = config.get('bms_ip_port')
 serial_port = config.get('bms_usb_port')
 baud_rate = config.get('bms_baud_rate')
 data_refresh_interval = config.get('data_refresh_interval')
-long_lived_access_token = config.get('long_lived_access_token')
-debug = config.get('debug_output')
+debug = config.get('debug')
 
 device_info = {
     "identifiers": "gobel_power_battery_3",
@@ -79,7 +80,7 @@ def run():
     # Connect to HA_REST_API
     # ha_comm = HA_REST_API(long_lived_access_token)
     # Connect to HA_MQTT
-    ha_comm = HA_MQTT(mqtt_broker, mqtt_port, mqtt_username, mqtt_password, base_topic, device_info, debug)
+    ha_comm = HA_MQTT(mqtt_broker, mqtt_port, mqtt_username, mqtt_password, device_name, device_info, debug)
     mqtt_client = ha_comm.connect()
     if not mqtt_client:
         logger.info("HA Connection failed")
@@ -93,7 +94,15 @@ def run():
         logger.info("BMS Connection failed")
         return
 
-    bms = PACEBMS(bms_comm, ha_comm, debug)
+    bms = PACEBMS(bms_comm, ha_comm, data_refresh_interval, debug)
+
+    logger.info("Pace BMS Monitor Working...")
+
+    print("-------------Dashboard Template Start -------------")
+
+    print(generate_dashboard_template(device_name, 1, 16))
+
+    print("-------------Dashboard Template End -------------")
 
     initial_data_fetched = False  # Flag to track if initial data has been fetched
 

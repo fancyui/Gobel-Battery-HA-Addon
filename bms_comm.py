@@ -20,7 +20,7 @@ class BMSCommunication:
     def connect(self):
         if self.interface == 'serial' and self.serial_port and self.baud_rate:
             try:
-                self.logger.info(f"Trying to connect {self.serial_port}:{self.baud_rate}")
+                self.logger.info(f"Trying to connect BMS over {self.serial_port}:{self.baud_rate}")
                 self.bms_connection = serial.Serial(self.serial_port, self.baud_rate, timeout=1)
                 self.logger.info(f"Connected to BMS over serial port: {self.serial_port} with baud rate: {self.baud_rate}")
                 return self.bms_connection
@@ -29,7 +29,7 @@ class BMSCommunication:
                 return None
         elif self.interface == 'ethernet' and self.ethernet_ip and self.ethernet_port:
             try:
-                self.logger.info(f"Trying to connect {self.ethernet_ip}:{self.ethernet_port}")
+                self.logger.info(f"Trying to connect BMS over {self.ethernet_ip}:{self.ethernet_port}")
                 self.bms_connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 self.bms_connection.settimeout(5)
                 self.bms_connection.connect((self.ethernet_ip, self.ethernet_port))
@@ -60,7 +60,7 @@ class BMSCommunication:
             return True
 
         except Exception as e:
-            print(f"Error sending data to BMS: {e}")
+            self.logger.error(f"Error sending data to BMS: {e}")
             return False
 
     def receive_data(self):
@@ -75,7 +75,7 @@ class BMSCommunication:
             else:
                 raise ValueError("Unsupported connection type")
 
-            self.logger.info(f"Received data from BMS: {received_data}")
+            self.logger.debug(f"Received data from BMS: {received_data}")
             return received_data
         except Exception as e:
             self.logger.error(f"Error receiving data from BMS: {e}")

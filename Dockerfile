@@ -10,6 +10,12 @@ RUN apk update && apk add --no-cache \
     py3-requests \
     build-base
 
+run \
+    apk --no-cache add \
+        nginx \
+    \
+    && mkdir -p /run/nginx
+
 
 
 # RUN apk update && apk add --no-cache libyaml build-base
@@ -29,7 +35,12 @@ COPY bms_comm.py /
 COPY ha_rest_api.py /
 COPY ha_mqtt.py /
 COPY config.yaml /
+COPY dashboard_generator.py /
+COPY ingress.conf /etc/nginx/http.d/
+
 RUN chmod +x /run.sh
 
 # Set the default command
 CMD [ "/run.sh" ]
+
+CMD [ "nginx", "-g", "daemonn off; error_log /dev/stdout debug;" ]

@@ -4,12 +4,12 @@ import logging
 
 class HA_MQTT:
 
-    def __init__(self, mqtt_broker, mqtt_port, mqtt_user, mqtt_password, base_topic, device_info, debug):
+    def __init__(self, mqtt_broker, mqtt_port, mqtt_user, mqtt_password, device_name, device_info, debug):
         self.mqtt_broker = mqtt_broker
         self.mqtt_port = mqtt_port
         self.mqtt_user = mqtt_user
         self.mqtt_password = mqtt_password
-        self.base_topic = base_topic
+        self.device_name = device_name
         self.device_info = device_info
         self.mqtt_client = None
 
@@ -35,20 +35,25 @@ class HA_MQTT:
             self.logger.error(f"Failed to connect to MQTT broker: {e}")
         return self.mqtt_client
 
-    def publish_sensor_discovery(self, entity_id, unit, icon):
+    def publish_sensor_discovery(self, entity_id, unit, icon, deviceclass, stateclass):
         main_topic = 'sensor'
-        topic = f"homeassistant/{main_topic}/{self.base_topic}_{entity_id}/config"
+        topic = f"homeassistant/{main_topic}/{self.device_name}_{entity_id}/config"
         self.logger.debug(f"Publishing discovery to topic: {topic}")
         payload = {
             "name": " ".join(self.cap_first(word) for word in entity_id.split("_")),
-            "state_topic": f"{main_topic}/{self.base_topic}_{entity_id}/state",
-            "unique_id": f"{self.base_topic}_{entity_id}",
+            "state_topic": f"{main_topic}/{self.device_name}_{entity_id}/state",
+            "unique_id": f"{self.device_name}_{entity_id}",
             "unit_of_measurement": unit,
             "icon": icon,
+            "state_class": stateclass,
+            "suggested_display_precision": 2,
             "value_template": "{{ value_json.state }}",
             "device": self.device_info
         }
+        if deviceclass != 'null':
+            payload["device_class"] = deviceclass
         self.logger.debug(f"Discovery payload: {json.dumps(payload)}")
+
         try:
             self.mqtt_client.publish(topic, json.dumps(payload), retain=True)
             self.logger.debug(f"Published discovery for {topic}")
@@ -57,7 +62,7 @@ class HA_MQTT:
 
     def publish_sensor_state(self, value, unit, entity_id):
         main_topic = 'sensor'
-        topic = f"{main_topic}/{self.base_topic}_{entity_id}/state"
+        topic = f"{main_topic}/{self.device_name}_{entity_id}/state"
         self.logger.debug(f"Publishing data to topic: {topic}")
         payload = {
             "state": value,
@@ -72,12 +77,12 @@ class HA_MQTT:
 
     def publish_event_discovery(self, entity_id):
         main_topic = 'event'
-        topic = f"homeassistant/{main_topic}/{self.base_topic}_{entity_id}/config"
+        topic = f"homeassistant/{main_topic}/{self.device_name}_{entity_id}/config"
         self.logger.debug(f"Publishing discovery to topic: {topic}")
         payload = {
             "name": " ".join(self.cap_first(word) for word in entity_id.split("_")),
-            "state_topic": f"{main_topic}/{self.base_topic}_{entity_id}/state",
-            "unique_id": f"{self.base_topic}_{entity_id}",
+            "state_topic": f"{main_topic}/{self.device_name}_{entity_id}/state",
+            "unique_id": f"{self.device_name}_{entity_id}",
             "event_types": ["normal", 
                             "below lower limit", 
                             "above upper limit", 
@@ -97,7 +102,7 @@ class HA_MQTT:
 
     def publish_event_state(self, value, entity_id):
         main_topic = 'event'
-        topic = f"{main_topic}/{self.base_topic}_{entity_id}/state"
+        topic = f"{main_topic}/{self.device_name}_{entity_id}/state"
         self.logger.debug(f"Publishing data to topic: {topic}")
         payload = {
             "event_type": value
@@ -111,12 +116,12 @@ class HA_MQTT:
 
     def publish_binary_sensor_discovery(self, entity_id, icon):
         main_topic = 'binary_sensor'
-        topic = f"homeassistant/{main_topic}/{self.base_topic}_{entity_id}/config"
+        topic = f"homeassistant/{main_topic}/{self.device_name}_{entity_id}/config"
         self.logger.debug(f"Publishing discovery to topic: {topic}")
         payload = {
             "name": " ".join(self.cap_first(word) for word in entity_id.split("_")),
-            "state_topic": f"{main_topic}/{self.base_topic}_{entity_id}/state",
-            "unique_id": f"{self.base_topic}_{entity_id}",
+            "state_topic": f"{main_topic}/{self.device_name}_{entity_id}/state",
+            "unique_id": f"{self.device_name}_{entity_id}",
             "payload_on": True,
             "payload_off": False,
             "icon": icon,
@@ -133,7 +138,7 @@ class HA_MQTT:
 
     def publish_binary_sensor_state(self, value, entity_id):
         main_topic = 'binary_sensor'
-        topic = f"{main_topic}/{self.base_topic}_{entity_id}/state"
+        topic = f"{main_topic}/{self.device_name}_{entity_id}/state"
         self.logger.debug(f"Publishing data to topic: {topic}")
         payload = {
             "state": value
@@ -148,12 +153,12 @@ class HA_MQTT:
 
     def publish_warn_discovery(self, entity_id, icon):
         main_topic = 'sensor'
-        topic = f"homeassistant/{main_topic}/{self.base_topic}_{entity_id}/config"
+        topic = f"homeassistant/{main_topic}/{self.device_name}_{entity_id}/config"
         self.logger.debug(f"Publishing discovery to topic: {topic}")
         payload = {
             "name": " ".join(self.cap_first(word) for word in entity_id.split("_")),
-            "state_topic": f"{main_topic}/{self.base_topic}_{entity_id}/state",
-            "unique_id": f"{self.base_topic}_{entity_id}",
+            "state_topic": f"{main_topic}/{self.device_name}_{entity_id}/state",
+            "unique_id": f"{self.device_name}_{entity_id}",
             "icon": icon,
             "value_template": "{{ value_json.state }}",
             "device": self.device_info
@@ -168,7 +173,7 @@ class HA_MQTT:
 
     def publish_warn_state(self, value, entity_id):
         main_topic = 'sensor'
-        topic = f"{main_topic}/{self.base_topic}_{entity_id}/state"
+        topic = f"{main_topic}/{self.device_name}_{entity_id}/state"
         self.logger.debug(f"Publishing data to topic: {topic}")
 
         payload = {
@@ -181,8 +186,4 @@ class HA_MQTT:
             self.logger.debug(f"Published data for {topic}")
         except Exception as e:
             self.logger.error(f"Failed to publish data for {topic}: {e}")
-
-
-
-
 

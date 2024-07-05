@@ -3,9 +3,10 @@ import logging
 
 class PACEBMS:
 
-    def __init__(self, bms_comm, ha_comm, debug):
+    def __init__(self, bms_comm, ha_comm, data_refresh_interval, debug):
         self.bms_comm = bms_comm
         self.ha_comm = ha_comm
+        self.data_refresh_interval = data_refresh_interval
 
         # Configure logging
         logging.basicConfig(level=logging.DEBUG if debug else logging.INFO,
@@ -184,7 +185,7 @@ class PACEBMS:
             # Number of cells
             num_cells = int(fields[offset], 16)
             offset += 1
-            pack_data['num_cells'] = num_cells
+            pack_data['view_num_cells'] = num_cells
     
             # Cell voltages
             cell_voltages = []
@@ -197,7 +198,7 @@ class PACEBMS:
             # Number of temperature sensors
             num_temps = int(fields[offset], 16)
             offset += 1
-            pack_data['num_temps'] = num_temps
+            pack_data['view_num_temps'] = num_temps
     
             # Temperatures
             temperatures = []
@@ -214,19 +215,25 @@ class PACEBMS:
             if pack_current > 32767:
                 pack_current -= 65536
             offset += 2
-            pack_data['pack_current'] = pack_current
+            pack_data['view_current'] = pack_current
     
             # Pack total voltage
             pack_total_voltage = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for total voltage
             pack_total_voltage = round(pack_total_voltage / 1000, 2)  # Convert mV to V
             offset += 2
-            pack_data['pack_total_voltage'] = pack_total_voltage
-    
+            pack_data['view_voltage'] = pack_total_voltage
+
+            pack_power = round(pack_total_voltage * pack_current / 1000, 1) # Convert W to kW
+            pack_data['view_power'] = pack_power
+
+            pack_data['view_energy_charged'] = round(pack_power * self.data_refresh_interval / 3600, 1) if pack_power >= 0 else 0
+            pack_data['view_energy_discharged'] = round(abs(pack_power) * self.data_refresh_interval / 3600, 1) if pack_power < 0 else 0
+
             # Pack remain capacity
             pack_remain_capacity = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for remaining capacity
             pack_remain_capacity = round(pack_remain_capacity / 100, 2)  # Convert 10mAH to AH
             offset += 2
-            pack_data['pack_remain_capacity'] = pack_remain_capacity
+            pack_data['view_remain_capacity'] = pack_remain_capacity
     
             # Define number P
             define_number_p = int(fields[offset], 16)
@@ -236,18 +243,22 @@ class PACEBMS:
             pack_full_capacity = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for full capacity
             pack_full_capacity = round(pack_full_capacity / 100, 2)  # Convert 10mAH to AH
             offset += 2
-            pack_data['pack_full_capacity'] = pack_full_capacity
+            pack_data['view_full_capacity'] = pack_full_capacity
+
+            pack_data['view_SOC'] = round(pack_remain_capacity / pack_full_capacity * 100, 1)
     
             # Cycle number
             cycle_number = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for cycle number
             offset += 2
-            pack_data['cycle_number'] = cycle_number
+            pack_data['view_cycle_number'] = cycle_number
     
             # Pack design capacity
             pack_design_capacity = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for design capacity
             pack_design_capacity = round(pack_design_capacity / 100, 2)  # Convert 10mAH to AH
             offset += 2
-            pack_data['pack_design_capacity'] = pack_design_capacity
+            pack_data['view_design_capacity'] = pack_design_capacity
+
+            pack_data['view_SOH'] = round(pack_full_capacity / pack_design_capacity * 100, 0)
     
             packs_data.append(pack_data)
     
@@ -343,51 +354,51 @@ class PACEBMS:
             pack_info['temp_sensor_warnings'] = temp_sensor_warnings
     
             # Parse 5. PACK charge current warning
-            pack_info['charge_current_warn'] = self.interpret_warning(warnstate_bytes[index])
+            pack_info['warn_charge_current'] = self.interpret_warning(warnstate_bytes[index])
             index += 1
     
             # Parse 6. PACK total voltage warning
-            pack_info['total_voltage_warn'] = self.interpret_warning(warnstate_bytes[index])
+            pack_info['warn_total_voltage'] = self.interpret_warning(warnstate_bytes[index])
             index += 1
     
             # Parse 7. PACK discharge current warning
-            pack_info['discharge_current_warn'] = self.interpret_warning(warnstate_bytes[index])
+            pack_info['warn_discharge_current'] = self.interpret_warning(warnstate_bytes[index])
             index += 1
     
             # Detailed interpretation for Protect State 1 based on Char A.19
             protect_state_1 = warnstate_bytes[index]
             pack_info['protect_state_1'] = {
-                'short_circuit_protect': bool(protect_state_1 & 0b01000000),
-                'high_discharge_current_protect': bool(protect_state_1 & 0b00100000),
-                'high_charge_current_protect': bool(protect_state_1 & 0b00010000),
-                'low_total_voltage_protect': bool(protect_state_1 & 0b00001000),
-                'high_total_voltage_protect': bool(protect_state_1 & 0b00000100),
-                'low_cell_voltage_protect': bool(protect_state_1 & 0b00000010),
-                'high_cell_voltage_protect': bool(protect_state_1 & 0b00000001),
+                'protect_short_circuit': bool(protect_state_1 & 0b01000000),
+                'protect_high_discharge_current': bool(protect_state_1 & 0b00100000),
+                'protect_high_charge_current': bool(protect_state_1 & 0b00010000),
+                'protect_low_total_voltage': bool(protect_state_1 & 0b00001000),
+                'protect_high_total_voltage': bool(protect_state_1 & 0b00000100),
+                'protect_low_cell_voltage': bool(protect_state_1 & 0b00000010),
+                'protect_high_cell_voltage': bool(protect_state_1 & 0b00000001),
             }
             index += 1
     
             # Detailed interpretation for Protect State 2 based on Char A.20
             protect_state_2 = warnstate_bytes[index]
             pack_info['protect_state_2'] = {
-                'fully_charged': bool(protect_state_2 & 0b10000000),
-                'low_env_temp_protect': bool(protect_state_2 & 0b01000000),
-                'high_env_temp_protect': bool(protect_state_2 & 0b00100000),
-                'high_MOS_temp_protect': bool(protect_state_2 & 0b00010000),
-                'low_discharge_temp_protect': bool(protect_state_2 & 0b00001000),
-                'low_charge_temp_protect': bool(protect_state_2 & 0b00000100),
-                'high_discharge_temp_protect': bool(protect_state_2 & 0b00000010),
-                'high_charge_temp_protect': bool(protect_state_2 & 0b00000001),
+                'status_fully_charged': bool(protect_state_2 & 0b10000000),
+                'protect_low_env_temp': bool(protect_state_2 & 0b01000000),
+                'protect_high_env_temp': bool(protect_state_2 & 0b00100000),
+                'protect_high_MOS_temp': bool(protect_state_2 & 0b00010000),
+                'protect_low_discharge_temp': bool(protect_state_2 & 0b00001000),
+                'protect_low_charge_temp': bool(protect_state_2 & 0b00000100),
+                'protect_high_discharge_temp': bool(protect_state_2 & 0b00000010),
+                'protect_high_charge_temp': bool(protect_state_2 & 0b00000001),
             }
             index += 1
     
             instruction_state = warnstate_bytes[index]
             pack_info['instruction_state'] = {
-                'charger_avaliable': bool(instruction_state & 0b00100000),
-                'reverse_connected': bool(instruction_state & 0b00010000),
-                'discharge_enabled': bool(instruction_state & 0b00000100),
-                'charge_enabled': bool(instruction_state & 0b00000010),
-                'current_limit_enabled': bool(instruction_state & 0b00000001),
+                'status_charger_avaliable': bool(instruction_state & 0b00100000),
+                'status_reverse_connected': bool(instruction_state & 0b00010000),
+                'status_discharge_enabled': bool(instruction_state & 0b00000100),
+                'status_charge_enabled': bool(instruction_state & 0b00000010),
+                'status_current_limit_enabled': bool(instruction_state & 0b00000001),
             }
             index += 1
             
@@ -402,11 +413,11 @@ class PACEBMS:
             
             fault_state = warnstate_bytes[index]
             pack_info['fault_state'] = {
-                'sampling_fault': bool(fault_state & 0b00100000),
-                'cell_fault': bool(fault_state & 0b00010000),
-                'NTC_fault': bool(fault_state & 0b00000100),
-                'discharge_MOS_fault': bool(fault_state & 0b00000010),
-                'charge_MOS_fault': bool(fault_state & 0b00000001),
+                'fault_sampling': bool(fault_state & 0b00100000),
+                'fault_cell': bool(fault_state & 0b00010000),
+                'fault_NTC': bool(fault_state & 0b00000100),
+                'fault_discharge_MOS': bool(fault_state & 0b00000010),
+                'fault_charge_MOS': bool(fault_state & 0b00000001),
             }
             index += 1
             
@@ -420,26 +431,26 @@ class PACEBMS:
             # Detailed interpretation for Warn State 1 based on Char A.24
             warn_state_1 = warnstate_bytes[index]
             pack_info['warn_state_1'] = {
-                'high_discharge_current_warn': bool(warn_state_1 & 0b00100000),
-                'high_charge_current_warn': bool(warn_state_1 & 0b00010000),
-                'low_total_voltage_warn': bool(warn_state_1 & 0b00001000),
-                'high_total_voltage_warn': bool(warn_state_1 & 0b00000100),
-                'low_cell_voltage_warn': bool(warn_state_1 & 0b00000010),
-                'high_cell_voltage_warn': bool(warn_state_1 & 0b00000001),
+                'warn_high_discharge_current': bool(warn_state_1 & 0b00100000),
+                'warn_high_charge_current': bool(warn_state_1 & 0b00010000),
+                'warn_low_total_voltage': bool(warn_state_1 & 0b00001000),
+                'warn_high_total_voltage': bool(warn_state_1 & 0b00000100),
+                'warn_low_cell_voltage': bool(warn_state_1 & 0b00000010),
+                'warn_high_cell_voltage': bool(warn_state_1 & 0b00000001),
             }
             index += 1
     
             # Detailed interpretation for Warn State 2 based on Char A.25
             warn_state_2 = warnstate_bytes[index]
             pack_info['warn_state_2'] = {
-                'low_SOC_warn': bool(warn_state_2 & 0b10000000),
-                'high_MOS_temp_warn': bool(warn_state_2 & 0b01000000),
-                'low_env_temp_warn': bool(warn_state_2 & 0b00100000),
-                'high_env_temp_warn': bool(warn_state_2 & 0b00010000),
-                'low_discharge_temp_warn': bool(warn_state_2 & 0b00001000),
-                'low_charge_temp_warn': bool(warn_state_2 & 0b00000100),
-                'high_discharge_temp_warn': bool(warn_state_2 & 0b00000010),
-                'low_charge_temp_warn': bool(warn_state_2 & 0b00000001),
+                'warn_low_SOC': bool(warn_state_2 & 0b10000000),
+                'warn_high_MOS_temp': bool(warn_state_2 & 0b01000000),
+                'warn_low_env_temp': bool(warn_state_2 & 0b00100000),
+                'warn_high_env_temp': bool(warn_state_2 & 0b00010000),
+                'warn_low_discharge_temp': bool(warn_state_2 & 0b00001000),
+                'warn_low_charge_temp': bool(warn_state_2 & 0b00000100),
+                'warn_high_discharge_temp': bool(warn_state_2 & 0b00000010),
+                'warn_low_charge_temp': bool(warn_state_2 & 0b00000001),
             }
             index += 1
     
@@ -460,9 +471,9 @@ class PACEBMS:
                 'cell_voltage_warnings': pack['cell_voltage_warnings'],
                 'temp_sensor_number': pack['temp_sensor_number'],
                 'temp_sensor_warnings': pack['temp_sensor_warnings'],
-                'charge_current_warn': pack['charge_current_warn'],
-                'total_voltage_warn': pack['total_voltage_warn'],
-                'discharge_current_warn': pack['discharge_current_warn'],
+                'warn_charge_current': pack['warn_charge_current'],
+                'warn_total_voltage': pack['warn_total_voltage'],
+                'warn_discharge_current': pack['warn_discharge_current'],
                 'protect_state_1': pack['protect_state_1'],
                 'protect_state_2': pack['protect_state_2'],
                 'instruction_state': pack['instruction_state'],
@@ -738,6 +749,12 @@ class PACEBMS:
         total_soc = round(total_pack_remain_capacity / total_pack_full_capacity * 100, 1) 
         self.ha_comm.publish_data(total_soc, '%', f"{self.base_topic}.total_soc")
 
+        total_mean_voltage = round(sum(d.get('pack_total_voltage', 0) for d in analog_data) / total_packs_num, 2)
+        self.ha_comm.publish_data(total_mean_voltage, 'V', f"{self.base_topic}.total_mean_voltage")
+
+        total_power = round(sum(d.get('pack_full_capacity', 0) for d in analog_data),2)
+        self.ha_comm.publish_data(total_power, 'kW', f"{self.base_topic}.total_power")
+
         import random
         random_number = random.randint(1, 100)
         self.ha_comm.publish_data(random_number, 'p', f"{self.base_topic}.random")
@@ -767,57 +784,153 @@ class PACEBMS:
     def publish_analog_data_mqtt(self, pack_number=None):
 
         units = {
-            'num_cells': 'cells',
+            'view_num_cells': 'cells',
             'cell_voltages': 'mV',
-            'num_temps': 'NTCs',
+            'view_num_temps': 'NTCs',
             'temperatures': '℃',
-            'pack_current': 'A',
-            'pack_total_voltage': 'V',
-            'pack_remain_capacity': 'Ah',
-            'pack_full_capacity': 'Ah',
-            'cycle_number': 'cycles',
-            'pack_design_capacity': 'Ah',
+            'view_current': 'A',
+            'view_voltage': 'V',
+            'view_remain_capacity': 'Ah',
+            'view_full_capacity': 'Ah',
+            'view_cycle_number': 'cycles',
+            'view_design_capacity': 'Ah',
+            'view_power': 'kW',
+            'view_energy_charged': 'kWh',
+            'view_energy_discharged': 'kWh',
+            'view_SOH': '%',
+            'view_SOC': '%',
         }
 
         icons = {
             'total_packs_num': 'mdi:database',
-            'total_pack_full_capacity': 'mdi:battery-high',
-            'total_pack_remain_capacity': 'mdi:battery-clock',
-            'total_pack_current': 'mdi:current-dc',
-            'total_soc': 'mdi:battery-70',
-            'num_cells': 'mdi:database',
+            'total_full_capacity': 'mdi:battery-high',
+            'total_remain_capacity': 'mdi:battery-clock',
+            'total_current': 'mdi:current-dc',
+            'total_SOC': 'mdi:battery-70',
+            'total_voltage': 'mdi:sine-wave',
+            'total_power': 'mdi:battery-charging',
+            'total_SOH': 'mdi:battery-plus-variant',
+            'total_energy_charged': 'mdi:battery-positive',
+            'total_energy_discharged': 'mdi:battery-negative',
+            'view_num_cells': 'mdi:database',
             'cell_voltages': 'mdi:sine-wave',
-            'num_temps': 'mdi:database',
+            'view_num_temps': 'mdi:database',
             'temperatures': 'mdi:thermometer',
-            'pack_current': 'mdi:current-dc',
-            'pack_total_voltage': 'mdi:sine-wave',
-            'pack_remain_capacity': 'mdi:battery-clock',
-            'pack_full_capacity': 'mdi:battery-high',
-            'cycle_number': 'mdi:battery-sync',
-            'pack_design_capacity': 'mdi:battery-high',
+            'view_current': 'mdi:current-dc',
+            'view_voltage': 'mdi:sine-wave',
+            'view_remain_capacity': 'mdi:battery-clock',
+            'view_full_capacity': 'mdi:battery-high',
+            'view_cycle_number': 'mdi:battery-sync',
+            'view_design_capacity': 'mdi:battery-high',
+            'view_power': 'mdi:battery-charging',
+            'view_energy_charged': 'mdi:battery-positive',
+            'view_energy_discharged': 'mdi:battery-negative',
+            'view_SOH': 'mdi:battery-plus-variant',
+            'view_SOC': 'mdi:battery-70',
         }
+
+        deviceclasses = {
+            'total_packs_num': 'null',
+            'total_full_capacity': 'null',
+            'total_remain_capacity': 'null',
+            'total_current': 'current',
+            'total_SOC': 'battery',
+            'total_voltage': 'voltage',
+            'total_power': 'power',
+            'total_SOH': 'null',
+            'total_energy_charged': 'energy',
+            'total_energy_discharged': 'energy',
+            'cell_voltages': 'voltage',
+            'temperatures': 'temperature',
+            'view_num_cells': 'null',
+            'view_num_temps': 'null',
+            'view_current': 'current',
+            'view_voltage': 'voltage',
+            'view_remain_capacity': 'null',
+            'view_full_capacity': 'null',
+            'view_cycle_number': 'null',
+            'view_design_capacity': 'null',
+            'view_energy_charged': 'energy',
+            'view_energy_discharged': 'energy',
+            'view_power': 'power',
+            'view_energy_charged': 'energy',
+            'view_energy_discharged': 'energy',
+            'view_SOH': 'null',
+            'view_SOC': 'null',
+        }
+
+        stateclasses = {
+            'total_packs_num': 'measurement',
+            'total_full_capacity': 'measurement',
+            'total_remain_capacity': 'measurement',
+            'total_current': 'measurement',
+            'total_SOC': 'measurement',
+            'total_voltage': 'measurement',
+            'total_power': 'measurement',
+            'total_SOH': 'measurement',
+            'total_energy_charged': 'total',
+            'total_energy_discharged': 'total',
+            'view_num_cells': 'measurement',
+            'cell_voltages': 'measurement',
+            'view_num_temps': 'measurement',
+            'temperatures': 'measurement',
+            'view_current': 'measurement',
+            'view_voltage': 'measurement',
+            'view_remain_capacity': 'measurement',
+            'view_full_capacity': 'measurement',
+            'view_cycle_number': 'measurement',
+            'view_design_capacity': 'measurement',
+            'view_power': 'measurement',
+            'view_energy_charged': 'total',
+            'view_energy_discharged': 'total',
+            'view_SOH': 'measurement',
+            'view_SOC': 'measurement',
+        }
+
+
 
         analog_data = self.get_analog_data(pack_number)
 
         total_packs_num = len(analog_data)
+
         self.ha_comm.publish_sensor_state(total_packs_num, 'packs', "total_packs_num")
-        self.ha_comm.publish_sensor_discovery("total_packs_num", "packs", icons['total_packs_num'])
+        self.ha_comm.publish_sensor_discovery("total_packs_num", "packs", icons['total_packs_num'], deviceclasses['total_packs_num'], stateclasses['total_packs_num'])
 
-        total_pack_full_capacity = round(sum(d.get('pack_full_capacity', 0) for d in analog_data),2)
-        self.ha_comm.publish_sensor_state(total_pack_full_capacity, 'Ah', "total_pack_full_capacity")
-        self.ha_comm.publish_sensor_discovery("total_pack_full_capacity", "Ah", icons['total_pack_full_capacity'])
+        total_full_capacity = round(sum(d.get('view_full_capacity', 0) for d in analog_data),2)
+        self.ha_comm.publish_sensor_state(total_full_capacity, 'Ah', "total_full_capacity")
+        self.ha_comm.publish_sensor_discovery("total_full_capacity", "Ah", icons['total_full_capacity'], deviceclasses['total_full_capacity'], stateclasses['total_full_capacity'])
 
-        total_pack_remain_capacity = round(sum(d.get('pack_remain_capacity', 0) for d in analog_data),2)
-        self.ha_comm.publish_sensor_state(total_pack_remain_capacity, 'Ah', "total_pack_remain_capacity")
-        self.ha_comm.publish_sensor_discovery("total_pack_remain_capacity", "Ah", icons['total_pack_remain_capacity'])
+        total_remain_capacity = round(sum(d.get('view_remain_capacity', 0) for d in analog_data),2)
+        self.ha_comm.publish_sensor_state(total_remain_capacity, 'Ah', "total_remain_capacity")
+        self.ha_comm.publish_sensor_discovery("total_remain_capacity", "Ah", icons['total_remain_capacity'], deviceclasses['total_remain_capacity'], stateclasses['total_remain_capacity'])
 
-        total_pack_current = round(sum(d.get('pack_current', 0) for d in analog_data),2)
-        self.ha_comm.publish_sensor_state(total_pack_current, 'A', "total_pack_current")
-        self.ha_comm.publish_sensor_discovery("total_pack_current", "A", icons['total_pack_current'])
+        total_current = round(sum(d.get('view_current', 0) for d in analog_data),2)
+        self.ha_comm.publish_sensor_state(total_current, 'A', "total_current")
+        self.ha_comm.publish_sensor_discovery("total_current", "A", icons['total_current'], deviceclasses['total_current'], stateclasses['total_current'])
 
-        total_soc = round(total_pack_remain_capacity / total_pack_full_capacity * 100, 1) 
-        self.ha_comm.publish_sensor_state(total_soc, '%', "total_soc")
-        self.ha_comm.publish_sensor_discovery("total_soc", "%", icons['total_soc'])
+        total_soc = round(total_remain_capacity / total_full_capacity * 100, 1) 
+        self.ha_comm.publish_sensor_state(total_soc, '%', "total_SOC")
+        self.ha_comm.publish_sensor_discovery("total_SOC", "%", icons['total_SOC'], deviceclasses['total_SOC'], stateclasses['total_SOC'])
+
+        total_soh = round(sum(d.get('view_SOH', 0) for d in analog_data) / total_packs_num, 1)
+        self.ha_comm.publish_sensor_state(total_soh, '%', "total_SOH")
+        self.ha_comm.publish_sensor_discovery("total_SOH", "%", icons['total_SOH'], deviceclasses['total_SOH'], stateclasses['total_SOH'])
+
+        total_voltage = round(sum(d.get('view_voltage', 0) for d in analog_data) / total_packs_num, 2)
+        self.ha_comm.publish_sensor_state(total_voltage, 'V', "total_voltage")
+        self.ha_comm.publish_sensor_discovery("total_voltage", "V", icons['total_voltage'], deviceclasses['total_voltage'], stateclasses['total_voltage'])
+
+        total_power = round(sum(d.get('view_power', 0) for d in analog_data),1)
+        self.ha_comm.publish_sensor_state(total_power, 'kW', "total_power")
+        self.ha_comm.publish_sensor_discovery("total_power", "kW", icons['total_power'], deviceclasses['total_power'], stateclasses['total_power'])
+
+        total_energy_charged = round(total_power * self.data_refresh_interval / 3600, 1) if total_power >= 0 else 0
+        self.ha_comm.publish_sensor_state(total_energy_charged, 'kWh', "total_energy_charged")
+        self.ha_comm.publish_sensor_discovery("total_energy_charged", "kWh", icons['total_energy_charged'], deviceclasses['total_energy_charged'], stateclasses['total_energy_charged'])
+
+        total_energy_discharged = round(abs(total_power) * self.data_refresh_interval / 3600, 1) if total_power < 0 else 0
+        self.ha_comm.publish_sensor_state(total_energy_discharged, 'kWh', "total_energy_discharged")
+        self.ha_comm.publish_sensor_discovery("total_energy_discharged", "kWh", icons['total_energy_discharged'], deviceclasses['total_energy_discharged'], stateclasses['total_energy_discharged'])
 
         # import random
         # random_number = random.randint(1, 100)
@@ -831,23 +944,26 @@ class PACEBMS:
             for key, value in pack.items():
                 unit = units.get(key, '')
                 icon = icons.get(key, '')
+                deviceclass = deviceclasses.get(key, '')
+                stateclass = stateclasses.get(key, '')
+
                 if key == 'cell_voltages':
                     cell_i = 0
                     for cell_voltage in value:
                         cell_i = cell_i + 1
                         self.ha_comm.publish_sensor_state(cell_voltage, unit, f"pack_{pack_i:02}_cell_voltage_{cell_i:02}")
-                        self.ha_comm.publish_sensor_discovery(f"pack_{pack_i:02}_cell_voltage_{cell_i:02}", unit, icon)
+                        self.ha_comm.publish_sensor_discovery(f"pack_{pack_i:02}_cell_voltage_{cell_i:02}", unit, icon,deviceclass,stateclass)
                         
                 elif key == 'temperatures':
                     temperature_i = 0
                     for temperature in value:
                         temperature_i = temperature_i + 1
                         self.ha_comm.publish_sensor_state(temperature, unit, f"pack_{pack_i:02}_temperature_{temperature_i:02}")
-                        self.ha_comm.publish_sensor_discovery(f"pack_{pack_i:02}_temperature_{temperature_i:02}", unit, icon)
+                        self.ha_comm.publish_sensor_discovery(f"pack_{pack_i:02}_temperature_{temperature_i:02}", unit, icon,deviceclass,stateclass)
                         
                 else:
                     self.ha_comm.publish_sensor_state(value, unit, f"pack_{pack_i:02}_{key}")
-                    self.ha_comm.publish_sensor_discovery(f"pack_{pack_i:02}_{key}", unit, icon)
+                    self.ha_comm.publish_sensor_discovery(f"pack_{pack_i:02}_{key}", unit, icon,deviceclass,stateclass)
 
 
     def publish_warning_data_mqtt(self, pack_number=None):
@@ -855,10 +971,6 @@ class PACEBMS:
         warn_data = self.get_warning_data(pack_number)
 
         total_packs_num = len(warn_data)
-
-        names = {
-
-        }
 
         pack_i = 0
 
