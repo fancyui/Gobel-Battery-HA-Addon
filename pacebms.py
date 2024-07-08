@@ -3,10 +3,11 @@ import logging
 
 class PACEBMS:
 
-    def __init__(self, bms_comm, ha_comm, data_refresh_interval, debug):
+    def __init__(self, bms_comm, ha_comm, data_refresh_interval, debug, if_random):
         self.bms_comm = bms_comm
         self.ha_comm = ha_comm
         self.data_refresh_interval = data_refresh_interval
+        self.if_random = if_random
 
         # Configure logging
         logging.basicConfig(level=logging.DEBUG if debug else logging.INFO,
@@ -827,6 +828,7 @@ class PACEBMS:
             'view_energy_discharged': 'mdi:battery-negative',
             'view_SOH': 'mdi:battery-plus-variant',
             'view_SOC': 'mdi:battery-70',
+            'random_number': 'mdi:battery-70',
         }
 
         deviceclasses = {
@@ -857,6 +859,7 @@ class PACEBMS:
             'view_energy_discharged': 'energy',
             'view_SOH': 'null',
             'view_SOC': 'null',
+            'random_number': 'null',
         }
 
         stateclasses = {
@@ -885,6 +888,7 @@ class PACEBMS:
             'view_energy_discharged': 'total',
             'view_SOH': 'measurement',
             'view_SOC': 'measurement',
+            'random_number': 'measurement',
         }
 
 
@@ -932,10 +936,12 @@ class PACEBMS:
         self.ha_comm.publish_sensor_state(total_energy_discharged, 'kWh', "total_energy_discharged")
         self.ha_comm.publish_sensor_discovery("total_energy_discharged", "kWh", icons['total_energy_discharged'], deviceclasses['total_energy_discharged'], stateclasses['total_energy_discharged'])
 
-        # import random
-        # random_number = random.randint(1, 100)
-        # self.ha_comm.publish_data(random_number, 'p', "random")
-        # self.ha_comm.publish_discovery("random", "p", "current")
+        if self.if_random:
+            import random
+            random_number = random.randint(1, 100)
+            self.ha_comm.publish_sensor_state(random_number, 'A', "random_number")
+            self.ha_comm.publish_sensor_discovery("random_number", "A", icons['random_number'], deviceclasses['random_number'], stateclasses['random_number'])
+
 
         pack_i = 0
 

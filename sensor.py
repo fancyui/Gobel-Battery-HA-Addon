@@ -8,9 +8,6 @@ from bms_comm import BMSCommunication
 from pacebms import PACEBMS
 from ha_rest_api import HA_REST_API
 from ha_mqtt import HA_MQTT
-from dashboard_generator import generate_dashboard_template
-
-
 
 # Define the load_config function
 def load_config():
@@ -45,6 +42,8 @@ mqtt_password = config.get('mqtt_password')
 mqtt_enable_discovery = config.get('mqtt_enable_discovery')
 mqtt_discovery_topic = config.get('mqtt_discovery_topic')
 device_name = config.get('device_name')
+battery_manufacturer = config.get('battery_manufacturer')
+battery_model = config.get('battery_model')
 interface = config.get('connection_type')
 battery_port = config.get('battery_port')
 bms_brand = config.get('bms_brand')
@@ -54,14 +53,19 @@ serial_port = config.get('bms_usb_port')
 baud_rate = config.get('bms_baud_rate')
 data_refresh_interval = config.get('data_refresh_interval')
 debug = config.get('debug')
+if_random = config.get('if_random')
+
+device_nameprocessed = device_name.lower().replace(" ", "_")
 
 device_info = {
-    "identifiers": "gobel_power_battery_3",
-    "name": "Gobel Monitor",
-    "manufacturer": "Gobel Power",
-    "model": "GP-SR1-PC200",
+    "identifiers": f"{device_nameprocessed}_{battery_manufacturer}_{battery_model}",
+    "name": device_name,
+    "manufacturer": battery_manufacturer,
+    "model": battery_model,
     "sw_version": "1.0"
 }
+
+device_name = device_nameprocessed
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG if debug else logging.INFO,
@@ -94,15 +98,9 @@ def run():
         logger.info("BMS Connection failed")
         return
 
-    bms = PACEBMS(bms_comm, ha_comm, data_refresh_interval, debug)
+    bms = PACEBMS(bms_comm, ha_comm, data_refresh_interval, debug, if_random)
 
     logger.info("Pace BMS Monitor Working...")
-
-    print("-------------Dashboard Template Start -------------")
-
-    print(generate_dashboard_template(device_name, 1, 16))
-
-    print("-------------Dashboard Template End -------------")
 
     initial_data_fetched = False  # Flag to track if initial data has been fetched
 

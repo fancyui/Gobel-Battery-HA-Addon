@@ -1,3 +1,5 @@
+import io
+from contextlib import redirect_stdout
 
 def views():
     print("views:")
@@ -110,7 +112,7 @@ def cell_warn_entity_filter(device_name, total_packs_num, num_cells):
         print(f"          title: Pack {i+1:02} Cell Warning")
         print("        conditions:")
         print("          - condition: state")
-        print("            state: normal")
+        print("            state_not: normal")
         print("        show_empty: false")
         print("        view_layout:")
         print("          position: sidebar")
@@ -153,6 +155,7 @@ def pack_entites(device_name, total_packs_num):
         print("        view_layout:")
         print("          position: sidebar")
         print(f"        title: Pack {i+1:02} Overview")
+        print("        entities:")
         print(f"          - entity: sensor.{device_name}_monitor_pack_{i+1:02}_view_current")
         print(f"            name: Current")
         print(f"          - entity: sensor.{device_name}_monitor_pack_{i+1:02}_view_voltage")
@@ -184,18 +187,20 @@ def pack_cell_history(device_name, total_packs_num, num_cells):
         print("        min_y_axis: 2000")
         print("        max_y_axis: 4000")
         print("        fit_y_data: false")
+        print("        entities:")
         for j in range(1, num_cells + 1):
             print(f"          - entity: sensor.{device_name}_monitor_pack_{i+1:02}_cell_voltage_{j:02}")
             print(f"            name: Cell{j:02}")
 
 
-def pack_temp_history(device_name, total_packs_num, num_cells):
+def pack_temp_history(device_name, total_packs_num, num_temps):
 
     for i in range(total_packs_num):
         print(f"      - title: Pack {i+1:02} Temperatures")
         print("        type: history-graph")
         print("        hours_to_show: 48")
-        for j in range(1, num_cells + 1):
+        print("        entities:")
+        for j in range(1, num_temps + 1):
             if j < 5:
                 print(f"          - entity: sensor.{device_name}_monitor_pack_{i+1:02}_temperature_{j:02}")
                 print(f"            name: Cell{j:02}")
@@ -207,14 +212,28 @@ def pack_temp_history(device_name, total_packs_num, num_cells):
                 print("            name: Environment")
 
 
-def generate_dashboard_template(device_name, total_packs_num, num_cells):
-
-	views()
-	glance(device_name)
-	pack_warn_entity_filter(device_name, total_packs_num)
-	cell_warn_entity_filter(device_name, total_packs_num, num_cells)
-	total_entites(device_name)
-	pack_entites(device_name, total_packs_num)
-	pack_cell_history(device_name, total_packs_num, num_cells)
-	pack_temp_history(device_name, total_packs_num, num_cells)
-
+def generate_dashboard_template(device_name, total_packs_num, num_cells, num_temps, output_file):
+    f = io.StringIO()
+    with redirect_stdout(f):
+        views()
+        glance(device_name)
+        pack_warn_entity_filter(device_name, total_packs_num)
+        cell_warn_entity_filter(device_name, total_packs_num, num_cells)
+        total_entites(device_name)
+        pack_entites(device_name, total_packs_num)
+        pack_cell_history(device_name, total_packs_num, num_cells)
+        pack_temp_history(device_name, total_packs_num, num_cells)
+    
+    yaml_content = f.getvalue()
+    
+    # Write the HTML file
+    with open(output_file, 'w') as file:
+        file.write('<html>\n<head>\n<title>YAML Content</title>\n')
+        file.write('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/themes/prism.min.css">\n')
+        file.write('</head>\n<body>\n')
+        file.write('<pre><code class="language-yaml">\n')
+        file.write(yaml_content)
+        file.write('</code></pre>\n')
+        file.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/prism.min.js"></script>\n')
+        file.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/components/prism-yaml.min.js"></script>\n')
+        file.write('</body>\n</html>')

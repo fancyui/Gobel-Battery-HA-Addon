@@ -1,7 +1,7 @@
-name: "Gobel Pace BMS Monitor"
-description: "Gobel Pace BMS Monitor"
-version: "1.1.16"
-slug: "gobel_pace_bms_monitr"
+name: "Gobel Battery Monitor"
+description: "Battery Monitor supports various BMS - Home Assistant Addon"
+version: "1.1.58"
+slug: "gobel_battery_monitor"
 url: "https://github.com/fancyui/HomeAssistant-PaceBMS-Addon"
 init: false
 homeassistant_api: true
@@ -27,6 +27,8 @@ options:
   mqtt_ha_discovery: true
   mqtt_ha_discovery_topic: "homeassistant"
   device_name: "gobel"
+  battery_manufacturer: "Gobel Power"
+  battery_model: "GP-SR1-PC200"
   connection_type: ""
   battery_port: "rs232"
   bms_brand: "PACE"
@@ -36,6 +38,7 @@ options:
   bms_baud_rate: 115200
   data_refresh_interval: 5
   debug: 0
+  if_random: 0
 schema:
   mqtt_broker: str
   mqtt_port: int
@@ -44,6 +47,8 @@ schema:
   mqtt_ha_discovery: bool
   mqtt_ha_discovery_topic: str
   device_name: str
+  battery_manufacturer: str
+  battery_model: str
   connection_type: list(ethernet|wifi|serial)
   battery_port: list(rs232|rs485)
   bms_brand: list(PACE|JK-ESS|RN200)
@@ -53,3 +58,4 @@ schema:
   bms_baud_rate: int
   data_refresh_interval: int
   debug: int
+  if_random: int
