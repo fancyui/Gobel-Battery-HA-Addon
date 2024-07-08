@@ -1,8 +1,8 @@
 name: "Gobel Battery Monitor"
 description: "Battery Monitor supports various BMS - Home Assistant Addon"
-version: "1.1.58"
+version: "1.2.0"
 slug: "gobel_battery_monitor"
-url: "https://github.com/fancyui/HomeAssistant-PaceBMS-Addon"
+url: "https://github.com/fancyui/Gobel-Battery-HA-Addon"
 init: false
 homeassistant_api: true
 
@@ -22,11 +22,10 @@ panel_icon: "mdi:home-battery"
 options:
   mqtt_broker: homeassistant.local
   mqtt_port: 1883
-  mqtt_username: gobel
-  mqtt_password: "123456"
-  mqtt_ha_discovery: true
+  mqtt_username: ""
+  mqtt_password: ""
   mqtt_ha_discovery_topic: "homeassistant"
-  device_name: "gobel"
+  device_name: "Gobel Monitor"
   battery_manufacturer: "Gobel Power"
   battery_model: "GP-SR1-PC200"
   connection_type: ""
@@ -44,7 +43,6 @@ schema:
   mqtt_port: int
   mqtt_username: str
   mqtt_password: str
-  mqtt_ha_discovery: bool
   mqtt_ha_discovery_topic: str
   device_name: str
   battery_manufacturer: str
