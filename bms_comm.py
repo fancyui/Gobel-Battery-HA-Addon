@@ -27,7 +27,7 @@ class BMSCommunication:
             except serial.SerialException as e:
                 self.logger.error(f"Serial connection error: {e}")
                 return None
-        elif self.interface == 'ethernet' and self.ethernet_ip and self.ethernet_port:
+        elif self.interface in ['ethernet', 'wifi'] and self.ethernet_ip and self.ethernet_port:
             try:
                 self.logger.info(f"Trying to connect BMS over {self.ethernet_ip}:{self.ethernet_port}")
                 self.bms_connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

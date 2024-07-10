@@ -451,7 +451,7 @@ class PACEBMS:
                 'warn_low_discharge_temp': bool(warn_state_2 & 0b00001000),
                 'warn_low_charge_temp': bool(warn_state_2 & 0b00000100),
                 'warn_high_discharge_temp': bool(warn_state_2 & 0b00000010),
-                'warn_low_charge_temp': bool(warn_state_2 & 0b00000001),
+                'warn_high_charge_temp': bool(warn_state_2 & 0b00000001),
             }
             index += 1
     
