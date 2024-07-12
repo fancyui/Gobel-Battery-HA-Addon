@@ -44,9 +44,10 @@ mqtt_discovery_topic = config.get('mqtt_discovery_topic')
 device_name = config.get('device_name')
 battery_manufacturer = config.get('battery_manufacturer')
 battery_model = config.get('battery_model')
+max_parallel_allowed = config.get('max_parallel_allowed')
 interface = config.get('connection_type')
 battery_port = config.get('battery_port')
-bms_brand = config.get('bms_brand')
+bms_type = config.get('bms_type')
 ethernet_ip = config.get('bms_ip_address')
 ethernet_port = config.get('bms_ip_port')
 serial_port = config.get('bms_usb_port')
@@ -98,29 +99,59 @@ def run():
         logger.info("BMS Connection failed")
         return
 
-    bms = PACEBMS(bms_comm, ha_comm, data_refresh_interval, debug, if_random)
-
-    logger.info("Pace BMS Monitor Working...")
-
-    initial_data_fetched = False  # Flag to track if initial data has been fetched
-
-    try:
-        while True:  # Run continuously
-            if not initial_data_fetched:
-                # Get initial data
-                initial_data_fetched = True  # Set the flag to True after fetching initial data
-            
-            # Fetch analog and warning data every 5 seconds
-            bms.publish_analog_data_mqtt()
-            bms.publish_warning_data_mqtt()
-
-            time.sleep(data_refresh_interval)  # Sleep for 5 seconds between each iteration
-
-    except KeyboardInterrupt:
-        logger.info("Stopping the program...")
+    if bms_type == 'PACE_LV':
     
-    finally:
-        mqtt_client.loop_stop()
+        bms = PACEBMS(bms_comm, ha_comm, data_refresh_interval, debug, if_random)
+
+        logger.info("PACE_LV BMS Monitor Working...")
+
+        initial_data_fetched = False  # Flag to track if initial data has been fetched
+
+        if battery_port == 'rs232':
+
+            logger.info("PACE_LV BMS RS232 Working...")
+
+            try:
+                while True:  # Run continuously
+                    
+                    # Fetch analog and warning data every 5 seconds
+                    bms.publish_analog_data_mqtt()
+                    bms.publish_warning_data_mqtt()
+
+                    time.sleep(data_refresh_interval)  # Sleep for 5 seconds between each iteration
+
+            except KeyboardInterrupt:
+                logger.info("Stopping the program...")
+            
+            finally:
+                mqtt_client.loop_stop()
+
+
+        if battery_port == 'rs485':
+
+            logger.info("PACE_LV BMS RS485 Working...")
+
+            pack_list = []
+
+            for pack_number in range(2, max_parallel_allowed+1):  #up to max_parallel_allowed
+                result = bms.get_pack_num_data(pack_number)
+                if int(result) == pack_number:
+                    pack_list.append(pack_number)
+
+            try:
+                while True:  # Run continuously
+
+                    for pack_number in pack_list:
+                        bms.publish_analog_data_mqtt(pack_number)
+                        bms.publish_warning_data_mqtt(pack_number)
+                    
+                        time.sleep(data_refresh_interval)  # Sleep for 5 seconds between each iteration
+
+            except KeyboardInterrupt:
+                logger.info("Stopping the program...")
+            
+            finally:
+                mqtt_client.loop_stop()
 
 if __name__ == "__main__":
     run()

@@ -699,47 +699,32 @@ class PACEBMS:
     
     
     def get_capacity_data(bms_connection, pack_number=None):
-        try:
-            # Generate request
-            request = generate_bms_request("capacity", pack_number)
-            
-            # Send request to BMS
-            if not send_data_to_bms(bms_connection, request):
-                return None
-            
-            # Receive response from BMS
-            response = receive_data_from_bms(bms_connection)
-            if response is None:
-                return None
-            
-            # Parse capacity data from response
-            capacity_data = parse_capacity_data(response)
-            return capacity_data
-        
-        except Exception as e:
-            self.logger.error(f"An error occurred: {e}")
-            return None
-    
-    
-    
-    def get_time_date_data(bms_connection, pack_number=None):
         
         try:
             # Generate request
-            request = generate_bms_request("time_date",pack_number)
-            
+            self.logger.debug(f"Trying to prepare capacity request")
+            request = self.generate_bms_request("capacity",pack_number)
+            self.logger.debug(f"capacity request: {request}")
+
             # Send request to BMS
-            if not send_data_to_bms(bms_connection, request):
+            self.logger.debug(f"Trying to send capacity request")
+            if not self.bms_comm.send_data(request):
                 return None
-            
+            self.logger.debug(f"capacity request sent")
+    
             # Receive response from BMS
-            response = receive_data_from_bms(bms_connection)
+            self.logger.debug(f"Trying to receive capacity data")
+            response = self.bms_comm.receive_data()
+            self.logger.debug(f"capacity data recieved: {response}")
             if response is None:
                 return None
             
             # Parse analog data from response
-            time_date_data = parse_time_date_data(response)
-            return time_date_data
+            self.logger.debug(f"Trying to parse capacity data")
+            capacity_data = self.parse_capacity_data(response)
+            self.logger.debug(f"capacity data parsed: {capacity_data}")
+            return capacity_data
+    
         except Exception as e:
             self.logger.error(f"An error occurred: {e}")
             return None
@@ -750,20 +735,74 @@ class PACEBMS:
         
         try:
             # Generate request
-            request = generate_bms_request("product_info",pack_number)
-            
+            self.logger.debug(f"Trying to prepare product info request")
+            request = self.generate_bms_request("product_info",pack_number)
+            self.logger.debug(f"product info request: {request}")
+
             # Send request to BMS
-            if not send_data_to_bms(bms_connection, request):
+            self.logger.debug(f"Trying to send product info request")
+            if not self.bms_comm.send_data(request):
                 return None
-            
+            self.logger.debug(f"product info request sent")
+    
             # Receive response from BMS
-            response = receive_data_from_bms(bms_connection)
+            self.logger.debug(f"Trying to receive product info data")
+            response = self.bms_comm.receive_data()
+            self.logger.debug(f"product info data recieved: {response}")
             if response is None:
                 return None
             
             # Parse analog data from response
-            product_info_data = parse_product_info_data(response)
-            return product_info_data
+            self.logger.debug(f"Trying to parse product info data")
+            bms_info, pack_info =  self.parse_product_info_data(response)
+            self.logger.debug(f"product info data parsed: {bms_info}")
+            self.logger.debug(f"product info data parsed: {pack_info}")
+            return bms_info, pack_info
+    
+        except Exception as e:
+            self.logger.error(f"An error occurred: {e}")
+            return None
+
+    def get_pack_num_data(self, pack_number):
+        
+        
+        try:
+            # Generate request
+            self.logger.debug(f"Trying to prepare pack num request")
+            request = self.generate_bms_request("pack_num",pack_number)
+            self.logger.debug(f"pack num request: {request}")
+
+            # Send request to BMS
+            self.logger.debug(f"Trying to send pack num request")
+            if not self.bms_comm.send_data(request):
+                return None
+            self.logger.debug(f"pack num request sent")
+    
+            # Receive response from BMS
+            self.logger.debug(f"Trying to receive pack num data")
+            response = self.bms_comm.receive_data()
+            self.logger.debug(f"pack num data recieved: {response}")
+            if response is None:
+                return None
+            
+            # Parse analog data from response
+            self.logger.debug(f"Trying to parse pack num data")
+            pack_number_data = self.parse_pack_number_data(response)
+            self.logger.debug(f"pack num data parsed: {pack_number_data}")
+            return pack_number_data
+    
+        except Exception as e:
+            self.logger.error(f"An error occurred: {e}")
+            return None
+
+    def check_if_pack_exsit(self, pack_number):
+        try:
+            pack_num_data = self.get_pack_num_data(pack_number)
+            if int(pack_num_data) == pack_number:
+                if_exsit = pack_number
+            else:
+                if_exsit = False
+
         except Exception as e:
             self.logger.error(f"An error occurred: {e}")
             return None
