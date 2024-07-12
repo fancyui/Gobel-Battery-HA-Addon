@@ -18,6 +18,15 @@ class HA_MQTT:
                             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         self.logger = logging.getLogger(__name__)
 
+    def update_device_info(self, new_device_info):
+        """
+        Updates the device_info parameter with new information.
+
+        :param new_device_info: The new device information to update with.
+        """
+        self.device_info = new_device_info
+        self.logger.debug(f"Updated device_info to: {new_device_info}")
+
     def cap_first(self,s):
         if not s:
             return s  # Return the empty string if input is empty

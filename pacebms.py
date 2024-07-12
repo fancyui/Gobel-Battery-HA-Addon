@@ -47,6 +47,7 @@ class PACEBMS:
             'product_info': b"\x43\x32",
             'capacity': b"\x41\x36",
             'warning_info': b"\x34\x34",
+            'get_time': b"\x42\x31",
         }
         
         lenids_table = {
@@ -56,19 +57,21 @@ class PACEBMS:
             'product_info': b"000",
             'capacity': b"000",
             'warning_info': b"002",
+            'get_time': b"000",
         }
     
         if command not in commands_table:
             raise ValueError("Invalid command")
     
         ver = b"\x32\x35"
-        adr = b"\x30\x30"
         cid1 = b"\x34\x36"
         cid2 = commands_table[command]
         
         pack_number = pack_number if pack_number is not None else 255
     
         info = f"{pack_number:02X}".encode('ascii')
+
+        adr = info
         
         request = b'\x7e' + ver + adr + cid1 + cid2
         
@@ -79,9 +82,11 @@ class PACEBMS:
         if LCHKSUM is False:
             return None
     
-        request += LCHKSUM.encode('ascii') + LENID + info
+        if LENID == b"000":
+            request += LCHKSUM.encode('ascii') + LENID
+        else:
+            request += LCHKSUM.encode('ascii') + LENID + info
         
-    
         CHKSUM = self.chksum_calc(request)
         if CHKSUM is False:
             return None
@@ -535,48 +540,93 @@ class PACEBMS:
     
     
     def parse_pack_number_data(self, data):
-        """
-        Parses the pack number data received from the BMS.
-        
-        Parameters:
-        data (str): The raw data string received from the BMS.
-        
-        Returns:
-        int: The pack number.
-        """
-        return int(data.strip(), 16)
+        # Remove the SOI character (~)
+        if response.startswith('~'):
+            response = response[1:]
+
+        # Extract fields based on the given response structure
+        ver = response[0:2]
+        adr = response[2:4]
+        fixed_hex = response[4:6]
+        rtn = response[6:8]
+        length = response[8:10]
+        lenid = response[10:12]
+
+        # Determine the length of DATAINFO
+        if lenid == '02':
+            data_info_length = 2  # 2 characters for address confirmation
+        else:
+            raise ValueError("Invalid LENID value")
+
+        data_info = response[12:14]
+
+        # Convert DATAINFO from hex to integer
+        address_value = int(data_info, 16)
+
+        return address_value
     
     
-    def parse_software_version_data(self, data):
-        """
-        Parses the software version data received from the BMS.
-        
-        Parameters:
-        data (str): The raw data string received from the BMS.
-        
-        Returns:
-        str: The software version.
-        """
-        return data.strip()
+    def parse_software_version_data(self, response):
+        # Remove the SOI character (~)
+        if response.startswith('~'):
+            response = response[1:]
+
+        # Extract fields based on the given response structure
+        ver = response[0:2]
+        adr = response[2:4]
+        fixed_hex = response[4:6]
+        rtn = response[6:8]
+        length = response[8:10]
+        lenid = response[10:12]
+
+        # Determine the length of DATAINFO
+        if lenid == '28':
+            data_info_length = 20  # 20 characters for software version information
+        else:
+            raise ValueError("Invalid LENID value")
+
+        data_info = response[12:12 + data_info_length * 2]  # Each character is represented by 2 hex digits
+
+        # Convert DATAINFO from hex to ASCII
+        software_version_info = bytes.fromhex(data_info).decode('ascii')
+
+        return software_version_info
     
     
-    def parse_product_info_data(self, data):
-        """
-        Parses the product information data received from the BMS.
-        
-        Parameters:
-        data (str): The raw data string received from the BMS.
-        
-        Returns:
-        dict: Parsed product information.
-        """
-        fields = data.split()
-        product_info = {
-            'manufacturer': fields[0],
-            'model': fields[1],
-            'serial_number': fields[2]
-        }
-        return product_info
+    def parse_product_info_data(self, response):
+        # Remove the SOI character (~)
+        if response.startswith('~'):
+            response = response[1:]
+
+        # Extract fields based on the given response structure
+        ver = response[0:2]
+        adr = response[2:4]
+        fixed_hex = response[4:6]
+        rtn = response[6:8]
+        length = response[8:10]
+        lenid = response[10:12]
+
+        # Determine the length of DATAINFO
+        if lenid == '50':
+            data_info_length = 40  # 20 characters for BMS and 20 characters for PACK
+        elif lenid == '28':
+            data_info_length = 20  # 20 characters for BMS only
+        else:
+            raise ValueError("Invalid LENID value")
+
+        data_info = response[12:12 + data_info_length * 2]  # Each character is represented by 2 hex digits
+
+        # Split DATAINFO into BMS and PACK production information
+        bms_info_hex = data_info[:40]  # 20 characters * 2 hex digits
+        bms_info = bytes.fromhex(bms_info_hex).decode('ascii')
+
+        if lenid == '50':
+            pack_info_hex = data_info[40:80]  # Next 20 characters * 2 hex digits
+            pack_info = bytes.fromhex(pack_info_hex).decode('ascii')
+        else:
+            pack_info = None
+
+        return bms_info, pack_info
     
     
     
