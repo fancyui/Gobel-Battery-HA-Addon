@@ -986,9 +986,10 @@ class PACEBMS485:
 
             self.logger.debug(f"trying to get analog data of pack: {pack_number}")
 
-            analog_data_single = self.get_analog_data(pack_number)
-            if analog_data_single is None:
-                return None  # return None if warn_data_single is None
+            while True:
+                analog_data_single = self.get_analog_data(pack_number)
+                if analog_data_single is not None:
+                    break  # got a valid value, break the loop
 
             analog_data.append(analog_data_single)
 
@@ -1076,10 +1077,10 @@ class PACEBMS485:
         
         for pack_number in pack_list:
 
-            warn_data_single = self.get_warning_data(pack_number)
-
-            if warn_data_single is None:
-                return None  # return None if warn_data_single is None
+            while True:
+                warn_data_single = self.get_warning_data(pack_number)
+                if warn_data_single is not None:
+                    break  # got a valid value, break the loop
 
             warn_data.append(warn_data_single)
 

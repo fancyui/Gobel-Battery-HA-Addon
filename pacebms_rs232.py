@@ -981,11 +981,10 @@ class PACEBMS232:
         }
 
 
-
-        analog_data = self.get_analog_data(pack_number)
-
-        if analog_data is None:
-            return None  # return None if analog_data is None
+        while True:
+            analog_data = self.get_analog_data(pack_number)
+            if analog_data is not None:
+                break  # got a valid value, break the loop
 
         total_packs_num = len(analog_data)
 
@@ -1066,10 +1065,10 @@ class PACEBMS232:
 
     def publish_warning_data_mqtt(self, pack_number=None):
 
-        warn_data = self.get_warning_data(pack_number)
-
-        if warn_data is None:
-            return None  # return None if warn_data is None
+        while True:
+            warn_data = self.get_warning_data(pack_number)
+            if warn_data is not None:
+                break  # got a valid value, break the loop
 
         total_packs_num = len(warn_data)
 
