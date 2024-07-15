@@ -5,7 +5,8 @@ import json
 import sys
 import logging
 from bms_comm import BMSCommunication
-from pacebms import PACEBMS
+from pacebms_rs232 import PACEBMS232
+from pacebms_rs485 import PACEBMS485
 from ha_rest_api import HA_REST_API
 from ha_mqtt import HA_MQTT
 
@@ -100,14 +101,12 @@ def run():
         return
 
     if bms_type == 'PACE_LV':
-    
-        bms = PACEBMS(bms_comm, ha_comm, data_refresh_interval, debug, if_random)
-
-        logger.info("PACE_LV BMS Monitor Working...")
-
-        initial_data_fetched = False  # Flag to track if initial data has been fetched
 
         if battery_port == 'rs232':
+
+            bms = PACEBMS232(bms_comm, ha_comm, data_refresh_interval, debug, if_random)
+
+            logger.info("PACE_LV BMS Monitor Working...")
 
             logger.info("PACE_LV BMS RS232 Working...")
 
@@ -129,29 +128,37 @@ def run():
 
         if battery_port == 'rs485':
 
+            bms = PACEBMS485(bms_comm, ha_comm, data_refresh_interval, debug, if_random)
+
+            logger.info("PACE_LV BMS Monitor Working...")
+
             logger.info("PACE_LV BMS RS485 Working...")
 
             pack_list = []
 
-            for pack_number in range(2, max_parallel_allowed+1):  #up to max_parallel_allowed
+            for pack_number in range(0, max_parallel_allowed+1):  #up to max_parallel_allowed
                 result = bms.get_pack_num_data(pack_number)
-                if int(result) == pack_number:
+                logger.debug(f"pack_number {result}")
+                if result == pack_number:
                     pack_list.append(pack_number)
 
-            try:
-                while True:  # Run continuously
+            logger.info(f"Total packs found: {pack_list}")
+            
+            if len(pack_list) > 0:
 
-                    for pack_number in pack_list:
-                        bms.publish_analog_data_mqtt(pack_number)
-                        bms.publish_warning_data_mqtt(pack_number)
+                try:
+                    while True:  # Run continuously
+
+                        bms.publish_analog_data_mqtt(pack_list)
+                        bms.publish_warning_data_mqtt(pack_list)
                     
                         time.sleep(data_refresh_interval)  # Sleep for 5 seconds between each iteration
 
-            except KeyboardInterrupt:
-                logger.info("Stopping the program...")
-            
-            finally:
-                mqtt_client.loop_stop()
+                except KeyboardInterrupt:
+                    logger.info("Stopping the program...")
+                
+                finally:
+                    mqtt_client.loop_stop()
 
 if __name__ == "__main__":
     run()

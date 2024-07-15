@@ -1,7 +1,7 @@
 import struct
 import logging
 
-class PACEBMS:
+class PACEBMS232:
 
     def __init__(self, bms_comm, ha_comm, data_refresh_interval, debug, if_random):
         self.bms_comm = bms_comm
@@ -539,7 +539,7 @@ class PACEBMS:
         return time_date_info
     
     
-    def parse_pack_number_data(self, data):
+    def parse_pack_number_data(self, response):
         # Remove the SOI character (~)
         if response.startswith('~'):
             response = response[1:]
@@ -769,7 +769,7 @@ class PACEBMS:
         try:
             # Generate request
             self.logger.debug(f"Trying to prepare pack num request")
-            request = self.generate_bms_request("pack_num",pack_number)
+            request = self.generate_bms_request("pack_number",pack_number)
             self.logger.debug(f"pack num request: {request}")
 
             # Send request to BMS
@@ -984,6 +984,9 @@ class PACEBMS:
 
         analog_data = self.get_analog_data(pack_number)
 
+        if analog_data is None:
+            return None  # return None if analog_data is None
+
         total_packs_num = len(analog_data)
 
         self.ha_comm.publish_sensor_state(total_packs_num, 'packs', "total_packs_num")
@@ -1064,6 +1067,9 @@ class PACEBMS:
     def publish_warning_data_mqtt(self, pack_number=None):
 
         warn_data = self.get_warning_data(pack_number)
+
+        if warn_data is None:
+            return None  # return None if warn_data is None
 
         total_packs_num = len(warn_data)
 
