@@ -170,6 +170,7 @@ class PACEBMS232:
         # Check the command and response validity
         if fields[2] != '46' or fields[3] != '00':
             raise ValueError(f"Invalid command or response code: {fields[2]} {fields[3]}")
+            return None
     
         # Extract the length of the data information
         length = int(fields[4] + fields[5], 16)
@@ -288,6 +289,11 @@ class PACEBMS232:
         rtn = data[6:8]
         length_high_byte = data[8:10]
         length_low_byte = data[10:12]
+
+        # Check the command and response validity
+        if command != '46' or rtn != '00':
+            raise ValueError(f"Invalid command or response code: {command} {rtn}")
+            return None
         
         # Calculate LENGTH in bytes
         length = int(length_high_byte + length_low_byte, 16)
@@ -825,6 +831,11 @@ class PACEBMS232:
         analog_data = self.get_analog_data(pack_number)
 
         total_packs_num = len(analog_data)
+
+        if total_packs_num < 1:
+            self.logger.error("No packs found")
+            return None
+
         self.ha_comm.publish_data(total_packs_num, 'packs', f"{self.base_topic}.total_packs_num")
 
         total_pack_full_capacity = round(sum(d.get('pack_full_capacity', 0) for d in analog_data),2)
@@ -988,6 +999,10 @@ class PACEBMS232:
 
         total_packs_num = len(analog_data)
 
+        if total_packs_num < 1:
+            self.logger.error("No packs found")
+            return None
+
         self.ha_comm.publish_sensor_state(total_packs_num, 'packs', "total_packs_num")
         self.ha_comm.publish_sensor_discovery("total_packs_num", "packs", icons['total_packs_num'], deviceclasses['total_packs_num'], stateclasses['total_packs_num'])
 
@@ -1071,6 +1086,10 @@ class PACEBMS232:
                 break  # got a valid value, break the loop
 
         total_packs_num = len(warn_data)
+
+        if total_packs_num < 1:
+            self.logger.error("No packs found")
+            return None
 
         pack_i = 0
 

@@ -170,6 +170,7 @@ class PACEBMS485:
         # Check the command and response validity
         if fields[2] != '46' or fields[3] != '00':
             raise ValueError(f"Invalid command or response code: {fields[2]} {fields[3]}")
+            return None
     
         # Extract the length of the data information
         length = int(fields[4] + fields[5], 16)
@@ -288,6 +289,11 @@ class PACEBMS485:
         rtn = data[6:8]
         length_high_byte = data[8:10]
         length_low_byte = data[10:12]
+
+        # Check the command and response validity
+        if command != '46' or rtn != '00':
+            raise ValueError(f"Invalid command or response code: {command} {rtn}")
+            return None
         
         # Calculate LENGTH in bytes
         length = int(length_high_byte + length_low_byte, 16)
@@ -321,6 +327,8 @@ class PACEBMS485:
             return 'unknown'
     
     def parse_warnstate(self, warnstate):
+        if warnstate == None:
+            return None
         warnstate_bytes = bytes.fromhex(warnstate)
         index = 0
     
@@ -469,7 +477,8 @@ class PACEBMS485:
     def parse_warning_data(self, data):
         infoflag, warnstate = self.extract_warnstate(data)
         pack = self.parse_warnstate(warnstate)
-    
+        if pack == None:
+            return None
         # packs_data = []
         # for pack in packs_info:
         pack_data = {
@@ -981,20 +990,28 @@ class PACEBMS485:
         }
 
         analog_data = []
-        
         for pack_number in pack_list:
-
-            self.logger.debug(f"trying to get analog data of pack: {pack_number}")
-
-            while True:
+            retry_count = 0
+            max_retries = 3
+            while retry_count < max_retries:
                 analog_data_single = self.get_analog_data(pack_number)
                 if analog_data_single is not None:
                     break  # got a valid value, break the loop
+                retry_count += 1
+                self.logger.debug(f"retry {retry_count} to get analog data of pack: {pack_number}")
 
-            analog_data.append(analog_data_single)
+            if retry_count == max_retries:
+                self.logger.error(f"Failed to get analog data of pack: {pack_number} after {max_retries} retries")
+            else:
+                analog_data.append(analog_data_single)
 
 
         total_packs_num = len(analog_data)
+
+        if total_packs_num < 1:
+            self.logger.error("No packs found")
+            return None
+
 
         self.ha_comm.publish_sensor_state(total_packs_num, 'packs', "total_packs_num")
         self.ha_comm.publish_sensor_discovery("total_packs_num", "packs", icons['total_packs_num'], deviceclasses['total_packs_num'], stateclasses['total_packs_num'])
@@ -1076,15 +1093,25 @@ class PACEBMS485:
         warn_data = []
         
         for pack_number in pack_list:
-
-            while True:
+            retry_count = 0
+            max_retries = 3
+            while retry_count < max_retries:
                 warn_data_single = self.get_warning_data(pack_number)
                 if warn_data_single is not None:
                     break  # got a valid value, break the loop
+                retry_count += 1
+                self.logger.debug(f"retry {retry_count} to get warning data of pack: {pack_number}")
 
-            warn_data.append(warn_data_single)
+            if retry_count == max_retries:
+                self.logger.error(f"Failed to get warning data of pack: {pack_number} after {max_retries} retries")
+            else:
+                warn_data.append(warn_data_single)
 
         total_packs_num = len(warn_data)
+
+        if total_packs_num < 1:
+            self.logger.error("No packs found")
+            return None
 
         pack_i = 0
 
