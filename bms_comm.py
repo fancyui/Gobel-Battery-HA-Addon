@@ -31,7 +31,7 @@ class BMSCommunication:
             try:
                 self.logger.info(f"Trying to connect BMS over {self.ethernet_ip}:{self.ethernet_port}")
                 self.bms_connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                self.bms_connection.settimeout(5)
+                self.bms_connection.settimeout(0.5)
                 self.bms_connection.connect((self.ethernet_ip, self.ethernet_port))
                 self.logger.info(f"Connected to BMS over Ethernet: {self.ethernet_ip}:{self.ethernet_port}")
                 return self.bms_connection
