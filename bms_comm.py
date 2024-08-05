@@ -23,6 +23,8 @@ class BMSCommunication:
                 self.logger.info(f"Trying to connect BMS over {self.serial_port}:{self.baud_rate}")
                 self.bms_connection = serial.Serial(self.serial_port, self.baud_rate, timeout=1)
                 self.logger.info(f"Connected to BMS over serial port: {self.serial_port} with baud rate: {self.baud_rate}")
+                self.logger.info("Please ensure the Baud Rate is correctly set. An incorrect baud rate may not raise an immediate error, but it can lead to communication failures or corrupted data.")
+
                 return self.bms_connection
             except serial.SerialException as e:
                 self.logger.error(f"Serial connection error: {e}")
