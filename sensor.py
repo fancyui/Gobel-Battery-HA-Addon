@@ -134,6 +134,8 @@ def run():
 
             logger.info("PACE_LV BMS RS485 Working...")
 
+            logger.info("Looking for valid packs...")
+
             pack_list = []
 
             for pack_number in range(0, max_parallel_allowed+1):  #up to max_parallel_allowed
@@ -142,7 +144,7 @@ def run():
                 if result == pack_number:
                     pack_list.append(pack_number)
 
-            logger.info(f"Total packs found: {pack_list}")
+            logger.info(f"Found packs list: {pack_list}")
             
             if len(pack_list) > 0:
 

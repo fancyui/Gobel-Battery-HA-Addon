@@ -48,7 +48,7 @@ class HA_MQTT:
     def publish_sensor_discovery(self, entity_id, unit, icon, deviceclass, stateclass):
         main_topic = 'sensor'
         topic = f"{self.host_name}/{main_topic}/{self.device_name}_{entity_id}/config"
-        self.logger.debug(f"Publishing discovery to topic: {topic}")
+        # self.logger.debug(f"Publishing discovery to topic: {topic}")
         payload = {
             "name": " ".join(self.cap_first(word) for word in entity_id.split("_")),
             "state_topic": f"{main_topic}/{self.device_name}_{entity_id}/state",
@@ -62,33 +62,33 @@ class HA_MQTT:
         }
         if deviceclass != 'null':
             payload["device_class"] = deviceclass
-        self.logger.debug(f"Discovery payload: {json.dumps(payload)}")
+        # self.logger.debug(f"Discovery payload: {json.dumps(payload)}")
 
         try:
             self.mqtt_client.publish(topic, json.dumps(payload), retain=True)
-            self.logger.debug(f"Published discovery for {topic}")
+            # self.logger.debug(f"Published discovery for {topic}")
         except Exception as e:
             self.logger.error(f"Failed to publish discovery for {topic}: {e}")
 
     def publish_sensor_state(self, value, unit, entity_id):
         main_topic = 'sensor'
         topic = f"{main_topic}/{self.device_name}_{entity_id}/state"
-        self.logger.debug(f"Publishing data to topic: {topic}")
+        # self.logger.debug(f"Publishing data to topic: {topic}")
         payload = {
             "state": value,
             "attributes": {"unit_of_measurement": unit}
         }
-        self.logger.debug(f"Data payload: {json.dumps(payload)}")
+        # self.logger.debug(f"Data payload: {json.dumps(payload)}")
         try:
             self.mqtt_client.publish(topic, json.dumps(payload))
-            self.logger.debug(f"Published data for {topic}")
+            # self.logger.debug(f"Published data for {topic}")
         except Exception as e:
             self.logger.error(f"Failed to publish data for {topic}: {e}")
 
     def publish_event_discovery(self, entity_id):
         main_topic = 'event'
         topic = f"{self.host_name}/{main_topic}/{self.device_name}_{entity_id}/config"
-        self.logger.debug(f"Publishing discovery to topic: {topic}")
+        # self.logger.debug(f"Publishing discovery to topic: {topic}")
         payload = {
             "name": " ".join(self.cap_first(word) for word in entity_id.split("_")),
             "state_topic": f"{main_topic}/{self.device_name}_{entity_id}/state",
@@ -102,10 +102,10 @@ class HA_MQTT:
             "icon":  "mdi:battery-heart-variant",
             "device": self.device_info
         }
-        self.logger.debug(f"Discovery payload: {json.dumps(payload)}")
+        # self.logger.debug(f"Discovery payload: {json.dumps(payload)}")
         try:
             self.mqtt_client.publish(topic, json.dumps(payload), retain=True)
-            self.logger.debug(f"Published discovery for {topic}")
+            # self.logger.debug(f"Published discovery for {topic}")
         except Exception as e:
             self.logger.error(f"Failed to publish discovery for {topic}: {e}")
 
@@ -113,21 +113,21 @@ class HA_MQTT:
     def publish_event_state(self, value, entity_id):
         main_topic = 'event'
         topic = f"{main_topic}/{self.device_name}_{entity_id}/state"
-        self.logger.debug(f"Publishing data to topic: {topic}")
+        # self.logger.debug(f"Publishing data to topic: {topic}")
         payload = {
             "event_type": value
         }
-        self.logger.debug(f"Data payload: {json.dumps(payload)}")
+        # self.logger.debug(f"Data payload: {json.dumps(payload)}")
         try:
             self.mqtt_client.publish(topic, json.dumps(payload))
-            self.logger.debug(f"Published data for {topic}")
+            # self.logger.debug(f"Published data for {topic}")
         except Exception as e:
             self.logger.error(f"Failed to publish data for {topic}: {e}")
 
     def publish_binary_sensor_discovery(self, entity_id, icon):
         main_topic = 'binary_sensor'
         topic = f"{self.host_name}/{main_topic}/{self.device_name}_{entity_id}/config"
-        self.logger.debug(f"Publishing discovery to topic: {topic}")
+        # self.logger.debug(f"Publishing discovery to topic: {topic}")
         payload = {
             "name": " ".join(self.cap_first(word) for word in entity_id.split("_")),
             "state_topic": f"{main_topic}/{self.device_name}_{entity_id}/state",
@@ -138,10 +138,10 @@ class HA_MQTT:
             "value_template": "{{ value_json.state }}",
             "device": self.device_info
         }
-        self.logger.debug(f"Discovery payload: {json.dumps(payload)}")
+        # self.logger.debug(f"Discovery payload: {json.dumps(payload)}")
         try:
             self.mqtt_client.publish(topic, json.dumps(payload), retain=True)
-            self.logger.debug(f"Published discovery for {topic}")
+            # self.logger.debug(f"Published discovery for {topic}")
         except Exception as e:
             self.logger.error(f"Failed to publish discovery for {topic}: {e}")
 
@@ -149,14 +149,14 @@ class HA_MQTT:
     def publish_binary_sensor_state(self, value, entity_id):
         main_topic = 'binary_sensor'
         topic = f"{main_topic}/{self.device_name}_{entity_id}/state"
-        self.logger.debug(f"Publishing data to topic: {topic}")
+        # self.logger.debug(f"Publishing data to topic: {topic}")
         payload = {
             "state": value
         }
-        self.logger.debug(f"Data payload: {json.dumps(payload)}")
+        # self.logger.debug(f"Data payload: {json.dumps(payload)}")
         try:
             self.mqtt_client.publish(topic, json.dumps(payload))
-            self.logger.debug(f"Published data for {topic}")
+            # self.logger.debug(f"Published data for {topic}")
         except Exception as e:
             self.logger.error(f"Failed to publish data for {topic}: {e}")
 
@@ -164,7 +164,7 @@ class HA_MQTT:
     def publish_warn_discovery(self, entity_id, icon):
         main_topic = 'sensor'
         topic = f"{self.host_name}/{main_topic}/{self.device_name}_{entity_id}/config"
-        self.logger.debug(f"Publishing discovery to topic: {topic}")
+        # self.logger.debug(f"Publishing discovery to topic: {topic}")
         payload = {
             "name": " ".join(self.cap_first(word) for word in entity_id.split("_")),
             "state_topic": f"{main_topic}/{self.device_name}_{entity_id}/state",
@@ -173,10 +173,10 @@ class HA_MQTT:
             "value_template": "{{ value_json.state }}",
             "device": self.device_info
         }
-        self.logger.debug(f"Discovery payload: {json.dumps(payload)}")
+        # self.logger.debug(f"Discovery payload: {json.dumps(payload)}")
         try:
             self.mqtt_client.publish(topic, json.dumps(payload), retain=True)
-            self.logger.debug(f"Published discovery for {topic}")
+            # self.logger.debug(f"Published discovery for {topic}")
         except Exception as e:
             self.logger.error(f"Failed to publish discovery for {topic}: {e}")
 
@@ -184,16 +184,16 @@ class HA_MQTT:
     def publish_warn_state(self, value, entity_id):
         main_topic = 'sensor'
         topic = f"{main_topic}/{self.device_name}_{entity_id}/state"
-        self.logger.debug(f"Publishing data to topic: {topic}")
+        # self.logger.debug(f"Publishing data to topic: {topic}")
 
         payload = {
             "state": value,
         }
 
-        self.logger.debug(f"Data payload: {json.dumps(payload)}")
+        # self.logger.debug(f"Data payload: {json.dumps(payload)}")
         try:
             self.mqtt_client.publish(topic, json.dumps(payload))
-            self.logger.debug(f"Published data for {topic}")
+            # self.logger.debug(f"Published data for {topic}")
         except Exception as e:
             self.logger.error(f"Failed to publish data for {topic}: {e}")
 

@@ -69,16 +69,23 @@ class BMSCommunication:
         try:
             # Check if the connection is a serial connection
             if hasattr(self.bms_connection, 'readline'):
-                received_data = self.bms_connection.readline().decode().strip()
+                raw_data = self.bms_connection.readline()
+                received_data = raw_data.decode().strip()
             # Check if the connection is a socket (Ethernet)
             elif hasattr(self.bms_connection, 'recv'):
                 # Assuming a buffer size of 1024 bytes for demonstration purposes
-                received_data = self.bms_connection.recv(self.buffer_size).decode().strip()
+                raw_data = self.bms_connection.recv(self.buffer_size)
+                received_data = raw_data.decode().strip()
             else:
                 raise ValueError("Unsupported connection type")
 
             self.logger.debug(f"Received data from BMS: {received_data}")
             return received_data
         except Exception as e:
-            self.logger.error(f"Error receiving data from BMS: {e}")
+            # Log the raw data when there is a decoding error
+            if 'raw_data' in locals():
+                self.logger.error(f"Error receiving data from BMS: {e}. Raw data: {raw_data}")
+                self.logger.error(f"Raw data (hex): {raw_data.hex()}")
+            else:
+                self.logger.warning(f"No data received from BMS: {e}")
             return None
