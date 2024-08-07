@@ -38,7 +38,27 @@ class PACEBMS232:
             self.logger.error(f"Error details: {str(e)}")
             return False
     
-    
+        def hex_to_signed(hex_str):
+        """
+        Convert a 16-bit hexadecimal string to signed integer value.
+        
+        :param hex_str: Hexadecimal string representing battery current (e.g., "FFFB")
+        :return: Signed integer current value
+        """
+        # Convert the hexadecimal string to an integer
+        raw_value = int(hex_str, 16)
+        
+        # Process the 16-bit two's complement signed integer
+        if raw_value & 0x8000:  # Check the sign bit (if the highest bit is 1)
+            # Handle negative numbers: invert bits and add 1, then attach negative sign
+            signed_value = -((~raw_value & 0xFFFF) + 1)
+        else:
+            signed_value = raw_value
+        
+        
+        return signed_value
+
+
     def generate_bms_request(self, command, pack_number=None):
         commands_table = {
             'pack_number': b"\x39\x30",
@@ -217,11 +237,11 @@ class PACEBMS232:
             pack_data['temperatures'] = temperatures
     
             # Pack current
-            pack_current = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for current
-            pack_current = round(pack_current / 100, 2)  # Convert 10mA to A
-            if pack_current > 32767:
-                pack_current -= 65536
+            pack_current = fields[offset] + fields[offset + 1]  # Combine two bytes for current
+            pack_current = hex_to_signed(pack_current) * 100
+
             offset += 2
+            
             pack_data['view_current'] = pack_current
     
             # Pack total voltage
