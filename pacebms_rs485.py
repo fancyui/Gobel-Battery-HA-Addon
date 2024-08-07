@@ -38,7 +38,7 @@ class PACEBMS485:
             self.logger.error(f"Error details: {str(e)}")
             return False
     
-    def hex_to_signed(hex_str):
+    def hex_to_signed(self, hex_str):
         """
         Convert a 16-bit hexadecimal string to signed integer value.
         
@@ -238,7 +238,7 @@ class PACEBMS485:
 
         # Pack current
         pack_current = fields[offset] + fields[offset + 1]  # Combine two bytes for current
-        pack_current = hex_to_signed(pack_current) * 100
+        pack_current = self.hex_to_signed(pack_current) * 100
 
         offset += 2
         
