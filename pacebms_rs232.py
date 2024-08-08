@@ -238,7 +238,7 @@ class PACEBMS232:
     
             # Pack current
             pack_current = fields[offset] + fields[offset + 1]  # Combine two bytes for current
-            pack_current = self.hex_to_signed(pack_current) * 100
+            pack_current = self.hex_to_signed(pack_current) / 100
 
             offset += 2
             
@@ -250,11 +250,11 @@ class PACEBMS232:
             offset += 2
             pack_data['view_voltage'] = pack_total_voltage
 
-            pack_power = round(pack_total_voltage * pack_current / 1000, 1) # Convert W to kW
+            pack_power = round(pack_total_voltage * pack_current / 1000, 4) # Convert W to kW
             pack_data['view_power'] = pack_power
 
-            pack_data['view_energy_charged'] = round(pack_power * self.data_refresh_interval / 3600, 1) if pack_power >= 0 else 0
-            pack_data['view_energy_discharged'] = round(abs(pack_power) * self.data_refresh_interval / 3600, 1) if pack_power < 0 else 0
+            pack_data['view_energy_charged'] = pack_power * self.data_refresh_interval / 3600 * 1000 if pack_power >= 0 else 0
+            pack_data['view_energy_discharged'] = abs(pack_power) * self.data_refresh_interval / 3600 * 1000 if pack_power < 0 else 0
 
             # Pack remain capacity
             pack_remain_capacity = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for remaining capacity
@@ -916,8 +916,8 @@ class PACEBMS232:
             'view_cycle_number': 'cycles',
             'view_design_capacity': 'Ah',
             'view_power': 'kW',
-            'view_energy_charged': 'kWh',
-            'view_energy_discharged': 'kWh',
+            'view_energy_charged': 'Wh',
+            'view_energy_discharged': 'Wh',
             'view_SOH': '%',
             'view_SOC': '%',
         }
@@ -1054,19 +1054,19 @@ class PACEBMS232:
         self.ha_comm.publish_sensor_state(total_power, 'kW', "total_power")
         self.ha_comm.publish_sensor_discovery("total_power", "kW", icons['total_power'], deviceclasses['total_power'], stateclasses['total_power'])
 
-        total_energy_charged = round(total_power * self.data_refresh_interval / 3600, 1) if total_power >= 0 else 0
-        self.ha_comm.publish_sensor_state(total_energy_charged, 'kWh', "total_energy_charged")
-        self.ha_comm.publish_sensor_discovery("total_energy_charged", "kWh", icons['total_energy_charged'], deviceclasses['total_energy_charged'], stateclasses['total_energy_charged'])
+        total_energy_charged = total_power * self.data_refresh_interval / 3600 * 1000 if total_power >= 0 else 0
+        self.ha_comm.publish_sensor_state(total_energy_charged, 'Wh', "total_energy_charged")
+        self.ha_comm.publish_sensor_discovery("total_energy_charged", "Wh", icons['total_energy_charged'], deviceclasses['total_energy_charged'], stateclasses['total_energy_charged'])
 
-        total_energy_discharged = round(abs(total_power) * self.data_refresh_interval / 3600, 1) if total_power < 0 else 0
-        self.ha_comm.publish_sensor_state(total_energy_discharged, 'kWh', "total_energy_discharged")
-        self.ha_comm.publish_sensor_discovery("total_energy_discharged", "kWh", icons['total_energy_discharged'], deviceclasses['total_energy_discharged'], stateclasses['total_energy_discharged'])
+        total_energy_discharged = abs(total_power) * self.data_refresh_interval / 3600 * 1000 if total_power < 0 else 0
+        self.ha_comm.publish_sensor_state(total_energy_discharged, 'Wh', "total_energy_discharged")
+        self.ha_comm.publish_sensor_discovery("total_energy_discharged", "Wh", icons['total_energy_discharged'], deviceclasses['total_energy_discharged'], stateclasses['total_energy_discharged'])
 
         if self.if_random:
             import random
             random_number = random.randint(1, 100)
-            self.ha_comm.publish_sensor_state(random_number, 'A', "random_number")
-            self.ha_comm.publish_sensor_discovery("random_number", "A", icons['random_number'], deviceclasses['random_number'], stateclasses['random_number'])
+            self.ha_comm.publish_sensor_state(random_number, 'R', "random_number")
+            self.ha_comm.publish_sensor_discovery("random_number", "R", icons['random_number'], deviceclasses['random_number'], stateclasses['random_number'])
 
 
         pack_i = 0
