@@ -7,6 +7,7 @@ import logging
 from bms_comm import BMSCommunication
 from pacebms_rs232 import PACEBMS232
 from pacebms_rs485 import PACEBMS485
+from tdtbms_rs232 import TDTBMS232
 from ha_rest_api import HA_REST_API
 from ha_mqtt import HA_MQTT
 
@@ -166,7 +167,7 @@ def run():
 
         if battery_port == 'rs232':
 
-            bms = PACEBMS232(bms_comm, ha_comm, data_refresh_interval, debug, if_random)
+            bms = TDTBMS232(bms_comm, ha_comm, data_refresh_interval, debug, if_random)
 
             logger.info("TDT BMS Monitor Working...")
 
