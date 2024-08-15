@@ -162,5 +162,46 @@ def run():
                 finally:
                     mqtt_client.loop_stop()
 
+    if bms_type == 'TDT':
+
+        if battery_port == 'rs232':
+
+            bms = PACEBMS485(bms_comm, ha_comm, data_refresh_interval, debug, if_random)
+
+            logger.info("TDT BMS Monitor Working...")
+
+            logger.info("TDT BMS RS232 Working...")
+
+            logger.info("Looking for valid packs...")
+
+            pack_list = []
+
+            for pack_number in range(0, max_parallel_allowed+1):  #up to max_parallel_allowed
+                result = bms.get_pack_num_data(pack_number)
+                logger.debug(f"pack_number {result}")
+                if result == pack_number:
+                    pack_list.append(pack_number)
+
+            logger.info(f"Found packs list: {pack_list}")
+            
+            if len(pack_list) > 0:
+
+                try:
+                    while True:  # Run continuously
+
+                        bms.publish_analog_data_mqtt(pack_list)
+                        bms.publish_warning_data_mqtt(pack_list)
+                    
+                        time.sleep(data_refresh_interval)  # Sleep for 5 seconds between each iteration
+
+                except KeyboardInterrupt:
+                    logger.info("Stopping the program...")
+                
+                finally:
+                    mqtt_client.loop_stop()
+
+        if battery_port == 'rs485':
+            logger.info("Please use RS232")
+
 if __name__ == "__main__":
     run()

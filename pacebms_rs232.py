@@ -586,8 +586,8 @@ class PACEBMS232:
 
         data_info = response[12:14]
 
-        # Convert DATAINFO from hex to integer
-        address_value = int(data_info, 16)
+        # RS232 protocol has no datainfo
+        address_value = int(adr, 16)
 
         return address_value
     
