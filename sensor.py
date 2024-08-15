@@ -166,7 +166,7 @@ def run():
 
         if battery_port == 'rs232':
 
-            bms = PACEBMS485(bms_comm, ha_comm, data_refresh_interval, debug, if_random)
+            bms = PACEBMS232(bms_comm, ha_comm, data_refresh_interval, debug, if_random)
 
             logger.info("TDT BMS Monitor Working...")
 
