@@ -56,7 +56,7 @@ class HA_MQTT:
             "unit_of_measurement": unit,
             "icon": icon,
             "state_class": stateclass,
-            "suggested_display_precision": 2,
+            # "suggested_display_precision": 2,
             "value_template": "{{ value_json.state }}",
             "device": self.device_info
         }

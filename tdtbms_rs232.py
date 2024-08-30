@@ -68,6 +68,7 @@ class TDTBMS232:
             'capacity': b"\x41\x36",
             'warning_info': b"\x34\x34",
             'get_time': b"\x42\x31",
+            'pack_quantity': b"\x39\x30",
         }
         
         lenids_table = {
@@ -78,6 +79,7 @@ class TDTBMS232:
             'capacity': b"000",
             'warning_info': b"002",
             'get_time': b"000",
+            'pack_quantity': b"000",
         }
     
         if command not in commands_table:
@@ -166,7 +168,7 @@ class TDTBMS232:
     
     
     
-    def parse_analog_data(self, response):
+    def parse_analog_data(self, response, pack_number):
         """
         Parses the ASCII response string to extract pack analog data for multiple packs.
     
@@ -205,6 +207,10 @@ class TDTBMS232:
         # Number of packs
         num_packs = int(fields[offset], 16)
         offset += 1
+
+        if num_packs != pack_number:
+            raise ValueError(f"Invalid data")
+            return None
     
         # for pack_index in range(num_packs):
         pack_data = {}
@@ -221,6 +227,12 @@ class TDTBMS232:
             cell_voltages.append(voltage)
             offset += 2
         pack_data['cell_voltages'] = cell_voltages
+
+        cell_voltage_max = max(cell_voltages)
+        cell_voltage_min = min(cell_voltages)
+
+        pack_data['cell_voltage_max'] = cell_voltage_max
+        pack_data['cell_voltage_min'] = cell_voltage_min
 
         # Number of temperature sensors
         num_temps = int(fields[offset], 16)
@@ -294,7 +306,7 @@ class TDTBMS232:
     
     
     
-    def extract_warnstate(self, data):
+    def extract_warnstate(self, data, pack_number):
         # Ensure the data starts with the SOI character (~)
         if data[0] != '~':
             raise ValueError("Data does not start with SOI (~)")
@@ -309,6 +321,11 @@ class TDTBMS232:
         rtn = data[6:8]
         length_high_byte = data[8:10]
         length_low_byte = data[10:12]
+        num_pack = data[14:16]
+
+        if int(num_pack, 16) != pack_number:
+            raise ValueError(f"Invalid data")
+            return None
 
         # Check the command and response validity
         if command != '46' or rtn != '00':
@@ -494,8 +511,8 @@ class TDTBMS232:
     
     
     
-    def parse_warning_data(self, data):
-        infoflag, warnstate = self.extract_warnstate(data)
+    def parse_warning_data(self, data, pack_number):
+        infoflag, warnstate = self.extract_warnstate(data,pack_number)
         pack = self.parse_warnstate(warnstate)
         if pack == None:
             return None
@@ -568,7 +585,7 @@ class TDTBMS232:
         return time_date_info
     
     
-    def parse_pack_number_data(self, response):
+    def parse_pack_quantity_data(self, response):
         # Remove the SOI character (~)
         if response.startswith('~'):
             response = response[1:]
@@ -589,10 +606,10 @@ class TDTBMS232:
 
         data_info = response[12:14]
 
-        # RS232 has not datainfo address
-        address_value = int(adr, 16)
+        # Convert DATAINFO from hex to integer
+        pack_quantity = int(data_info, 16)
 
-        return address_value
+        return pack_quantity
     
     
     def parse_software_version_data(self, response):
@@ -683,7 +700,7 @@ class TDTBMS232:
             
             # Parse analog data from response
             self.logger.debug(f"Trying to parse analog data")
-            analog_data = self.parse_analog_data(response)
+            analog_data = self.parse_analog_data(response,pack_number)
             self.logger.debug(f"analog data parsed: {analog_data}")
             return analog_data
     
@@ -716,7 +733,7 @@ class TDTBMS232:
             
             # Parse analog data from response
             self.logger.debug(f"Trying to parse warning data")
-            warning_data = self.parse_warning_data(response)
+            warning_data = self.parse_warning_data(response,pack_number)
             self.logger.debug(f"warning data parsed: {warning_data}")
     
             return warning_data
@@ -792,33 +809,33 @@ class TDTBMS232:
             self.logger.error(f"An error occurred: {e}")
             return None
 
-    def get_pack_num_data(self, pack_number):
+    def get_pack_quantity_data(self, pack_number=None):
         
         
         try:
             # Generate request
-            self.logger.debug(f"Trying to prepare pack num request")
-            request = self.generate_bms_request("pack_number",pack_number)
-            self.logger.debug(f"pack num request: {request}")
+            self.logger.debug(f"Trying to prepare pack quantity request")
+            request = self.generate_bms_request("pack_quantity",pack_number)
+            self.logger.debug(f"pack quantity request: {request}")
 
             # Send request to BMS
-            self.logger.debug(f"Trying to send pack num request")
+            self.logger.debug(f"Trying to send pack quantity request")
             if not self.bms_comm.send_data(request):
                 return None
-            self.logger.debug(f"pack num request sent")
+            self.logger.debug(f"pack quantity request sent")
     
             # Receive response from BMS
-            self.logger.debug(f"Trying to receive pack num data")
+            self.logger.debug(f"Trying to receive pack quantity data")
             response = self.bms_comm.receive_data()
-            self.logger.debug(f"pack num data recieved: {response}")
+            self.logger.debug(f"pack quantity data recieved: {response}")
             if response is None:
                 return None
             
             # Parse analog data from response
-            self.logger.debug(f"Trying to parse pack num data")
-            pack_number_data = self.parse_pack_number_data(response)
-            self.logger.debug(f"pack num data parsed: {pack_number_data}")
-            return pack_number_data
+            self.logger.debug(f"Trying to parse pack quantity data")
+            pack_quantity_data = self.parse_pack_quantity_data(response)
+            self.logger.debug(f"pack quantity data parsed: {pack_quantity_data}")
+            return pack_quantity_data
     
         except Exception as e:
             self.logger.error(f"An error occurred: {e}")
@@ -905,6 +922,8 @@ class TDTBMS232:
         units = {
             'view_num_cells': 'cells',
             'cell_voltages': 'mV',
+            'cell_voltage_max': 'mV',
+            'cell_voltage_min': 'mV',
             'view_num_temps': 'NTCs',
             'temperatures': '℃',
             'view_current': 'A',
@@ -931,8 +950,12 @@ class TDTBMS232:
             'total_SOH': 'mdi:battery-plus-variant',
             'total_energy_charged': 'mdi:battery-positive',
             'total_energy_discharged': 'mdi:battery-negative',
+            'total_cell_voltage_max': 'mdi:align-vertical-top',
+            'total_cell_voltage_min': 'mdi:align-vertical-bottom',
             'view_num_cells': 'mdi:database',
             'cell_voltages': 'mdi:sine-wave',
+            'cell_voltage_max': 'mdi:align-vertical-top',
+            'cell_voltage_min': 'mdi:align-vertical-bottom',
             'view_num_temps': 'mdi:database',
             'temperatures': 'mdi:thermometer',
             'view_current': 'mdi:current-dc',
@@ -960,7 +983,11 @@ class TDTBMS232:
             'total_SOH': 'null',
             'total_energy_charged': 'energy',
             'total_energy_discharged': 'energy',
+            'total_cell_voltage_max': 'voltage',
+            'total_cell_voltage_min': 'voltage',
             'cell_voltages': 'voltage',
+            'cell_voltage_max': 'voltage',
+            'cell_voltage_min': 'voltage',
             'temperatures': 'temperature',
             'view_num_cells': 'null',
             'view_num_temps': 'null',
@@ -991,8 +1018,12 @@ class TDTBMS232:
             'total_SOH': 'measurement',
             'total_energy_charged': 'total',
             'total_energy_discharged': 'total',
+            'total_cell_voltage_max': 'measurement',
+            'total_cell_voltage_min': 'measurement',
             'view_num_cells': 'measurement',
             'cell_voltages': 'measurement',
+            'cell_voltage_max': 'measurement',
+            'cell_voltage_min': 'measurement',
             'view_num_temps': 'measurement',
             'temperatures': 'measurement',
             'view_current': 'measurement',
@@ -1071,6 +1102,19 @@ class TDTBMS232:
         total_energy_discharged = abs(total_power) * self.data_refresh_interval / 3600 * 1000 if total_power < 0 else 0
         self.ha_comm.publish_sensor_state(total_energy_discharged, 'Wh', "total_energy_discharged")
         self.ha_comm.publish_sensor_discovery("total_energy_discharged", "Wh", icons['total_energy_discharged'], deviceclasses['total_energy_discharged'], stateclasses['total_energy_discharged'])
+
+        # Extract all cell_voltages lists and flatten them into a single list
+        all_cell_voltages = [voltage for d in analog_data for voltage in d.get('cell_voltages', [])]
+
+        # Find the maximum and min value from the flattened list
+        total_cell_voltage_max = max(all_cell_voltages, default=None)
+        self.ha_comm.publish_sensor_state(total_cell_voltage_max, 'V', "total_cell_voltage_max")
+        self.ha_comm.publish_sensor_discovery("total_cell_voltage_max", "V", icons['total_cell_voltage_max'], deviceclasses['total_cell_voltage_max'], stateclasses['total_cell_voltage_max'])
+
+        total_cell_voltage_min = min(all_cell_voltages, default=None)
+        self.ha_comm.publish_sensor_state(total_cell_voltage_min, 'V', "total_cell_voltage_min")
+        self.ha_comm.publish_sensor_discovery("total_cell_voltage_min", "V", icons['total_cell_voltage_min'], deviceclasses['total_cell_voltage_min'], stateclasses['total_cell_voltage_min'])
+
 
         if self.if_random:
             import random

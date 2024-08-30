@@ -101,11 +101,11 @@ def run():
         logger.info("BMS Connection failed")
         return
 
-    if bms_type == 'PACE_LV':
+    if bms_type == 'PACE_LV_V1' or bms_type == 'PACE_LV':
 
         if battery_port == 'rs232':
 
-            bms = PACEBMS232(bms_comm, ha_comm, data_refresh_interval, debug, if_random)
+            bms = PACEBMS232(bms_comm, ha_comm, bms_type, data_refresh_interval, debug, if_random)
 
             logger.info("PACE_LV BMS Monitor Working...")
 
@@ -177,11 +177,9 @@ def run():
 
             pack_list = []
 
-            for pack_number in range(0, max_parallel_allowed+1):  #up to max_parallel_allowed
-                result = bms.get_pack_num_data(pack_number)
-                logger.debug(f"pack_number {result}")
-                if result == pack_number:
-                    pack_list.append(pack_number)
+            pack_quantity = bms.get_pack_quantity_data()
+
+            pack_list = list(range(1, pack_quantity + 1))
 
             logger.info(f"Found packs list: {pack_list}")
             
