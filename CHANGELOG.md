@@ -2,6 +2,13 @@
 
 ---------------
 
+## 1.7.3
+
+-   TDT BMS bug fix.
+
+---------------
+
+
 ## 1.7
 
 -   fix RS232 multiple packs bug.
