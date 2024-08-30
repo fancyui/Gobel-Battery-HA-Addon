@@ -239,6 +239,10 @@ class TDTBMS232:
         offset += 1
         pack_data['view_num_temps'] = num_temps
 
+        if num_temps >6 :
+            raise ValueError(f"Invalid data")
+            return None
+
         # Temperatures
         temperatures = []
         for temp_index in range(num_temps):
@@ -396,6 +400,10 @@ class TDTBMS232:
         pack_info['temp_sensor_number'] = temp_sensor_number
         index += 1
 
+        if temp_sensor_number >6 :
+            raise ValueError(f"Invalid data")
+            return None
+
         # Parse 4. Temperature sensor warnings
         temp_sensor_warnings = []
         for _ in range(temp_sensor_number):
@@ -474,10 +482,17 @@ class TDTBMS232:
         
         pack_info['balance_state_1'] = warnstate_bytes[index]
         index += 1
+
+        if pack_info['balance_state_1'] >1 :
+            raise ValueError(f"Invalid data")
+            return None
         
         pack_info['balance_state_2'] = warnstate_bytes[index]
         index += 1
 
+        if pack_info['balance_state_2'] >1 :
+            raise ValueError(f"Invalid data")
+            return None
 
         # Detailed interpretation for Warn State 1 based on Char A.24
         warn_state_1 = warnstate_bytes[index]
@@ -702,6 +717,9 @@ class TDTBMS232:
             self.logger.debug(f"Trying to parse analog data")
             analog_data = self.parse_analog_data(response,pack_number)
             self.logger.debug(f"analog data parsed: {analog_data}")
+            if analog_data is None:
+                return None
+
             return analog_data
     
         except Exception as e:
@@ -735,6 +753,8 @@ class TDTBMS232:
             self.logger.debug(f"Trying to parse warning data")
             warning_data = self.parse_warning_data(response,pack_number)
             self.logger.debug(f"warning data parsed: {warning_data}")
+            if warning_data is None:
+                return None
     
             return warning_data
     
@@ -1053,6 +1073,7 @@ class TDTBMS232:
 
             if retry_count == max_retries:
                 self.logger.error(f"Failed to get analog data of pack: {pack_number} after {max_retries} retries")
+                return None
             else:
                 analog_data.append(analog_data_single)
 
@@ -1168,6 +1189,7 @@ class TDTBMS232:
 
             if retry_count == max_retries:
                 self.logger.error(f"Failed to get warning data of pack: {pack_number} after {max_retries} retries")
+                return None
             else:
                 warn_data.append(warn_data_single)
 

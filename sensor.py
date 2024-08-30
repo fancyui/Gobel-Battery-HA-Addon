@@ -177,7 +177,7 @@ def run():
 
             pack_list = []
 
-            pack_quantity = bms.get_pack_quantity_data()
+            pack_quantity = max_parallel_allowed
 
             pack_list = list(range(1, pack_quantity + 1))
 
