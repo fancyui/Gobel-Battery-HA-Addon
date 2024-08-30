@@ -209,8 +209,8 @@ class TDTBMS232:
         offset += 1
 
         if num_packs != pack_number:
-            raise ValueError(f"Invalid data")
-            return None
+            # raise ValueError(f"Invalid data")
+            # return None
     
         # for pack_index in range(num_packs):
         pack_data = {}
@@ -328,8 +328,8 @@ class TDTBMS232:
         num_pack = data[14:16]
 
         if int(num_pack, 16) != pack_number:
-            raise ValueError(f"Invalid data")
-            return None
+            # raise ValueError(f"Invalid data")
+            # return None
 
         # Check the command and response validity
         if command != '46' or rtn != '00':
