@@ -273,7 +273,8 @@ class PACEBMS232:
 
             pack_data['view_energy_charged'] = pack_power * self.data_refresh_interval / 3600 * 1000 if pack_power >= 0 else 0
             pack_data['view_energy_discharged'] = abs(pack_power) * self.data_refresh_interval / 3600 * 1000 if pack_power < 0 else 0
-
+            pack_data['view_energy_charged'] = round(pack_data['view_energy_charged'], 5)
+            pack_data['view_energy_discharged'] = round(pack_data['view_energy_discharged'], 5)
             # Pack remain capacity
             pack_remain_capacity = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for remaining capacity
             pack_remain_capacity = round(pack_remain_capacity / 100, 2)  # Convert 10mAH to AH
@@ -407,7 +408,8 @@ class PACEBMS232:
 
             pack_data['view_energy_charged'] = pack_power * self.data_refresh_interval / 3600 * 1000 if pack_power >= 0 else 0
             pack_data['view_energy_discharged'] = abs(pack_power) * self.data_refresh_interval / 3600 * 1000 if pack_power < 0 else 0
-
+            pack_data['view_energy_charged'] = round(pack_data['view_energy_charged'], 5)
+            pack_data['view_energy_discharged'] = round(pack_data['view_energy_discharged'], 5)
             # Pack remain capacity
             pack_remain_capacity = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for remaining capacity
             pack_remain_capacity = round(pack_remain_capacity / 100, 2)  # Convert 10mAH to AH
@@ -471,7 +473,7 @@ class PACEBMS232:
     
             packs_data.append(pack_data)
 
-        print(packs_data)
+        # print(packs_data)
     
         return packs_data
     
@@ -1430,10 +1432,12 @@ class PACEBMS232:
         self.ha_comm.publish_sensor_discovery("total_power", "kW", icons['total_power'], deviceclasses['total_power'], stateclasses['total_power'])
 
         total_energy_charged = total_power * self.data_refresh_interval / 3600 * 1000 if total_power >= 0 else 0
+        total_energy_charged = round(total_energy_charged, 5)
         self.ha_comm.publish_sensor_state(total_energy_charged, 'Wh', "total_energy_charged")
         self.ha_comm.publish_sensor_discovery("total_energy_charged", "Wh", icons['total_energy_charged'], deviceclasses['total_energy_charged'], stateclasses['total_energy_charged'])
 
         total_energy_discharged = abs(total_power) * self.data_refresh_interval / 3600 * 1000 if total_power < 0 else 0
+        total_energy_discharged = round(total_energy_discharged, 5)
         self.ha_comm.publish_sensor_state(total_energy_discharged, 'Wh', "total_energy_discharged")
         self.ha_comm.publish_sensor_discovery("total_energy_discharged", "Wh", icons['total_energy_discharged'], deviceclasses['total_energy_discharged'], stateclasses['total_energy_discharged'])
 

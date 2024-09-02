@@ -1,6 +1,14 @@
 # Changelog
 
+
 ---------------
+
+## 1.8.0
+
+-   Value precision of energy charged/discharged is changed to 5.
+
+---------------
+
 
 ## 1.7.8
 
