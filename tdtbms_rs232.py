@@ -93,7 +93,7 @@ class TDTBMS232:
     
         info = f"{pack_number:02X}".encode('ascii')
 
-        adr = info
+        adr = b"\x30\x30"
         
         request = b'\x7e' + ver + adr + cid1 + cid2
         
@@ -208,9 +208,9 @@ class TDTBMS232:
         num_packs = int(fields[offset], 16)
         offset += 1
 
-        if num_packs != pack_number:
-            # raise ValueError(f"Invalid data")
-            # return None
+        # if num_packs != pack_number:
+        #     raise ValueError(f"Invalid data")
+        #     return None
     
         # for pack_index in range(num_packs):
         pack_data = {}
@@ -327,9 +327,9 @@ class TDTBMS232:
         length_low_byte = data[10:12]
         num_pack = data[14:16]
 
-        if int(num_pack, 16) != pack_number:
-            # raise ValueError(f"Invalid data")
-            # return None
+        # if int(num_pack, 16) != pack_number:
+        #     raise ValueError(f"Invalid data")
+        #     return None
 
         # Check the command and response validity
         if command != '46' or rtn != '00':
@@ -1256,8 +1256,4 @@ class TDTBMS232:
                     icon = "mdi:battery-heart-variant"
                     self.ha_comm.publish_warn_state(value, f"pack_{pack_i:02}_{key}")
                     self.ha_comm.publish_warn_discovery(f"pack_{pack_i:02}_{key}",icon)
-
-
-
-
 
