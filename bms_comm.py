@@ -21,7 +21,7 @@ class BMSCommunication:
         if self.interface == 'serial' and self.serial_port and self.baud_rate:
             try:
                 self.logger.info(f"Trying to connect BMS over {self.serial_port}:{self.baud_rate}")
-                self.bms_connection = serial.Serial(self.serial_port, self.baud_rate, timeout=1)
+                self.bms_connection = serial.Serial(self.serial_port, self.baud_rate, timeout=3)
                 self.logger.info(f"Connected to BMS over serial port: {self.serial_port} with baud rate: {self.baud_rate}")
                 self.logger.info("Please ensure the Baud Rate is correctly set. An incorrect baud rate may not raise an immediate error, but it can lead to communication failures or corrupted data.")
 
@@ -33,7 +33,7 @@ class BMSCommunication:
             try:
                 self.logger.info(f"Trying to connect BMS over {self.ethernet_ip}:{self.ethernet_port}")
                 self.bms_connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                self.bms_connection.settimeout(0.5)
+                self.bms_connection.settimeout(3)
                 self.bms_connection.connect((self.ethernet_ip, self.ethernet_port))
                 self.logger.info(f"Connected to BMS over Ethernet: {self.ethernet_ip}:{self.ethernet_port}")
                 return self.bms_connection

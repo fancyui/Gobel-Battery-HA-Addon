@@ -239,6 +239,8 @@ class PACEBMS232:
 
             pack_data['cell_voltage_max'] = cell_voltage_max
             pack_data['cell_voltage_min'] = cell_voltage_min
+
+            pack_data['cell_voltage_diff'] = cell_voltage_max - cell_voltage_min
     
             # Number of temperature sensors
             num_temps = int(fields[offset], 16)
@@ -373,6 +375,8 @@ class PACEBMS232:
 
             pack_data['cell_voltage_max'] = cell_voltage_max
             pack_data['cell_voltage_min'] = cell_voltage_min
+
+            pack_data['cell_voltage_diff'] = cell_voltage_max - cell_voltage_min
     
             # Number of temperature sensors
             num_temps = int(fields[offset], 16)
@@ -1202,7 +1206,7 @@ class PACEBMS232:
             'num_cells': 'cells',
             'cell_voltages': 'mV',
             'num_temps': 'NTCs',
-            'temperatures': '℃',
+            'temperatures': '°C',
             'pack_current': 'A',
             'pack_total_voltage': 'V',
             'pack_remain_capacity': 'Ah',
@@ -1272,8 +1276,9 @@ class PACEBMS232:
             'cell_voltages': 'mV',
             'cell_voltage_max': 'mV',
             'cell_voltage_min': 'mV',
+            'cell_voltage_diff': 'mV',
             'view_num_temps': 'NTCs',
-            'temperatures': '℃',
+            'temperatures': '°C',
             'view_current': 'A',
             'view_voltage': 'V',
             'view_remain_capacity': 'Ah',
@@ -1300,10 +1305,12 @@ class PACEBMS232:
             'total_energy_discharged': 'mdi:battery-negative',
             'total_cell_voltage_max': 'mdi:align-vertical-top',
             'total_cell_voltage_min': 'mdi:align-vertical-bottom',
+            'total_cell_voltage_diff': 'mdi:format-align-middle',
             'view_num_cells': 'mdi:database',
             'cell_voltages': 'mdi:sine-wave',
             'cell_voltage_max': 'mdi:align-vertical-top',
             'cell_voltage_min': 'mdi:align-vertical-bottom',
+            'cell_voltage_diff': 'mdi:format-align-middle',
             'view_num_temps': 'mdi:database',
             'temperatures': 'mdi:thermometer',
             'view_current': 'mdi:current-dc',
@@ -1333,9 +1340,11 @@ class PACEBMS232:
             'total_energy_discharged': 'energy',
             'total_cell_voltage_max': 'voltage',
             'total_cell_voltage_min': 'voltage',
+            'total_cell_voltage_diff': 'voltage',
             'cell_voltages': 'voltage',
             'cell_voltage_max': 'voltage',
             'cell_voltage_min': 'voltage',
+            'cell_voltage_diff': 'voltage',
             'temperatures': 'temperature',
             'view_num_cells': 'null',
             'view_num_temps': 'null',
@@ -1368,10 +1377,12 @@ class PACEBMS232:
             'total_energy_discharged': 'total',
             'total_cell_voltage_max': 'measurement',
             'total_cell_voltage_min': 'measurement',
+            'total_cell_voltage_diff': 'measurement',
             'view_num_cells': 'measurement',
             'cell_voltages': 'measurement',
             'cell_voltage_max': 'measurement',
             'cell_voltage_min': 'measurement',
+            'cell_voltage_diff': 'measurement',
             'view_num_temps': 'measurement',
             'temperatures': 'measurement',
             'view_current': 'measurement',
@@ -1446,12 +1457,17 @@ class PACEBMS232:
 
         # Find the maximum and min value from the flattened list
         total_cell_voltage_max = max(all_cell_voltages, default=None)
-        self.ha_comm.publish_sensor_state(total_cell_voltage_max, 'V', "total_cell_voltage_max")
-        self.ha_comm.publish_sensor_discovery("total_cell_voltage_max", "V", icons['total_cell_voltage_max'], deviceclasses['total_cell_voltage_max'], stateclasses['total_cell_voltage_max'])
+        self.ha_comm.publish_sensor_state(total_cell_voltage_max, 'mV', "total_cell_voltage_max")
+        self.ha_comm.publish_sensor_discovery("total_cell_voltage_max", "mV", icons['total_cell_voltage_max'], deviceclasses['total_cell_voltage_max'], stateclasses['total_cell_voltage_max'])
 
         total_cell_voltage_min = min(all_cell_voltages, default=None)
-        self.ha_comm.publish_sensor_state(total_cell_voltage_min, 'V', "total_cell_voltage_min")
-        self.ha_comm.publish_sensor_discovery("total_cell_voltage_min", "V", icons['total_cell_voltage_min'], deviceclasses['total_cell_voltage_min'], stateclasses['total_cell_voltage_min'])
+        self.ha_comm.publish_sensor_state(total_cell_voltage_min, 'mV', "total_cell_voltage_min")
+        self.ha_comm.publish_sensor_discovery("total_cell_voltage_min", "mV", icons['total_cell_voltage_min'], deviceclasses['total_cell_voltage_min'], stateclasses['total_cell_voltage_min'])
+
+        total_cell_voltage_diff = total_cell_voltage_max - total_cell_voltage_min
+        self.ha_comm.publish_sensor_state(total_cell_voltage_diff, 'mV', "total_cell_voltage_diff")
+        self.ha_comm.publish_sensor_discovery("total_cell_voltage_diff", "mV", icons['total_cell_voltage_diff'], deviceclasses['total_cell_voltage_diff'], stateclasses['total_cell_voltage_diff'])
+
 
         if self.if_random:
             import random

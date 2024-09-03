@@ -3,6 +3,16 @@
 
 ---------------
 
+## 1.8.2
+
+-   Fix temperature unit error.
+-   Fix max/min voltage unit error.
+-   Add voltage difference value.
+-   Change data reading timeout to 3 seconds.
+
+---------------
+
+
 ## 1.8.0
 
 -   Value precision of energy charged/discharged is changed to 5.
