@@ -44,6 +44,31 @@ class BMSCommunication:
             self.logger.error("Invalid parameters or interface selection.")
             return None
 
+
+    def disconnect(self):
+        if self.bms_connection:
+            if self.interface == 'serial':
+                try:
+                    self.bms_connection.close()
+                    self.logger.debug(f"Disconnected from BMS over serial port: {self.serial_port}")
+                except serial.SerialException as e:
+                    self.logger.error(f"Error while disconnecting serial connection: {e}")
+            
+            elif self.interface in ['ethernet', 'wifi']:
+                try:
+                    self.bms_connection.close()
+                    self.logger.debug(f"Disconnected from BMS over Ethernet: {self.ethernet_ip}:{self.ethernet_port}")
+                except socket.error as e:
+                    self.logger.error(f"Error while disconnecting Ethernet connection: {e}")
+            
+            # Set connection to None after closing it.
+            self.bms_connection = None
+        else:
+            self.logger.warning("No active connection to disconnect.")
+
+
+
+
     def send_data(self, data):
         try:
             # Ensure data is in bytes format
@@ -58,11 +83,11 @@ class BMSCommunication:
                 self.bms_connection.write(data)
             else:
                 raise ValueError("Unsupported connection type")
-
             return True
 
         except Exception as e:
             self.logger.error(f"Error sending data to BMS: {e}")
+            self.connect()
             return False
 
     def receive_data(self):

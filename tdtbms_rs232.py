@@ -230,9 +230,13 @@ class TDTBMS232:
 
         cell_voltage_max = max(cell_voltages)
         cell_voltage_min = min(cell_voltages)
+        cell_voltage_max_index = cell_voltages.index(cell_voltage_max) + 1
+        cell_voltage_min_index = cell_voltages.index(cell_voltage_min) + 1
 
         pack_data['cell_voltage_max'] = cell_voltage_max
         pack_data['cell_voltage_min'] = cell_voltage_min
+        pack_data['cell_voltage_max_index'] = cell_voltage_max_index
+        pack_data['cell_voltage_min_index'] = cell_voltage_min_index
 
         pack_data['cell_voltage_diff'] = cell_voltage_max - cell_voltage_min
 
@@ -947,6 +951,8 @@ class TDTBMS232:
             'cell_voltages': 'mV',
             'cell_voltage_max': 'mV',
             'cell_voltage_min': 'mV',
+            'cell_voltage_max_index': '',
+            'cell_voltage_min_index': '',
             'cell_voltage_diff': 'mV',
             'view_num_temps': 'NTCs',
             'temperatures': '°C',
@@ -981,6 +987,8 @@ class TDTBMS232:
             'cell_voltages': 'mdi:sine-wave',
             'cell_voltage_max': 'mdi:align-vertical-top',
             'cell_voltage_min': 'mdi:align-vertical-bottom',
+            'cell_voltage_max_index': 'mdi:database',
+            'cell_voltage_min_index': 'mdi:database',
             'cell_voltage_diff': 'mdi:format-align-middle',
             'view_num_temps': 'mdi:database',
             'temperatures': 'mdi:thermometer',
@@ -1015,6 +1023,8 @@ class TDTBMS232:
             'cell_voltages': 'voltage',
             'cell_voltage_max': 'voltage',
             'cell_voltage_min': 'voltage',
+            'cell_voltage_max_index': 'null',
+            'cell_voltage_min_index': 'null',
             'cell_voltage_diff': 'voltage',
             'temperatures': 'temperature',
             'view_num_cells': 'null',
@@ -1053,6 +1063,8 @@ class TDTBMS232:
             'cell_voltages': 'measurement',
             'cell_voltage_max': 'measurement',
             'cell_voltage_min': 'measurement',
+            'cell_voltage_max_index': 'measurement',
+            'cell_voltage_min_index': 'measurement',
             'cell_voltage_diff': 'measurement',
             'view_num_temps': 'measurement',
             'temperatures': 'measurement',

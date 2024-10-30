@@ -1,6 +1,16 @@
 # Changelog
 
 
+
+---------------
+
+## 1.9.0
+
+-   Auto reconnection after connection lost.
+-   Add index of max/min cell voltage.
+-   Modify Protoss PW10 / Waveshare manual, change 'Flow Control Settings' to 'Flow Control', 'Software Flow Control' to 'OFF'.
+
+
 ---------------
 
 ## 1.8.2

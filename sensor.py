@@ -4,6 +4,7 @@ import os
 import json
 import sys
 import logging
+import threading
 from bms_comm import BMSCommunication
 from pacebms_rs232 import PACEBMS232
 from pacebms_rs485 import PACEBMS485
@@ -75,6 +76,19 @@ logging.basicConfig(level=logging.DEBUG if debug else logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# Declare bms_comm in the global scope
+bms_comm = None
+
+def initiate_bms_communication():
+    global bms_comm
+    bms_comm = BMSCommunication(interface, serial_port, baud_rate, ethernet_ip, ethernet_port, buffer_size, debug)
+    return bms_comm.connect()
+
+def schedule_bms_reinit():
+    initiate_bms_communication()
+    # threading.Timer(60, schedule_bms_reinit).start()
+    # logger.info(f"schedule_bms_reinit start")
+
 def run():
 
     logger.info(f"interface: {interface}")
@@ -94,14 +108,14 @@ def run():
         return
     mqtt_client.loop_start()
 
-    # Connect to BMS
-    bms_comm = BMSCommunication(interface, serial_port, baud_rate, ethernet_ip, ethernet_port, buffer_size, debug)
+    # Schedule the BMS re-initialization
+    schedule_bms_reinit()
 
     if not bms_comm.connect():
         logger.info("BMS Connection failed")
         return
 
-    if bms_type == 'PACE_LV_V1' or bms_type == 'PACE_LV':
+    if bms_type == 'PACE_LV':
 
         if battery_port == 'rs232':
 
@@ -116,6 +130,7 @@ def run():
                     
                     # Fetch analog and warning data every 5 seconds
                     bms.publish_analog_data_mqtt()
+                    time.sleep(1)
                     bms.publish_warning_data_mqtt()
 
                     time.sleep(data_refresh_interval)  # Sleep for 5 seconds between each iteration
@@ -153,6 +168,7 @@ def run():
                     while True:  # Run continuously
 
                         bms.publish_analog_data_mqtt(pack_list)
+                        time.sleep(1)
                         bms.publish_warning_data_mqtt(pack_list)
                     
                         time.sleep(data_refresh_interval)  # Sleep for 5 seconds between each iteration

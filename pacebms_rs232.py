@@ -84,7 +84,8 @@ class PACEBMS232:
         }
     
         if command not in commands_table:
-            raise ValueError("Invalid command")
+            self.logger.error("Invalid command")
+            return None
     
         ver = b"\x32\x35"
         cid1 = b"\x34\x36"
@@ -148,10 +149,12 @@ class PACEBMS232:
         }
         
         if command_type not in commands:
-            raise ValueError("Invalid command type")
+            self.logger.error("Invalid command type")
+            return None
         
         if state not in [0, 1]:
-            raise ValueError("Invalid state. Must be 0 (open) or 1 (close)")
+            self.logger.error("Invalid state. Must be 0 (open) or 1 (close)")
+            return None
         
         CID1, CID2, length = commands[command_type]
         data_info = struct.pack('B', state)
@@ -201,7 +204,7 @@ class PACEBMS232:
         self.logger.debug(f"fields: {fields}")
         # Check the command and response validity
         if fields[2] != '46' or fields[3] != '00':
-            raise ValueError(f"Invalid command or response code: {fields[2]} {fields[3]}")
+            self.logger.error(f"Invalid command or response code: {fields[2]} {fields[3]}")
             return None
     
         # Extract the length of the data information
@@ -236,9 +239,13 @@ class PACEBMS232:
 
             cell_voltage_max = max(cell_voltages)
             cell_voltage_min = min(cell_voltages)
+            cell_voltage_max_index = cell_voltages.index(cell_voltage_max) + 1
+            cell_voltage_min_index = cell_voltages.index(cell_voltage_min) + 1
 
             pack_data['cell_voltage_max'] = cell_voltage_max
             pack_data['cell_voltage_min'] = cell_voltage_min
+            pack_data['cell_voltage_max_index'] = cell_voltage_max_index
+            pack_data['cell_voltage_min_index'] = cell_voltage_min_index
 
             pack_data['cell_voltage_diff'] = cell_voltage_max - cell_voltage_min
     
@@ -337,7 +344,7 @@ class PACEBMS232:
         self.logger.debug(f"fields: {fields}")
         # Check the command and response validity
         if fields[2] != '46' or fields[3] != '00':
-            raise ValueError(f"Invalid command or response code: {fields[2]} {fields[3]}")
+            self.logger.error(f"Invalid command or response code: {fields[2]} {fields[3]}")
             return None
     
         # Extract the length of the data information
@@ -372,9 +379,13 @@ class PACEBMS232:
 
             cell_voltage_max = max(cell_voltages)
             cell_voltage_min = min(cell_voltages)
+            cell_voltage_max_index = cell_voltages.index(cell_voltage_max) + 1
+            cell_voltage_min_index = cell_voltages.index(cell_voltage_min) + 1
 
             pack_data['cell_voltage_max'] = cell_voltage_max
             pack_data['cell_voltage_min'] = cell_voltage_min
+            pack_data['cell_voltage_max_index'] = cell_voltage_max_index
+            pack_data['cell_voltage_min_index'] = cell_voltage_min_index
 
             pack_data['cell_voltage_diff'] = cell_voltage_max - cell_voltage_min
     
@@ -487,7 +498,8 @@ class PACEBMS232:
     def extract_warnstate(self, data):
         # Ensure the data starts with the SOI character (~)
         if data[0] != '~':
-            raise ValueError("Data does not start with SOI (~)")
+            self.logger.error("Data does not start with SOI (~)")
+            return None
     
         # Remove SOI (~)
         data = data[1:]
@@ -502,7 +514,7 @@ class PACEBMS232:
 
         # Check the command and response validity
         if command != '46' or rtn != '00':
-            raise ValueError(f"Invalid command or response code: {command} {rtn}")
+            self.logger.error(f"Invalid command or response code: {command} {rtn}")
             return None
         
         # Calculate LENGTH in bytes
@@ -924,7 +936,7 @@ class PACEBMS232:
         if lenid == '02':
             data_info_length = 2  # 2 characters for address confirmation
         else:
-            raise ValueError("Invalid LENID value")
+            self.logger.error("Invalid LENID value")
 
         data_info = response[12:14]
 
@@ -950,7 +962,7 @@ class PACEBMS232:
         if lenid == '02':
             data_info_length = 2  # 2 characters for address confirmation
         else:
-            raise ValueError("Invalid LENID value")
+            self.logger.error("Invalid LENID value")
 
         data_info = response[12:14]
 
@@ -976,7 +988,7 @@ class PACEBMS232:
         if lenid == '28':
             data_info_length = 20  # 20 characters for software version information
         else:
-            raise ValueError("Invalid LENID value")
+            self.logger.error("Invalid LENID value")
 
         data_info = response[12:12 + data_info_length * 2]  # Each character is represented by 2 hex digits
 
@@ -1005,7 +1017,8 @@ class PACEBMS232:
         elif lenid == '28':
             data_info_length = 20  # 20 characters for BMS only
         else:
-            raise ValueError("Invalid LENID value")
+            self.logger.error("Invalid LENID value")
+            return None
 
         data_info = response[12:12 + data_info_length * 2]  # Each character is represented by 2 hex digits
 
@@ -1276,6 +1289,8 @@ class PACEBMS232:
             'cell_voltages': 'mV',
             'cell_voltage_max': 'mV',
             'cell_voltage_min': 'mV',
+            'cell_voltage_max_index': '',
+            'cell_voltage_min_index': '',
             'cell_voltage_diff': 'mV',
             'view_num_temps': 'NTCs',
             'temperatures': '°C',
@@ -1310,6 +1325,8 @@ class PACEBMS232:
             'cell_voltages': 'mdi:sine-wave',
             'cell_voltage_max': 'mdi:align-vertical-top',
             'cell_voltage_min': 'mdi:align-vertical-bottom',
+            'cell_voltage_max_index': 'mdi:database',
+            'cell_voltage_min_index': 'mdi:database',
             'cell_voltage_diff': 'mdi:format-align-middle',
             'view_num_temps': 'mdi:database',
             'temperatures': 'mdi:thermometer',
@@ -1344,6 +1361,8 @@ class PACEBMS232:
             'cell_voltages': 'voltage',
             'cell_voltage_max': 'voltage',
             'cell_voltage_min': 'voltage',
+            'cell_voltage_max_index': 'null',
+            'cell_voltage_min_index': 'null',
             'cell_voltage_diff': 'voltage',
             'temperatures': 'temperature',
             'view_num_cells': 'null',
@@ -1382,6 +1401,8 @@ class PACEBMS232:
             'cell_voltages': 'measurement',
             'cell_voltage_max': 'measurement',
             'cell_voltage_min': 'measurement',
+            'cell_voltage_max_index': 'measurement',
+            'cell_voltage_min_index': 'measurement',
             'cell_voltage_diff': 'measurement',
             'view_num_temps': 'measurement',
             'temperatures': 'measurement',
