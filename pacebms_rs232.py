@@ -1301,8 +1301,8 @@ class PACEBMS232:
             'view_cycle_number': 'cycles',
             'view_design_capacity': 'Ah',
             'view_power': 'kW',
-            'view_energy_charged': 'Wh',
-            'view_energy_discharged': 'Wh',
+            'view_energy_charged': 'kWh',
+            'view_energy_discharged': 'kWh',
             'view_SOH': '%',
             'view_SOC': '%',
         }
