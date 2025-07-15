@@ -23,6 +23,7 @@ COPY sensor.py /
 COPY pacebms_rs485.py /
 COPY pacebms_rs232.py /
 COPY tdtbms_rs232.py /
+COPY jkbms_rs485.py /
 COPY bms_comm.py /
 COPY ha_rest_api.py /
 COPY ha_mqtt.py /
