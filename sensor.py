@@ -9,6 +9,7 @@ from bms_comm import BMSCommunication
 from pacebms_rs232 import PACEBMS232
 from pacebms_rs485 import PACEBMS485
 from tdtbms_rs232 import TDTBMS232
+from jkbms_rs485 import JKBMS485
 from ha_rest_api import HA_REST_API
 from ha_mqtt import HA_MQTT
 
@@ -179,7 +180,41 @@ def run():
                 finally:
                     mqtt_client.loop_stop()
 
-    if bms_type == 'TDT':
+    elif bms_type == 'JK_PB':
+
+        if battery_port == 'rs485':
+
+            bms = JKBMS485(
+                bms_comm=bms_comm,
+                ha_comm=ha_comm,
+                bms_type=bms_type,
+                data_refresh_interval=data_refresh_interval,
+                debug=debug,
+                if_random=if_random
+            )
+
+            logger.info("JK_PB BMS Monitor Working...")
+            logger.info("JK_PB BMS RS485 Working...")
+
+            try:
+                while True:  # Run continuously
+                    
+                    bms.publish_analog_data_mqtt()
+                    time.sleep(1)
+                    bms.publish_warning_data_mqtt()
+
+                    time.sleep(data_refresh_interval)
+
+            except KeyboardInterrupt:
+                logger.info("Stopping the program...")
+            
+            finally:
+                mqtt_client.loop_stop()
+        
+        else:
+            logger.error(f"Unsupported port '{battery_port}' for JK_PB BMS. Only 'rs485' is supported.")
+
+    elif bms_type == 'TDT':
 
         if battery_port == 'rs232':
 

@@ -53,13 +53,19 @@ class HA_MQTT:
             "name": " ".join(self.cap_first(word) for word in entity_id.split("_")),
             "state_topic": f"{main_topic}/{self.device_name}_{entity_id}/state",
             "unique_id": f"{self.device_name}_{entity_id}",
-            "unit_of_measurement": unit,
             "icon": icon,
-            "state_class": stateclass,
-            # "suggested_display_precision": 2,
-            "value_template": "{{ value_json.state }}",
+            "value_template": "{{ value }}",
             "device": self.device_info
         }
+        
+        # Only add the unit_of_measurement attribute if the unit is not empty
+        if unit and unit.strip():
+            payload["unit_of_measurement"] = unit
+            
+        # Only add the state_class attribute if it is not 'null' (text values like version info do not need state_class)
+        if stateclass != 'null':
+            payload["state_class"] = stateclass
+            
         if deviceclass != 'null':
             payload["device_class"] = deviceclass
         # self.logger.debug(f"Discovery payload: {json.dumps(payload)}")
@@ -74,13 +80,20 @@ class HA_MQTT:
         main_topic = 'sensor'
         topic = f"{main_topic}/{self.device_name}_{entity_id}/state"
         # self.logger.debug(f"Publishing data to topic: {topic}")
-        payload = {
-            "state": value,
-            "attributes": {"unit_of_measurement": unit}
-        }
-        # self.logger.debug(f"Data payload: {json.dumps(payload)}")
+        
+        # Add debugging for version information
+        if 'version' in entity_id:
+            self.logger.debug(f"Publishing version info to MQTT - Topic: {topic}, Value: '{value}', Unit: '{unit}'")
+        
+        # Publish the value directly, without JSON wrapping (compliant with MQTT sensor standards)
+        payload = str(value)
+        
+        # Add payload debugging for version information
+        if 'version' in entity_id:
+            self.logger.debug(f"Version info MQTT payload: {payload}")
+        
         try:
-            self.mqtt_client.publish(topic, json.dumps(payload))
+            self.mqtt_client.publish(topic, payload)
             # self.logger.debug(f"Published data for {topic}")
         except Exception as e:
             self.logger.error(f"Failed to publish data for {topic}: {e}")

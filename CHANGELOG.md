@@ -1,6 +1,13 @@
 # Changelog
 
 
+---------------
+
+## 1.9.20
+
+-   Add JK BMS RS485 support.
+-   Fix Energy Discharged/Charged bug.
+
 
 ---------------
 

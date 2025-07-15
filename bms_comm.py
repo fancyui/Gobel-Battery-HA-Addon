@@ -77,10 +77,13 @@ class BMSCommunication:
 
             # Check if the connection is a socket (Ethernet)
             if hasattr(self.bms_connection, 'send'):
-                self.bms_connection.send(data)
+                sent_bytes = self.bms_connection.send(data)
+                self.logger.debug(f"Sent data via TCP: {data.hex().upper()}")
+                
             # Check if the connection is a serial connection
             elif hasattr(self.bms_connection, 'write'):
-                self.bms_connection.write(data)
+                sent_bytes = self.bms_connection.write(data)
+                self.logger.debug(f"Sent data via serial: {data.hex().upper()}")
             else:
                 raise ValueError("Unsupported connection type")
             return True
@@ -90,22 +93,35 @@ class BMSCommunication:
             self.connect()
             return False
 
-    def receive_data(self):
+    def receive_data(self, return_raw=False):
         try:
             # Check if the connection is a serial connection
             if hasattr(self.bms_connection, 'readline'):
                 raw_data = self.bms_connection.readline()
-                received_data = raw_data.decode().strip()
+                if return_raw:
+                    return raw_data
+                else:
+                    received_data = raw_data.decode().strip()
             # Check if the connection is a socket (Ethernet)
             elif hasattr(self.bms_connection, 'recv'):
-                # Assuming a buffer size of 1024 bytes for demonstration purposes
-                raw_data = self.bms_connection.recv(self.buffer_size)
-                received_data = raw_data.decode().strip()
+                if return_raw:
+                    # For raw data, use dedicated TCP Modbus receiving logic
+                    raw_data = self._receive_tcp_modbus_response()
+                    if raw_data:
+                        self.logger.debug(f"Received raw data (hex): {raw_data.hex().upper()}")
+                        return raw_data
+                    else:
+                        return None
+                else:
+                    # Original string receiving method, for other BMS
+                    raw_data = self.bms_connection.recv(self.buffer_size)
+                    received_data = raw_data.decode().strip()
             else:
                 raise ValueError("Unsupported connection type")
 
-            self.logger.debug(f"Received data from BMS: {received_data}")
-            return received_data
+            if not return_raw:
+                self.logger.debug(f"Received data from BMS: {received_data}")
+                return received_data
         except Exception as e:
             # Log the raw data when there is a decoding error
             if 'raw_data' in locals():
@@ -114,3 +130,68 @@ class BMSCommunication:
             else:
                 self.logger.warning(f"No data received from BMS: {e}")
             return None
+
+    def _receive_tcp_modbus_response(self):
+        """
+        A dedicated method for receiving TCP Modbus RTU responses.
+        """
+        try:
+            import time
+            
+            # Wait for BMS processing time after sending
+            time.sleep(0.1)
+            
+            # Receive data
+            all_data = b''
+            max_attempts = 5
+            attempt = 0
+            
+            while attempt < max_attempts:
+                try:
+                    # Set timeout
+                    original_timeout = self.bms_connection.gettimeout()
+                    self.bms_connection.settimeout(1.0)
+                    
+                    chunk = self.bms_connection.recv(1024)
+                    
+                    # Restore original timeout setting
+                    self.bms_connection.settimeout(original_timeout)
+                    
+                    if chunk:
+                        all_data += chunk
+                        self.logger.debug(f"Received {len(chunk)} bytes, total {len(all_data)} bytes")
+                        
+                        # Check if a complete Modbus response has been received
+                        if len(all_data) >= 3:
+                            device_addr, function_code, byte_count = all_data[0], all_data[1], all_data[2]
+                            expected_length = 3 + byte_count + 2  # Header + Data + CRC
+                            
+                            if len(all_data) >= expected_length:
+                                complete_response = all_data[:expected_length]
+                                self.logger.debug(f"Successfully received complete Modbus response: {expected_length} bytes")
+                                return complete_response
+                        
+                        # Wait a short while for more data
+                        time.sleep(0.05)
+                    else:
+                        time.sleep(0.1)
+                        
+                except socket.timeout:
+                    # Timeout is normal, continue trying
+                    pass
+                except Exception as e:
+                    self.logger.warning(f"Error while receiving data: {e}")
+                    
+                attempt += 1
+            
+            if all_data:
+                self.logger.debug(f"Received data, but it might be incomplete: {len(all_data)} bytes")
+                return all_data
+            else:
+                self.logger.warning("No data received")
+                return None
+                
+        except Exception as e:
+            self.logger.error(f"Error receiving TCP Modbus response: {e}")
+            return None
+

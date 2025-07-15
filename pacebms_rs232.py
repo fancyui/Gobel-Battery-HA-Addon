@@ -14,6 +14,12 @@ class PACEBMS232:
         logging.basicConfig(level=logging.DEBUG if debug else logging.INFO,
                             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         self.logger = logging.getLogger(__name__)
+        
+        # 累积能量相关变量
+        import time
+        self.total_energy_charged = 0.0
+        self.total_energy_discharged = 0.0
+        self.last_energy_time = time.time()
 
     def lchksum_calc(self, lenid):
         try:
@@ -59,6 +65,49 @@ class PACEBMS232:
         
         return signed_value
 
+    def calculate_cumulative_energy(self, power):
+        """
+        计算累积能量 (Wh)
+        
+        :param power: 当前功率 (kW)
+        :return: tuple(charged_energy, discharged_energy) - 累积充电和放电能量 (Wh)
+        """
+        import time
+        current_time = time.time()
+        time_diff = current_time - self.last_energy_time
+        
+        # 异常时间间隔检测（超过5分钟认为异常）
+        if time_diff > 300:
+            self.logger.warning(f"Abnormal time interval detected: {time_diff:.1f}s, resetting time base")
+            self.last_energy_time = current_time
+            return self.total_energy_charged, self.total_energy_discharged
+        
+        # 忽略过小的时间间隔（小于1秒）
+        if time_diff < 1:
+            return self.total_energy_charged, self.total_energy_discharged
+        
+        # 计算增量能量：功率(kW) × 时间(小时) × 1000 = Wh
+        energy_increment = abs(power) * time_diff / 3600 * 1000
+        
+        if power >= 0:
+            # 充电（正功率）
+            self.total_energy_charged += energy_increment
+            self.logger.debug(f"Charge increment: {energy_increment:.2f} Wh, Total charged: {self.total_energy_charged:.2f} Wh")
+        else:
+            # 放电（负功率）
+            self.total_energy_discharged += energy_increment
+            self.logger.debug(f"Discharge increment: {energy_increment:.2f} Wh, Total discharged: {self.total_energy_discharged:.2f} Wh")
+        
+        self.last_energy_time = current_time
+        return round(self.total_energy_charged, 2), round(self.total_energy_discharged, 2)
+
+    def reset_cumulative_energy(self):
+        """重置累积能量计数器"""
+        import time
+        self.total_energy_charged = 0.0
+        self.total_energy_discharged = 0.0
+        self.last_energy_time = time.time()
+        self.logger.info("Cumulative energy counters have been reset")
 
     def generate_bms_request(self, command, pack_number=None):
         commands_table = {
@@ -280,10 +329,10 @@ class PACEBMS232:
             pack_power = round(pack_total_voltage * pack_current / 1000, 4) # Convert W to kW
             pack_data['view_power'] = pack_power
 
-            pack_data['view_energy_charged'] = pack_power * self.data_refresh_interval / 3600 * 1000 if pack_power >= 0 else 0
-            pack_data['view_energy_discharged'] = abs(pack_power) * self.data_refresh_interval / 3600 * 1000 if pack_power < 0 else 0
-            pack_data['view_energy_charged'] = round(pack_data['view_energy_charged'], 5)
-            pack_data['view_energy_discharged'] = round(pack_data['view_energy_discharged'], 5)
+            # 使用累积能量计算
+            cumulative_charged, cumulative_discharged = self.calculate_cumulative_energy(pack_power)
+            pack_data['view_energy_charged'] = cumulative_charged
+            pack_data['view_energy_discharged'] = cumulative_discharged
             # Pack remain capacity
             pack_remain_capacity = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for remaining capacity
             pack_remain_capacity = round(pack_remain_capacity / 100, 2)  # Convert 10mAH to AH
@@ -421,10 +470,10 @@ class PACEBMS232:
             pack_power = round(pack_total_voltage * pack_current / 1000, 4) # Convert W to kW
             pack_data['view_power'] = pack_power
 
-            pack_data['view_energy_charged'] = pack_power * self.data_refresh_interval / 3600 * 1000 if pack_power >= 0 else 0
-            pack_data['view_energy_discharged'] = abs(pack_power) * self.data_refresh_interval / 3600 * 1000 if pack_power < 0 else 0
-            pack_data['view_energy_charged'] = round(pack_data['view_energy_charged'], 5)
-            pack_data['view_energy_discharged'] = round(pack_data['view_energy_discharged'], 5)
+            # 使用累积能量计算
+            cumulative_charged, cumulative_discharged = self.calculate_cumulative_energy(pack_power)
+            pack_data['view_energy_charged'] = cumulative_charged
+            pack_data['view_energy_discharged'] = cumulative_discharged
             # Pack remain capacity
             pack_remain_capacity = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for remaining capacity
             pack_remain_capacity = round(pack_remain_capacity / 100, 2)  # Convert 10mAH to AH
@@ -1463,13 +1512,11 @@ class PACEBMS232:
         self.ha_comm.publish_sensor_state(total_power, 'kW', "total_power")
         self.ha_comm.publish_sensor_discovery("total_power", "kW", icons['total_power'], deviceclasses['total_power'], stateclasses['total_power'])
 
-        total_energy_charged = total_power * self.data_refresh_interval / 3600 * 1000 if total_power >= 0 else 0
-        total_energy_charged = round(total_energy_charged, 5)
+        # 使用累积能量计算
+        total_energy_charged, total_energy_discharged = self.calculate_cumulative_energy(total_power)
         self.ha_comm.publish_sensor_state(total_energy_charged, 'Wh', "total_energy_charged")
         self.ha_comm.publish_sensor_discovery("total_energy_charged", "Wh", icons['total_energy_charged'], deviceclasses['total_energy_charged'], stateclasses['total_energy_charged'])
 
-        total_energy_discharged = abs(total_power) * self.data_refresh_interval / 3600 * 1000 if total_power < 0 else 0
-        total_energy_discharged = round(total_energy_discharged, 5)
         self.ha_comm.publish_sensor_state(total_energy_discharged, 'Wh', "total_energy_discharged")
         self.ha_comm.publish_sensor_discovery("total_energy_discharged", "Wh", icons['total_energy_discharged'], deviceclasses['total_energy_discharged'], stateclasses['total_energy_discharged'])
 
