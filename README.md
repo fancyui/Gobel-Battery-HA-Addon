@@ -1,4 +1,4 @@
-## Gobel Power Battery Home Assistant Addon
+## Gobel Power Battery Home Assistant Addon for Pace BMS, JK BMS, TDT BMS
 
 ### Documents
 <a href="https://www.gobelpower.com/introduction_f61.html">Gobel Power Battery Home Assistant Addon Manual</a>
