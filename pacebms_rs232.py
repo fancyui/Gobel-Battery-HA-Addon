@@ -144,7 +144,7 @@ class PACEBMS232:
     
         info = f"{pack_number:02X}".encode('ascii')
 
-        adr = info
+        adr = b"00"  # ADR should be fixed "00", pack_number goes in INFO only
         
         request = b'\x7e' + ver + adr + cid1 + cid2
         
