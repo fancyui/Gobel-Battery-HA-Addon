@@ -3,6 +3,13 @@
 
 ---------------
 
+## 1.9.21
+
+-   Add build.yaml to fix Docker build failure (missing BUILD_FROM arg).
+
+
+---------------
+
 ## 1.9.20
 
 -   Add JK BMS RS485 support.
