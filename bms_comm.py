@@ -137,61 +137,153 @@ class BMSCommunication:
         """
         try:
             import time
-            
+
             # Wait for BMS processing time after sending
             time.sleep(0.1)
-            
+
             # Receive data
             all_data = b''
             max_attempts = 5
             attempt = 0
-            
+
             while attempt < max_attempts:
                 try:
                     # Set timeout
                     original_timeout = self.bms_connection.gettimeout()
                     self.bms_connection.settimeout(1.0)
-                    
+
                     chunk = self.bms_connection.recv(1024)
-                    
+
                     # Restore original timeout setting
                     self.bms_connection.settimeout(original_timeout)
-                    
+
                     if chunk:
                         all_data += chunk
                         self.logger.debug(f"Received {len(chunk)} bytes, total {len(all_data)} bytes")
-                        
+
                         # Check if a complete Modbus response has been received
                         if len(all_data) >= 3:
                             device_addr, function_code, byte_count = all_data[0], all_data[1], all_data[2]
                             expected_length = 3 + byte_count + 2  # Header + Data + CRC
-                            
+
                             if len(all_data) >= expected_length:
                                 complete_response = all_data[:expected_length]
                                 self.logger.debug(f"Successfully received complete Modbus response: {expected_length} bytes")
                                 return complete_response
-                        
+
                         # Wait a short while for more data
                         time.sleep(0.05)
                     else:
                         time.sleep(0.1)
-                        
+
                 except socket.timeout:
                     # Timeout is normal, continue trying
                     pass
                 except Exception as e:
                     self.logger.warning(f"Error while receiving data: {e}")
-                    
+
                 attempt += 1
-            
+
             if all_data:
                 self.logger.debug(f"Received data, but it might be incomplete: {len(all_data)} bytes")
                 return all_data
             else:
                 self.logger.warning("No data received")
                 return None
-                
+
         except Exception as e:
             self.logger.error(f"Error receiving TCP Modbus response: {e}")
+            return None
+
+    def flush_jkbms_buffer(self):
+        """
+        Flush any stale/buffered data from the socket before sending a new command.
+        The JK BMS continuously broadcasts 55AA frames, so we need to discard
+        any pre-existing data in the TCP buffer to avoid reading stale frames.
+        """
+        import socket as _socket
+        if not self.bms_connection:
+            return
+        try:
+            original_timeout = self.bms_connection.gettimeout()
+            self.bms_connection.settimeout(0.05)
+            flushed = 0
+            while True:
+                try:
+                    chunk = self.bms_connection.recv(4096)
+                    if not chunk:
+                        break
+                    flushed += len(chunk)
+                except _socket.timeout:
+                    break
+            self.bms_connection.settimeout(original_timeout)
+            if flushed > 0:
+                self.logger.debug(f"JK BMS: Flushed {flushed} stale bytes from input buffer")
+        except Exception as e:
+            self.logger.debug(f"JK BMS: Buffer flush note: {e}")
+            try:
+                self.bms_connection.settimeout(original_timeout)
+            except Exception:
+                pass
+
+    def receive_jkbms_raw(self):
+        """
+        Receive raw TCP data for JK BMS communication.
+        Reads all available bytes from TCP without Modbus framing assumptions.
+        The JK BMS responds with JK proprietary 55AA frames which need to be parsed
+        at the protocol level, not here.
+        """
+        try:
+            import time
+
+            # Wait for BMS processing time before reading
+            time.sleep(0.3)
+
+            all_data = b''
+            idle_timeout = 5   # Consecutive empty reads before stopping
+            idle_count = 0
+            got_data = False
+
+            while True:
+                try:
+                    original_timeout = self.bms_connection.gettimeout()
+                    self.bms_connection.settimeout(0.2)
+
+                    chunk = self.bms_connection.recv(2048)
+                    self.bms_connection.settimeout(original_timeout)
+
+                    if chunk:
+                        all_data += chunk
+                        self.logger.debug(f"JK BMS: Received {len(chunk)} bytes, total {len(all_data)} bytes")
+                        got_data = True
+                        idle_count = 0  # Reset idle counter
+                    else:
+                        idle_count += 1
+
+                except socket.timeout:
+                    idle_count += 1
+
+                except Exception as e:
+                    self.logger.warning(f"JK BMS receive error: {e}")
+                    idle_count += 1
+
+                # After getting data, allow a few idle cycles for trailing chunks
+                if got_data and idle_count >= idle_timeout:
+                    break
+                # If no data at all after initial wait + max attempts, give up
+                if not got_data and idle_count >= 40:  # ~8 seconds total
+                    break
+
+                time.sleep(0.05)
+
+            if all_data:
+                self.logger.debug(f"JK BMS: Total received {len(all_data)} bytes")
+                return all_data
+            else:
+                self.logger.warning("JK BMS: No data received")
+                return None
+
+        except Exception as e:
+            self.logger.error(f"JK BMS receive error: {e}")
             return None
 

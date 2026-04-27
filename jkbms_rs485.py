@@ -6,8 +6,23 @@ import logging
 
 class JKBMS485:
     """
-    JK BMS RS485 Modbus Communication Class
-    Implements RS485 Modbus communication with JK BMS, providing the same interface and data format as PACE BMS.
+    JK BMS RS485 Communication Class
+    Implements JK BMS RS485 protocol (as used by jkbms-rs485-addon Node-RED reference).
+
+    Protocol summary:
+    - Data query: Modbus FC 0x10 (Write Multiple Registers) with value 0x0000
+      * 0x161C -> Static data (hardware/software version, serial, etc.)
+      * 0x161E -> Setup/Config data
+      * 0x1620 -> Dynamic data (cell voltages, current, SOC, temperatures)
+      The BMS responds with a JK proprietary 55AA data frame, not standard Modbus.
+    - Alarm query: Modbus FC 0x03 (Read Holding Registers) of 0x12A0, count 2
+      The BMS responds with standard Modbus RTU for this register.
+    - Note: Standard Modbus FC 0x03 reads of 0x1200-0x1420 registers
+      return 'Illegal Data Address' (01 83 02 C0 F1) on this firmware.
+      Only FC 0x10 write-triggered 55AA frames + FC 0x03 alarm read work.
+
+    Frame offsets calibrated for firmware 9.04 (JK_PB1A16S10P, 16S LFP).
+    Other firmware versions may have different 55AA frame layouts.
     """
 
     def __init__(self, bms_comm, ha_comm, bms_type, data_refresh_interval, debug, if_random):
@@ -18,109 +33,29 @@ class JKBMS485:
         self.debug = debug
         self.if_random = if_random
 
-        # Cumulative energy variables (for energy statistics)
-        self.total_energy_charged = 0.0    # Cumulative charged energy (Wh)
-        self.total_energy_discharged = 0.0  # Cumulative discharged energy (Wh)
-        self.last_energy_time = None       # Timestamp of the last energy calculation
-        
-        # Configure logging
+        # Cumulative energy variables
+        self.total_energy_charged = 0.0
+        self.total_energy_discharged = 0.0
+        self.last_energy_time = None
+
         logging.basicConfig(level=logging.DEBUG if debug else logging.INFO,
                             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         self.logger = logging.getLogger(__name__)
 
-        # Default slave address (JK BMS may use address 0)
-        self.default_slave_address = 0x00
-        self.address_detected = False  # Flag to indicate if address detection has been performed
-        
-        # Function code definitions
-        self.FUNCTION_CODE_READ_HOLDING_REGISTERS = 0x03
-        self.FUNCTION_CODE_WRITE_MULTIPLE_REGISTERS = 0x10
-        
-        # Register address definitions (based on JK BMS protocol document)
-        # Configuration area base address: 0x1000, Data area base address: 0x1200, Version info area: 0x1400
-        self.CONFIG_BASE_ADDRESS = 0x1000
-        self.DATA_BASE_ADDRESS = 0x1200
-        self.VERSION_BASE_ADDRESS = 0x1400
-        
-        # Data area register address mapping
-        self.REGISTER_ADDRESSES = {
-            # Cell Voltages (Base Address 0x1200)
-            'CellVol0': 0x1200,      # Cell Voltage 0
-            'CellVol1': 0x1202,      # Cell Voltage 1
-            'CellVol2': 0x1204,      # Cell Voltage 2
-            'CellVol3': 0x1206,      # Cell Voltage 3
-            'CellVol4': 0x1208,      # Cell Voltage 4
-            'CellVol5': 0x120A,      # Cell Voltage 5
-            'CellVol6': 0x120C,      # Cell Voltage 6
-            'CellVol7': 0x120E,      # Cell Voltage 7
-            'CellVol8': 0x1210,      # Cell Voltage 8
-            'CellVol9': 0x1212,      # Cell Voltage 9
-            'CellVol10': 0x1214,     # Cell Voltage 10
-            'CellVol11': 0x1216,     # Cell Voltage 11
-            'CellVol12': 0x1218,     # Cell Voltage 12
-            'CellVol13': 0x121A,     # Cell Voltage 13
-            'CellVol14': 0x121C,     # Cell Voltage 14
-            'CellVol15': 0x121E,     # Cell Voltage 15
-            'CellVol16': 0x1220,     # Cell Voltage 16
-            'CellVol17': 0x1222,     # Cell Voltage 17
-            'CellVol18': 0x1224,     # Cell Voltage 18
-            'CellVol19': 0x1226,     # Cell Voltage 19
-            'CellVol20': 0x1228,     # Cell Voltage 20
-            'CellVol21': 0x122A,     # Cell Voltage 21
-            'CellVol22': 0x122C,     # Cell Voltage 22
-            'CellVol23': 0x122E,     # Cell Voltage 23
-            'CellVol24': 0x1230,     # Cell Voltage 24
-            'CellVol25': 0x1232,     # Cell Voltage 25
-            'CellVol26': 0x1234,     # Cell Voltage 26
-            'CellVol27': 0x1236,     # Cell Voltage 27
-            'CellVol28': 0x1238,     # Cell Voltage 28
-            'CellVol29': 0x123A,     # Cell Voltage 29
-            'CellVol30': 0x123C,     # Cell Voltage 30
-            'CellVol31': 0x123E,     # Cell Voltage 31
-            
-            # Main Parameters
-            'CellSta': 0x1240,       # Battery Status (UINT32)
-            'CellVolAve': 0x1244,    # Average Cell Voltage (UINT16)
-            'CellVdifMax': 0x1246,   # Max Voltage Difference (UINT16)
-            'MaxMinVolCellNbr': 0x1248, # Max/Min Voltage Cell Number (UINT8*2)
-            'TempMos': 0x128A,       # Power Board Temperature (INT16)
-            'BatVol': 0x1290,        # Battery Total Voltage (UINT32)
-            'BatWatt': 0x1294,       # Battery Power (UINT32)
-            'BatCurrent': 0x1298,    # Battery Current (INT32)
-            'TempBat1': 0x129C,      # Battery Temperature 1 (INT16)
-            'TempBat2': 0x129E,      # Battery Temperature 2 (INT16)
-            'AlarmSta': 0x12A0,      # Alarm Status (UINT32)
-            'BalanCurrent': 0x12A4,  # Balancing Current (INT16)
-            'BalanSOC': 0x12A6,      # Balancing Status and SOC (UINT8*2)
-            'SOCCapRemain': 0x12A8,  # Remaining Capacity (INT32)
-            'SOCFullChargeCap': 0x12AC, # Battery Actual Capacity (UINT32)
-            'SOCCycleCount': 0x12B0, # Cycle Count (UINT32)
-            'SOCCycleCap': 0x12B4,   # Total Cycle Capacity (UINT32)
-            'SOCSOH': 0x12B8,        # SOH Estimation (UINT8)
-            'UserAlarm': 0x12BA,     # User Level Alarm (UINT16)
-            'RunTime': 0x12BC,       # Running Time (UINT32)
-            'ChargeDischarge': 0x12C0, # Charge/Discharge Status (UINT8*2)
-            'TempBat3': 0x12F8,      # Battery Temperature 3 (INT16)
-            'TempBat4': 0x12FA,      # Battery Temperature 4 (INT16)
-            'TempBat5': 0x12FC,      # Battery Temperature 5 (INT16)
-            
-            # Version Info Area Register Address Mapping (Base Address 0x1400)
-            'HardwareVersion': 0x1410,  # Hardware Version (ASCII 8 bytes)
-            'SoftwareVersion': 0x1418,  # Software Version (ASCII 8 bytes)
-        }
+        # JK BMS registers for data queries (Modbus FC 0x10 write with 0x0000)
+        self.REG_STATIC = 0x161C    # Trame 1 - Static data (version, serial, etc.)
+        self.REG_SETUP  = 0x161E    # Trame 2 - Setup/Config data
+        self.REG_DYNAMIC = 0x1620   # Trame 3 - Dynamic data (cells, current, SOC, etc.)
+        self.REG_ALARM  = 0x12A0    # Alarm register (FC 0x03 read, count 2)
 
+        # Slave address: default 0x01 as used by reference implementation
+        self.slave_address = 0x01
+
+    # ---------------------------------------------------------------------------
+    # CRC16 Modbus
+    # ---------------------------------------------------------------------------
     def calculate_crc16_modbus(self, data):
-        """
-        Calculate Modbus CRC16 checksum.
-        
-        Args:
-            data (bytes): Data to calculate CRC for.
-            
-        Returns:
-            int: CRC16 checksum.
-        """
         crc = 0xFFFF
-        
         for byte in data:
             crc ^= byte
             for _ in range(8):
@@ -129,811 +64,778 @@ class JKBMS485:
                     crc ^= 0xA001
                 else:
                     crc >>= 1
-                    
         return crc
 
+    # ---------------------------------------------------------------------------
+    # Energy calculation (same as original, uses time intervals)
+    # ---------------------------------------------------------------------------
     def calculate_cumulative_energy(self, current_power_kw):
-        """
-        Calculate cumulative energy using actual time intervals.
-        
-        Args:
-            current_power_kw (float): Current power (kW).
-            
-        Returns:
-            tuple: (Cumulative charged energy Wh, Cumulative discharged energy Wh).
-        """
         import time
-        
         current_time = time.time()
-        
-        # Initialize timestamp on the first call
         if self.last_energy_time is None:
             self.last_energy_time = current_time
             return self.total_energy_charged, self.total_energy_discharged
-        
-        # Calculate actual time interval (seconds)
         time_interval = current_time - self.last_energy_time
         self.last_energy_time = current_time
-        
-        # Prevent abnormal time intervals
-        if time_interval <= 0 or time_interval > 300:  # More than 5 minutes is considered abnormal
-            self.logger.warning(f"Abnormal time interval: {time_interval}s, skipping energy calculation for this cycle")
+        if time_interval <= 0 or time_interval > 300:
+            self.logger.warning(f"Abnormal time interval: {time_interval}s, skipping energy calculation")
             return self.total_energy_charged, self.total_energy_discharged
-        
-        # Calculate energy increment (Wh)
-        # Power(kW) * Time(s) * 1000 / 3600 = Energy(Wh)
         if current_power_kw is not None:
             energy_delta = abs(current_power_kw) * time_interval * 1000 / 3600
-            
-            # Accumulate to the corresponding energy counter
             if current_power_kw >= 0:
                 self.total_energy_charged += energy_delta
                 self.logger.debug(f"Charge energy delta: {energy_delta:.3f}Wh, cumulative: {self.total_energy_charged:.3f}Wh")
             else:
                 self.total_energy_discharged += energy_delta
                 self.logger.debug(f"Discharge energy delta: {energy_delta:.3f}Wh, cumulative: {self.total_energy_discharged:.3f}Wh")
-        
         return self.total_energy_charged, self.total_energy_discharged
 
     def reset_cumulative_energy(self):
-        """
-        Reset the cumulative energy counters.
-        Used for manual reset or to restart statistics.
-        """
         self.total_energy_charged = 0.0
         self.total_energy_discharged = 0.0
         self.last_energy_time = None
         self.logger.info("Cumulative energy counters have been reset")
 
-    def hex_to_signed(self, hex_str):
+    # ---------------------------------------------------------------------------
+    # Command builders
+    # ---------------------------------------------------------------------------
+    def build_read_command(self, register_address, register_count=1):
         """
-        Convert a 16-bit hexadecimal string to signed integer value.
-        
-        :param hex_str: Hexadecimal string representing battery current (e.g., "FFFB")
-        :return: Signed integer current value
+        Build Modbus FC 0x03 (Read Holding Registers) command.
+        Used for alarm reads (0x12A0).
         """
-        # Convert the hexadecimal string to an integer
-        raw_value = int(hex_str, 16)
-        
-        # Process the 16-bit two's complement signed integer
-        if raw_value & 0x8000:  # Check the sign bit (if the highest bit is 1)
-            # Handle negative numbers: invert bits and add 1, then attach negative sign
-            signed_value = -((~raw_value & 0xFFFF) + 1)
-        else:
-            signed_value = raw_value
-        
-        return signed_value
-
-    def build_read_register_command(self, register_address, register_count=1, slave_address=None):
-        """
-        Build a Modbus command to read registers.
-        
-        Args:
-            register_address (int): Starting register address.
-            register_count (int): Number of registers to read, defaults to 1.
-            slave_address (int): Slave address, defaults to the one used in class initialization.
-            
-        Returns:
-            bytes: The constructed Modbus command.
-        """
-        if slave_address is None:
-            slave_address = self.default_slave_address
-            
-        # Build the command frame (without CRC)
-        command_frame = struct.pack('>BBHH', 
-                                  slave_address,                              # Address code (1 byte)
-                                  self.FUNCTION_CODE_READ_HOLDING_REGISTERS,  # Function code (1 byte)
-                                  register_address,                           # Starting register address (2 bytes, big-endian)
-                                  register_count)                             # Number of registers (2 bytes, big-endian)
-        
-        # Calculate CRC checksum
+        command_frame = struct.pack('>BBHH',
+                                    self.slave_address,
+                                    0x03,               # Function code: Read Holding Registers
+                                    register_address,
+                                    register_count)
         crc = self.calculate_crc16_modbus(command_frame)
-        
-        # Add CRC checksum (little-endian)
-        command_with_crc = command_frame + struct.pack('<H', crc)
-        
-        self.logger.debug(f"Built command: {command_with_crc.hex().upper()}")
-        
-        return command_with_crc
+        command = command_frame + struct.pack('<H', crc)
+        self.logger.debug(f"Read command: {command.hex().upper()}")
+        return command
 
-    def parse_register_response(self, response):
+    def build_write_command(self, register_address):
         """
-        Parse the response for reading registers.
-        
-        Args:
-            response (bytes): Response data from the BMS.
-            
-        Returns:
-            list: A list of parsed register values.
+        Build Modbus FC 0x10 (Write Multiple Registers) command with value 0x0000.
+        Used to query JK BMS data frames (0x161C, 0x161E, 0x1620).
         """
-        if len(response) < 5:
-            self.logger.error("Response data length is insufficient")
-            return None
-            
-        # Verify CRC checksum
-        data_without_crc = response[:-2]
-        received_crc = struct.unpack('<H', response[-2:])[0]
-        calculated_crc = self.calculate_crc16_modbus(data_without_crc)
-        
-        if received_crc != calculated_crc:
-            self.logger.error(f"CRC check failed: received={received_crc:04X}, calculated={calculated_crc:04X}")
-            return None
-            
-        # Parse the response data
-        slave_address = response[0]
-        function_code = response[1]
-        byte_count = response[2]
-        
-        if function_code != self.FUNCTION_CODE_READ_HOLDING_REGISTERS:
-            self.logger.error(f"Function code mismatch: {function_code:02X}")
-            return None
-            
-        # Extract register data
-        register_data = response[3:3+byte_count]
-        register_values = []
-        
-        # Each register is 2 bytes, big-endian
-        for i in range(0, len(register_data), 2):
-            if i+1 < len(register_data):
-                value = struct.unpack('>H', register_data[i:i+2])[0]
-                register_values.append(value)
-                
-        return register_values
+        command_frame = struct.pack('>BBHHBB',
+                                    self.slave_address,
+                                    0x10,               # Function code: Write Multiple Registers
+                                    register_address,
+                                    0x0001,             # Quantity: 1 register
+                                    0x02,               # Byte count: 2 bytes
+                                    0x00)               # Data high byte
+        # Append data low byte separately for clarity
+        command_frame += struct.pack('B', 0x00)          # Data low byte
+        crc = self.calculate_crc16_modbus(command_frame)
+        command = command_frame + struct.pack('<H', crc)
+        self.logger.debug(f"Write query command for 0x{register_address:04X}: {command.hex().upper()}")
+        return command
 
-    def set_slave_address(self, address):
+    def send_and_receive(self, command):
         """
-        Set the slave address.
-        
-        Args:
-            address (int): Slave address (0-247).
+        Send a command and receive raw response using the JK-specific receive method.
+        Flushes stale broadcast frames from the input buffer before sending.
         """
-        if 0 <= address <= 247:
-            self.default_slave_address = address
-            self.logger.info(f"Slave address set to: {address}")
-        else:
-            raise ValueError("Slave address must be in the range 0-247")
+        # Flush any stale 55AA broadcast data from the TCP buffer
+        self.bms_comm.flush_jkbms_buffer()
 
-    def auto_detect_slave_address(self):
-        """
-        Automatically detect the slave address (tries addresses 0 and 1).
-        
-        Returns:
-            int: Detected slave address, or None on failure.
-        """
-        try:
-            # Try common slave addresses
-            test_addresses = [0x00, 0x01]
-            
-            for addr in test_addresses:
-                self.logger.debug(f"Trying slave address: {addr}")
-                self.default_slave_address = addr
-                
-                # Try reading a simple register to test the connection
-                register_values = self.read_register_data('BatVol', 2)
-                
-                if register_values is not None:
-                    self.logger.info(f"Auto-detected slave address: {addr}")
-                    return addr
-                    
-            self.logger.warning("Could not auto-detect a valid slave address")
-            # Restore default address
-            self.default_slave_address = 0x00
+        if not self.bms_comm.send_data(command):
+            self.logger.error("Failed to send command")
             return None
-            
-        except Exception as e:
-            self.logger.error(f"Error during slave address auto-detection: {e}")
-            return None
+        response = self.bms_comm.receive_jkbms_raw()
+        return response
 
-    def read_register_data(self, register_name, register_count=1):
-        """
-        Read data from a specified register.
-        
-        Args:
-            register_name (str): The name of the register.
-            register_count (int): The number of registers to read.
-            
-        Returns:
-            list: A list of register values, or None on failure.
-        """
-        try:
-            if register_name not in self.REGISTER_ADDRESSES:
-                self.logger.error(f"Unknown register name: {register_name}")
-                return None
-                
-            register_address = self.REGISTER_ADDRESSES[register_name]
-            
-            # Build the read command
-            command = self.build_read_register_command(register_address, register_count)
-            self.logger.debug(f"Read register {register_name} command: {command.hex().upper()}")
-            
-            # Send the command to the BMS
-            if not self.bms_comm.send_data(command):
-                self.logger.error("Failed to send command")
-                return None
-                
-            # Receive the response - using raw binary data format
-            response = self.bms_comm.receive_data(return_raw=True)
-            if response is None:
-                self.logger.error("Failed to receive response")
-                return None
-                
-            self.logger.debug(f"Received response: {response.hex().upper()}")
-            
-            # Parse the response
-            register_values = self.parse_register_response(response)
-            return register_values
-            
-        except Exception as e:
-            self.logger.error(f"Error reading register {register_name}: {e}")
-            return None
+    # ---------------------------------------------------------------------------
+    # 55AA JK BMS Frame Parser
+    # ---------------------------------------------------------------------------
+    # Frame offsets match reference documentation (jkbms-rs485-addon).
+    # Verified against firmware 9.04 (JK_PB1A16S10P, 16S LFP) via live captures.
+    #
+    # Reference offsets (from RS485-Frames-decoded.md + live verification):
+    #   Cell voltages:      uint16le at 6   (×16, mV)
+    #   Cell resistance:    int16le  at 80  (×16, mΩ)
+    #   MOS temp:           int16le  at 144 (/10 = °C)
+    #   Voltage (mV):       uint32le at 150 (mV)
+    #   Power:              uint32le at 154 (mW)
+    #   Current:            int32le  at 158 (mA)
+    #   Temp sensor 1:      int16le  at 162 (/10 = °C)
+    #   Temp sensor 2:      int16le  at 164 (/10 = °C)
+    #   Balance current:    int16le  at 170 (mA)
+    #   Balance action:     uint8    at 172
+    #   SOC:                uint8    at 173 (%)
+    #   Remain capacity:    uint32le at 174 (mAh, /1000 = Ah)
+    #   Full capacity:      uint32le at 178 (mAh, /1000 = Ah)
+    #   Cycle count:        uint32le at 182
+    #   Cycle capacity:     uint32le at 186 (mAh, /1000 = Ah)
+    #   SOH:                uint8    at 190 (%)
+    #   Total runtime:      uint32le at 194 (s)
+    #   Charge MOS:         uint8    at 198
+    #   Discharge MOS:      uint8    at 199
+    #   Balance MOS:        uint8    at 200
+    #   Total voltage:      uint16le at 234 (/100 = V)
+    #   Temp sensor 3:      int16le  at 254 (/10 = °C)
+    #   Temp sensor 4:      int16le  at 258 (/10 = °C)
+    #   Fault record count: uint8    at 266
+    # ---------------------------------------------------------------------------
 
-    def get_cell_voltages(self, cell_count=16):
+    def parse_jkbms_55aa_frame(self, data):
         """
-        Get all cell voltages.
-        
-        Args:
-            cell_count (int): Number of cells, defaults to 16.
-            
-        Returns:
-            list: A list of cell voltages (mV), or None on failure.
-        """
-        try:
-            # Read all cell voltages, starting from CellVol0
-            register_values = self.read_register_data('CellVol0', cell_count)
-            
-            if register_values is None:
-                return None
-                
-            # Convert to mV
-            cell_voltages = []
-            for i, voltage in enumerate(register_values):
-                if voltage > 0:  # Filter out invalid voltages
-                    cell_voltages.append(voltage)
-                    
-            self.logger.debug(f"Read {len(cell_voltages)} cell voltages: {cell_voltages}")
-            return cell_voltages
-            
-        except Exception as e:
-            self.logger.error(f"Error getting cell voltages: {e}")
-            return None
+        Parse a JK BMS proprietary 55AA data frame.
 
-    def get_battery_voltage(self):
-        """
-        Get the total battery voltage.
-        
-        Returns:
-            float: Total battery voltage (V), or None on failure.
-        """
-        try:
-            # Read battery total voltage register (UINT32, 2 registers)
-            register_values = self.read_register_data('BatVol', 2)
-            
-            if register_values and len(register_values) >= 2:
-                # Combine 32-bit value: high 16 bits + low 16 bits
-                voltage_mv = (register_values[0] << 16) | register_values[1]
-                voltage_v = voltage_mv / 1000.0  # Convert to V
-                
-                self.logger.debug(f"Battery total voltage: {voltage_v}V ({voltage_mv}mV)")
-                return voltage_v
-                
-            return None
-            
-        except Exception as e:
-            self.logger.error(f"Error getting battery voltage: {e}")
-            return None
+        Offsets match the reference documentation (RS485-Frames-decoded.md)
+        and verified against firmware 9.04 (JK_PB1A16S10P, 16S LFP).
 
-    def get_battery_current(self):
+        Returns dict with parsed values or empty dict on failure.
         """
-        Get the battery current.
-        
-        Returns:
-            float: Battery current (A), or None on failure.
-        """
-        try:
-            # Read battery current register (INT32, 2 registers)
-            register_values = self.read_register_data('BatCurrent', 2)
-            
-            if register_values and len(register_values) >= 2:
-                # Combine 32-bit signed value
-                current_ma = (register_values[0] << 16) | register_values[1]
-                
-                # Handle signed number
-                if current_ma & 0x80000000:
-                    current_ma = current_ma - 0x100000000
-                    
-                current_a = current_ma / 1000.0  # Convert to A
-                
-                self.logger.debug(f"Battery current: {current_a}A ({current_ma}mA)")
-                return current_a
-                
-            return None
-            
-        except Exception as e:
-            self.logger.error(f"Error getting battery current: {e}")
-            return None
+        result = {}
 
-    def get_battery_power(self):
-        """
-        Get the battery power.
-        
-        Returns:
-            float: Battery power (kW), or None on failure.
-        """
-        try:
-            # Read battery power register (UINT32, 2 registers)
-            register_values = self.read_register_data('BatWatt', 2)
-            
-            if register_values and len(register_values) >= 2:
-                # Combine 32-bit value
-                power_mw = (register_values[0] << 16) | register_values[1]
-                power_kw = power_mw / 1000000.0  # Convert to kW
-                
-                self.logger.debug(f"Battery power: {power_kw}kW ({power_mw}mW)")
-                return power_kw
-                
-            return None
-            
-        except Exception as e:
-            self.logger.error(f"Error getting battery power: {e}")
-            return None
+        if not data or len(data) < 6 or data[0] != 0x55 or data[1] != 0xAA:
+            self.logger.warning(f"Not a valid 55AA frame (len={len(data) if data else 0})")
+            return result
 
-    def get_balance_current(self):
-        """
-        Get the balancing current.
-        
-        Returns:
-            float: Balancing current (A), or None on failure.
-        """
-        try:
-            # Read balancing current register (INT16, 1 register)
-            register_values = self.read_register_data('BalanCurrent', 1)
-            
-            if register_values and len(register_values) > 0:
-                # INT16, signed 16-bit value, unit is mA
-                balance_current_ma = register_values[0]
-                
-                # Handle signed number
-                if balance_current_ma & 0x8000:
-                    balance_current_ma = balance_current_ma - 0x10000
-                    
-                balance_current_a = balance_current_ma / 1000.0  # Convert to A
-                
-                self.logger.debug(f"Balance current: {balance_current_a}A ({balance_current_ma}mA)")
-                return balance_current_a
-                
-            return None
-            
-        except Exception as e:
-            self.logger.error(f"Error getting balance current: {e}")
-            return None
+        self.logger.debug(f"Parsing 55AA frame, {len(data)} bytes")
 
-    def get_version_info(self):
-        """
-        Get version information.
-        
-        Returns:
-            dict: A dictionary containing hardware and software versions, or None on failure.
-        """
-        try:
-            version_info = {}
-            
-            # Get hardware version (ASCII 8 bytes = 4 registers)
-            hw_version_values = self.read_register_data('HardwareVersion', 4)
-            if hw_version_values and len(hw_version_values) >= 4:
-                self.logger.debug(f"Hardware version register values: {hw_version_values}")
-                
-                # Convert register values to ASCII string
-                hw_version_bytes = b''
-                for value in hw_version_values:
-                    # Each register contains 2 bytes, big-endian
-                    hw_version_bytes += struct.pack('>H', value)
-                
-                self.logger.debug(f"Hardware version byte data: {hw_version_bytes.hex()}")
-                
-                # Convert to string and remove null characters
-                hw_version = hw_version_bytes.decode('ascii', errors='ignore').rstrip('\x00')
-                self.logger.debug(f"Hardware version raw string: '{hw_version}' (length: {len(hw_version)})")
-                
-                # Further clean the string, remove all control characters and whitespace
-                hw_version = ''.join(char for char in hw_version if char.isprintable()).strip()
-                self.logger.debug(f"Hardware version cleaned: '{hw_version}' (length: {len(hw_version)})")
-                
-                # If the version is empty, set a default value
-                if not hw_version:
-                    hw_version = "Unknown"
-                    self.logger.warning("Hardware version is empty, setting to Unknown")
-                
-                version_info['hardware_version'] = hw_version
-                self.logger.debug(f"Hardware version: {hw_version}")
-            
-            # Get software version (ASCII 8 bytes = 4 registers)
-            sw_version_values = self.read_register_data('SoftwareVersion', 4)
-            if sw_version_values and len(sw_version_values) >= 4:
-                self.logger.debug(f"Software version register values: {sw_version_values}")
-                
-                # Convert register values to ASCII string
-                sw_version_bytes = b''
-                for value in sw_version_values:
-                    # Each register contains 2 bytes, big-endian
-                    sw_version_bytes += struct.pack('>H', value)
-                
-                self.logger.debug(f"Software version byte data: {sw_version_bytes.hex()}")
-                
-                # Convert to string and remove null characters
-                sw_version = sw_version_bytes.decode('ascii', errors='ignore').rstrip('\x00')
-                self.logger.debug(f"Software version raw string: '{sw_version}' (length: {len(sw_version)})")
-                
-                # Further clean the string, remove all control characters and whitespace
-                sw_version = ''.join(char for char in sw_version if char.isprintable()).strip()
-                self.logger.debug(f"Software version cleaned: '{sw_version}' (length: {len(sw_version)})")
-                
-                # If the version is empty, set a default value
-                if not sw_version:
-                    sw_version = "Unknown"
-                    self.logger.warning("Software version is empty, setting to Unknown")
-                
-                version_info['software_version'] = sw_version
-                self.logger.debug(f"Software version: {sw_version}")
-            
-            self.logger.debug(f"Final version info: {version_info}")
-            return version_info if version_info else None
-            
-        except Exception as e:
-            self.logger.error(f"Error getting version info: {e}")
-            return None
-
-    def get_temperatures(self):
-        """
-        Get temperature information.
-        
-        Returns:
-            list: A list of temperatures (°C), or None on failure.
-        """
-        try:
-            temperatures = []
-            
-            # Read individual temperature sensors
-            temp_registers = ['TempBat1', 'TempBat2', 'TempBat3', 'TempBat4', 'TempBat5', 'TempMos']
-            
-            for temp_reg in temp_registers:
-                register_values = self.read_register_data(temp_reg, 1)
-                
-                if register_values and len(register_values) > 0:
-                    # INT16, signed 16-bit value, unit is 0.1°C
-                    temp_raw = register_values[0]
-                    
-                    # Handle signed number
-                    if temp_raw & 0x8000:
-                        temp_raw = temp_raw - 0x10000
-                        
-                    temp_celsius = temp_raw / 10.0  # Convert to °C
-                    
-                    # Only add reasonable temperature values
-                    if -50 <= temp_celsius <= 150:
-                        temperatures.append(temp_celsius)
-                        
-            self.logger.debug(f"Read {len(temperatures)} temperatures: {temperatures}")
-            return temperatures
-            
-        except Exception as e:
-            self.logger.error(f"Error getting temperatures: {e}")
-            return None
-
-    def get_soc_data(self):
-        """
-        Get SOC related data.
-        
-        Returns:
-            dict: A dictionary of SOC data, or None on failure.
-        """
-        try:
-            soc_data = {}
-            
-            # Read balancing status and SOC register
-            balan_soc_values = self.read_register_data('BalanSOC', 1)
-            if balan_soc_values and len(balan_soc_values) > 0:
-                # Split into two UINT8 values
-                value = balan_soc_values[0]
-                balan_state = (value >> 8) & 0xFF  # High byte: balancing status
-                soc = value & 0xFF                 # Low byte: SOC
-                
-                soc_data['view_SOC'] = float(soc)
-                soc_data['balance_state'] = balan_state
-                
-            # Read remaining capacity (INT32)
-            remain_cap_values = self.read_register_data('SOCCapRemain', 2)
-            if remain_cap_values and len(remain_cap_values) >= 2:
-                remain_cap_mah = (remain_cap_values[0] << 16) | remain_cap_values[1]
-                # Handle signed number
-                if remain_cap_mah & 0x80000000:
-                    remain_cap_mah = remain_cap_mah - 0x100000000
-                soc_data['view_remain_capacity'] = remain_cap_mah / 1000.0  # Convert to Ah
-                
-            # Read full charge capacity (UINT32)
-            full_cap_values = self.read_register_data('SOCFullChargeCap', 2)
-            if full_cap_values and len(full_cap_values) >= 2:
-                full_cap_mah = (full_cap_values[0] << 16) | full_cap_values[1]
-                soc_data['view_full_capacity'] = full_cap_mah / 1000.0  # Convert to Ah
-                
-            # Read cycle count (UINT32)
-            cycle_values = self.read_register_data('SOCCycleCount', 2)
-            if cycle_values and len(cycle_values) >= 2:
-                cycle_count = (cycle_values[0] << 16) | cycle_values[1]
-                soc_data['view_cycle_number'] = cycle_count
-                
-            # Read SOH
-            soh_values = self.read_register_data('SOCSOH', 1)
-            if soh_values and len(soh_values) > 0:
-                # SOH is in the high byte of the UINT8
-                value = soh_values[0]
-                soh = (value >> 8) & 0xFF
-                soc_data['view_SOH'] = float(soh)
-                
-            self.logger.debug(f"SOC data: {soc_data}")
-            return soc_data
-            
-        except Exception as e:
-            self.logger.error(f"Error getting SOC data: {e}")
-            return None
-
-    def parse_analog_data(self, raw_data):
-        """
-        Parse analog data, maintaining the same data structure as PACE BMS.
-        
-        Args:
-            raw_data (dict): Raw data read from registers.
-            
-        Returns:
-            list: A list of parsed pack data.
-        """
-        try:
-            packs_data = []
-            pack_data = {}
-            
-            # Cell voltage data
-            cell_voltages = raw_data.get('cell_voltages', [])
-            pack_data['cell_voltages'] = cell_voltages
-            pack_data['view_num_cells'] = len(cell_voltages)
-            
-            if cell_voltages:
-                cell_voltage_max = max(cell_voltages)
-                cell_voltage_min = min(cell_voltages)
-                cell_voltage_max_index = cell_voltages.index(cell_voltage_max) + 1
-                cell_voltage_min_index = cell_voltages.index(cell_voltage_min) + 1
-
-                pack_data['cell_voltage_max'] = cell_voltage_max
-                pack_data['cell_voltage_min'] = cell_voltage_min
-                pack_data['cell_voltage_max_index'] = cell_voltage_max_index
-                pack_data['cell_voltage_min_index'] = cell_voltage_min_index
-                pack_data['cell_voltage_diff'] = cell_voltage_max - cell_voltage_min
+        # ---- Cell voltages: uint16le at offset 6 (16 cells, mV) ----
+        cells = []
+        for i in range(16):
+            offset = 6 + i * 2
+            if offset + 1 < len(data):
+                raw_mv = struct.unpack_from('<H', data, offset)[0]
+                if raw_mv > 0 and raw_mv < 50000:
+                    cells.append(raw_mv)
+                else:
+                    break
             else:
-                pack_data['cell_voltage_max'] = 0
-                pack_data['cell_voltage_min'] = 0
-                pack_data['cell_voltage_max_index'] = 0
-                pack_data['cell_voltage_min_index'] = 0
-                pack_data['cell_voltage_diff'] = 0
+                break
+        if cells:
+            result['cell_voltages'] = cells
 
-            # Temperature data
-            temperatures = raw_data.get('temperatures', [])
-            pack_data['temperatures'] = temperatures
-            pack_data['view_num_temps'] = len(temperatures)
+        # ---- Cell resistance: int16le at offset 80 (16 cells, mΩ) ----
+        cell_resistances = []
+        for i in range(16):
+            offset = 80 + i * 2
+            if offset + 1 < len(data):
+                raw_mohm = struct.unpack_from('<h', data, offset)[0]
+                if 0 <= raw_mohm <= 1000:
+                    cell_resistances.append(raw_mohm)
+                else:
+                    break
+            else:
+                break
+        if cell_resistances:
+            result['cell_resistances'] = cell_resistances
 
-            # Current data
-            current = raw_data.get('current', 0.0)
-            pack_data['view_current'] = current
+        # ---- MOS temp: int16le at offset 144 (/10 = °C) ----
+        if 145 < len(data):
+            raw_mos = struct.unpack_from('<h', data, 144)[0]
+            if -500 < raw_mos < 1500:
+                result['temp_mos'] = raw_mos / 10.0
 
-            # Voltage data
-            voltage = raw_data.get('voltage', 0.0)
-            pack_data['view_voltage'] = voltage
+        # ---- Total voltage (high precision): uint32le at offset 150 (mV) ----
+        if 154 <= len(data):
+            raw_v = struct.unpack_from('<I', data, 150)[0]
+            if raw_v > 0:
+                result['voltage_v'] = raw_v / 1000.0
 
-            # Power data
-            power = raw_data.get('power', 0.0)
-            pack_data['view_power'] = power
+        # ---- Power: uint32le at offset 154 (mW) ----
+        if 158 <= len(data):
+            raw_p = struct.unpack_from('<I', data, 154)[0]
+            result['power_kw'] = raw_p / 1000000.0  # mW → kW
 
-            # Calculate cumulative energy data (using actual time intervals)
-            charged_total, discharged_total = self.calculate_cumulative_energy(power)
-            pack_data['view_energy_charged'] = round(charged_total, 2)
-            pack_data['view_energy_discharged'] = round(discharged_total, 2)
+        # ---- Current: int32le at offset 158 (mA) ----
+        if 162 <= len(data):
+            raw_c = struct.unpack_from('<i', data, 158)[0]
+            result['current_a'] = raw_c / 1000.0  # mA → A
 
-            # SOC related data
-            soc_data = raw_data.get('soc_data', {})
-            pack_data['view_remain_capacity'] = soc_data.get('view_remain_capacity', 0.0)
-            pack_data['view_full_capacity'] = soc_data.get('view_full_capacity', 0.0)
-            pack_data['view_cycle_number'] = soc_data.get('view_cycle_number', 0)
-            pack_data['view_SOC'] = soc_data.get('view_SOC', 0.0)
-            pack_data['view_SOH'] = soc_data.get('view_SOH', 0.0)
+        # ---- Battery temp sensors: int16le at 162, 164, 254, 258 (/10 = °C) ----
+        temps = {
+            'temp_bat1': 162,
+            'temp_bat2': 164,
+            'temp_bat3': 254,
+            'temp_bat4': 258,
+        }
+        for name, off in temps.items():
+            if off + 2 <= len(data):
+                raw = struct.unpack_from('<h', data, off)[0]
+                if -500 < raw < 1500:
+                    result[name] = raw / 10.0
 
-            # Estimate design capacity (based on full charge capacity)
-            pack_data['view_design_capacity'] = pack_data['view_full_capacity']
+        # ---- Balance current: int16le at offset 170 (mA) ----
+        if 172 <= len(data):
+            raw_bal = struct.unpack_from('<h', data, 170)[0]
+            if -10000 < raw_bal < 10000:
+                result['balance_current_a'] = raw_bal / 1000.0  # mA → A
 
-            # Balancing current data
-            balance_current = raw_data.get('balance_current', 0.0)
-            pack_data['view_balance_current'] = balance_current
+        # ---- SOC: uint8 at offset 173 (%) ----
+        if 173 < len(data):
+            soc_val = data[173]
+            if 0 <= soc_val <= 100:
+                result['soc'] = float(soc_val)
 
-            # Version info data
-            version_info = raw_data.get('version_info', {})
-            pack_data['hardware_version'] = version_info.get('hardware_version', '')
-            pack_data['software_version'] = version_info.get('software_version', '')
+        # ---- Capacity: uint32le at 174 (remain mAh) and 178 (full mAh) ----
+        if 182 <= len(data):
+            remain = struct.unpack_from('<I', data, 174)[0]
+            if 0 < remain <= 5000000000:
+                result['remain_capacity_ah'] = remain / 1000.0
+        if 182 <= len(data):
+            full = struct.unpack_from('<I', data, 178)[0]
+            if 0 < full <= 5000000000:
+                result['full_capacity_ah'] = full / 1000.0
 
-            packs_data.append(pack_data)
-            
-            self.logger.debug(f"Finished parsing analog data: {pack_data}")
-            return packs_data
+        # ---- Cycle count: uint32le at offset 182 ----
+        if 186 <= len(data):
+            cc = struct.unpack_from('<I', data, 182)[0]
+            if 0 <= cc < 65000:
+                result['cycle_count'] = cc
 
-        except Exception as e:
-            self.logger.error(f"Error parsing analog data: {e}")
+        # ---- SOH: uint8 at offset 190 (%) ----
+        if 190 < len(data):
+            soh = data[190]
+            if 0 < soh <= 100:
+                result['soh'] = float(soh)
+
+        # ---- Total runtime: uint32le at offset 194 (s) ----
+        if 198 <= len(data):
+            runtime = struct.unpack_from('<I', data, 194)[0]
+            result['total_runtime_s'] = runtime
+
+        # ---- MOS status: uint8 at 198 (charge), 199 (discharge), 200 (balance) ----
+        if 201 < len(data):
+            result['charge_mos'] = bool(data[198])
+            result['discharge_mos'] = bool(data[199])
+            result['balance_mos'] = bool(data[200])
+
+        # ---- Total voltage (standard precision): uint16le at 234 (/100 = V) ----
+        if 236 <= len(data):
+            raw_sv = struct.unpack_from('<H', data, 234)[0]
+            if raw_sv > 0:
+                # Only set if voltage_v wasn't set from offset 150
+                if 'voltage_v' not in result:
+                    result['voltage_v'] = raw_sv / 100.0
+
+        # ---- Fault record count: uint8 at offset 266 ----
+        if 266 < len(data):
+            result['fault_count'] = int(data[266])
+
+        self.logger.debug(f"Parsed 55AA frame: {result}")
+        return result
+
+    def dump_frame_analysis(self, data):
+        """
+        Diagnostic tool: dump a 55AA frame with all potential field locations.
+        Use this when calibrating offsets for a new BMS firmware version.
+
+        Call this with raw response data after receiving to see annotated hex dump
+        with interpretations of every word in the frame.
+        """
+        if not data or len(data) < 6 or data[0] != 0x55 or data[1] != 0xAA:
+            self.logger.warning("Not a valid 55AA frame for analysis")
+            return
+
+        print("=" * 70)
+        print("JK BMS 55AA FRAME ANALYSIS")
+        print("=" * 70)
+        print(f"Frame length: {len(data)} bytes")
+        print(f"Pack ID:      {data[4]} (offset 4)")
+        print()
+
+        # Print hex dump with interpretations
+        for row_start in range(0, len(data), 16):
+            row_end = min(row_start + 16, len(data))
+            row_data = data[row_start:row_end]
+
+            hex_part = ' '.join(f'{b:02X}' for b in row_data)
+            hex_padded = hex_part.ljust(48)
+            ascii_part = ''.join(chr(b) if 32 <= b < 127 else '.' for b in row_data)
+
+            notes = []
+            for i, b in enumerate(row_data):
+                abs_offset = row_start + i
+
+                if abs_offset == 0:
+                    notes.append("← 55AA Header")
+                if abs_offset == 144:
+                    if abs_offset + 1 < len(data):
+                        t = struct.unpack_from('<h', data, 144)[0] / 10.0
+                        notes.append(f"← MOS temp={t:.1f}°C")
+                if abs_offset == 150:
+                    if abs_offset + 3 < len(data):
+                        v = struct.unpack_from('<I', data, 150)[0] / 1000.0
+                        notes.append(f"← V={v:.3f}V(uint32 mV)")
+                if abs_offset == 154:
+                    notes.append("← Power(uint32 mW)")
+                if abs_offset == 158:
+                    notes.append("← Current(int32 mA)")
+                if abs_offset == 162:
+                    notes.append("← Temp1(int16/10)")
+                if abs_offset == 164:
+                    notes.append("← Temp2(int16/10)")
+                if abs_offset == 170:
+                    notes.append("← Balance A")
+                if abs_offset == 173:
+                    notes.append(f"← SOC={data[173]}%")
+                if abs_offset == 174:
+                    if abs_offset + 3 < len(data):
+                        cap = struct.unpack_from('<I', data, 174)[0] / 1000.0
+                        notes.append(f"← Remain={cap:.1f}Ah")
+                if abs_offset == 178:
+                    if abs_offset + 3 < len(data):
+                        cap = struct.unpack_from('<I', data, 178)[0] / 1000.0
+                        notes.append(f"← FullCap={cap:.1f}Ah")
+                if abs_offset == 182:
+                    notes.append("← Cycles")
+                if abs_offset == 190:
+                    notes.append(f"← SOH={data[190]}%")
+                if abs_offset == 198:
+                    notes.append("← ChgMOS")
+                if abs_offset == 199:
+                    notes.append("← DchMOS")
+                if abs_offset == 234:
+                    if abs_offset + 1 < len(data):
+                        v = struct.unpack_from('<H', data, 234)[0] / 100.0
+                        notes.append(f"← V={v:.2f}V(uint16)")
+
+                # Cell voltages (offset 6-37)
+                if 6 <= abs_offset <= 37 and (abs_offset - 6) % 2 == 0:
+                    if abs_offset + 1 < len(data):
+                        mv = struct.unpack_from('<H', data, abs_offset)[0]
+                        if 2000 <= mv <= 5000:
+                            cell_num = (abs_offset - 6) // 2 + 1
+                            notes.append(f"← C{cell_num}={mv}mV")
+
+                # Cell resistance (offset 80-111)
+                if 80 <= abs_offset <= 110 and (abs_offset - 80) % 2 == 0:
+                    if abs_offset + 1 < len(data):
+                        r = struct.unpack_from('<h', data, abs_offset)[0]
+                        if 0 <= r <= 1000:
+                            cell_num = (abs_offset - 80) // 2 + 1
+                            notes.append(f"← R{cell_num}={r}mΩ")
+
+            note_str = '; '.join(notes) if notes else ''
+            if note_str:
+                print(f"  {row_start:04X}: {hex_padded} |{ascii_part}| {note_str}")
+            else:
+                print(f"  {row_start:04X}: {hex_padded} |{ascii_part}|")
+
+        # Scan section
+        print()
+        print("--- FIELD SCAN ---")
+        print()
+
+        # Temperatures
+        print("Temperature candidates (int16le/10, -10 to 100°C):")
+        for off in range(0, len(data) - 1):
+            if off % 2 != 0:
+                continue
+            raw = struct.unpack_from('<h', data, off)[0]
+            if -100 < raw < 1000:
+                print(f"  offset {off:3d} (0x{off:04X}): {raw/10:.1f}°C")
+
+        # Voltage
+        cell_mvs = [struct.unpack_from('<H', data, 6+i*2)[0] for i in range(16)
+                    if 6+i*2+1 < len(data) and 2000 <= struct.unpack_from('<H', data, 6+i*2)[0] <= 5000]
+        total_mv = sum(cell_mvs) if cell_mvs else 0
+
+        print()
+        print("Voltage candidates (uint16le mV):")
+        for off in range(len(data) - 1):
+            raw = struct.unpack_from('<H', data, off)[0]
+            if 10000 < raw < 60000:
+                mark = " ← MATCH" if total_mv and abs(raw - total_mv) < 500 else ""
+                print(f"  offset {off:3d}: {raw}mV = {raw/1000:.3f}V{mark}")
+
+        print()
+        print("Voltage candidates (uint32le mV):")
+        for off in range(len(data) - 3):
+            raw = struct.unpack_from('<I', data, off)[0]
+            if 10000 < raw < 60000:
+                mark = " ← MATCH" if total_mv and abs(raw - total_mv) < 500 else ""
+                print(f"  offset {off:3d}: {raw}mV = {raw/1000:.3f}V{mark}")
+
+        print()
+        print("Current candidates (int32le mA):")
+        for off in range(len(data) - 3):
+            raw = struct.unpack_from('<i', data, off)[0]
+            if -500000 < raw < 500000 and (abs(raw) > 1000 or raw == 0):
+                label = " ← ZERO" if raw == 0 else ""
+                print(f"  offset {off:3d}: {raw}mA = {raw/1000:.2f}A{label}")
+
+        print()
+        print("Power candidates (uint32le mW):")
+        for off in range(len(data) - 3):
+            raw = struct.unpack_from('<I', data, off)[0]
+            if 1000 < raw < 50000000:
+                print(f"  offset {off:3d}: {raw}mW = {raw/1000:.1f}W = {raw/1000000:.3f}kW")
+
+        print()
+        print("Capacity candidates (uint32le mAh):")
+        for off in range(len(data) - 3):
+            raw = struct.unpack_from('<I', data, off)[0]
+            if 90000 < raw < 110000:
+                print(f"  offset {off:3d}: {raw/1000:.3f}Ah")
+
+        print()
+        print("--- END FRAME ANALYSIS ---")
+        print("=" * 70)
+
+    def parse_jkbms_static_frame(self, data):
+        """
+        Parse JK BMS static data 55AA frame (from register 0x161C).
+        Extracts hardware/software version info.
+
+        Based on reference buffer-parser Trame 1 layout.
+        """
+        result = {}
+        if not data or len(data) < 6 or data[0] != 0x55 or data[1] != 0xAA:
+            return result
+
+        # BMS name: ASCII at offset 6, 13 chars
+        if len(data) >= 19:
+            bms_name = data[6:19].decode('ascii', errors='ignore').rstrip('\x00').strip()
+            if bms_name:
+                result['bms_name'] = bms_name
+
+        # Hardware version (FW_A): ASCII at offset 22, 3 chars
+        if len(data) >= 25:
+            hw_ver = data[22:25].decode('ascii', errors='ignore').rstrip('\x00').strip()
+            if hw_ver:
+                result['hardware_version'] = hw_ver
+
+        # Software version (SW_N): ASCII at offset 30, 5 chars
+        if len(data) >= 35:
+            sw_ver = data[30:35].decode('ascii', errors='ignore').rstrip('\x00').strip()
+            if sw_ver:
+                result['software_version'] = sw_ver
+
+        # Serial number: ASCII at offset 46, 13 chars
+        if len(data) >= 59:
+            serial = data[46:59].decode('ascii', errors='ignore').rstrip('\x00').strip()
+            if serial:
+                result['serial_number'] = serial
+
+        # Manufacturing date: ASCII at offset 78, 8 chars
+        if len(data) >= 86:
+            mfg_date = data[78:86].decode('ascii', errors='ignore').rstrip('\x00').strip()
+            if mfg_date:
+                result['manufacturing_date'] = mfg_date
+
+        self.logger.debug(f"Parsed static frame: {result}")
+        return result
+
+    def parse_alarm_response(self, response):
+        """
+        Parse alarm response from Modbus FC 0x03 read of 0x12A0.
+
+        Standard Modbus RTU response format:
+        [0]: Slave ID
+        [1]: 0x03 (FC)
+        [2]: 0x04 (byte count)
+        [3-6]: 32-bit alarm value (big-endian)
+        [7-8]: CRC
+        """
+        if not response or len(response) < 9:
+            self.logger.warning("Alarm response too short")
             return None
 
+        # Validate CRC
+        data_no_crc = response[:-2]
+        received_crc = struct.unpack('<H', response[-2:])[0]
+        calc_crc = self.calculate_crc16_modbus(data_no_crc)
+        if received_crc != calc_crc:
+            self.logger.error(f"Alarm CRC failed: received={received_crc:04X}, calculated={calc_crc:04X}")
+            # Try parsing anyway for resilience
+
+        alarm_value = struct.unpack('>I', response[3:7])[0]
+        return self._decode_alarms(alarm_value)
+
+    def _decode_alarms(self, alarm_value):
+        """Decode 32-bit alarm bitfield into structured dict."""
+        alarm_bits = {
+            0: "Balancing resistance too high",
+            1: "MOS over-temperature protection",
+            2: "Number of cells does not match parameter",
+            3: "Abnormal current sensor",
+            4: "Cell over-voltage protection",
+            5: "Battery over-voltage protection",
+            6: "Overcurrent charge protection",
+            7: "Charge short-circuit protection",
+            8: "Over-temperature charge protection",
+            9: "Low temperature charge protection",
+            10: "Internal communication anomaly",
+            11: "Cell under-voltage protection",
+            12: "Battery under-voltage protection",
+            13: "Overcurrent discharge protection",
+            14: "Discharge short-circuit protection",
+            15: "Over-temperature discharge protection",
+            16: "Charge MOS anomaly",
+            17: "Discharge MOS anomaly",
+            18: "GPS disconnected",
+            19: "Please modify the authorization password in time",
+            20: "Discharge activation failure",
+            21: "Battery over-temperature alarm",
+            22: "Temperature sensor anomaly",
+            23: "Parallel module anomaly",
+        }
+
+        active = {}
+        for bit, desc in alarm_bits.items():
+            active[desc] = bool(alarm_value & (1 << bit))
+
+        return {
+            'raw_value': alarm_value,
+            'active_count': bin(alarm_value).count('1') & 0xFF,
+            'has_alarms': alarm_value != 0,
+            'alarms': active,
+        }
+
+    # ---------------------------------------------------------------------------
+    # Data retrieval methods
+    # ---------------------------------------------------------------------------
+    def get_dynamic_data(self):
+        """
+        Query JK BMS dynamic data (register 0x1620).
+        Returns parsed 55AA frame dict or None.
+        """
+        self.logger.debug("Querying JK BMS dynamic data (0x1620)")
+        command = self.build_write_command(self.REG_DYNAMIC)
+        raw = self.send_and_receive(command)
+        if not raw:
+            self.logger.error("No response for dynamic data query")
+            return None
+
+        # Find the 55AA frame in the response (there may be Modbus ACK frames before it)
+        idx = raw.find(b'\x55\xAA')
+        if idx < 0:
+            self.logger.error(f"No 55AA frame found in response (len={len(raw)})")
+            self.logger.debug(f"Raw response hex: {raw.hex().upper()[:200]}")
+            return None
+
+        frame = raw[idx:]
+        self.logger.debug(f"Found 55AA frame at offset {idx}, frame len={len(frame)}")
+
+        # In debug mode, dump frame analysis
+        if self.debug and self.logger.isEnabledFor(logging.DEBUG):
+            self.dump_frame_analysis(frame)
+
+        return self.parse_jkbms_55aa_frame(frame)
+
+    def get_static_data(self):
+        """
+        Query JK BMS static data (register 0x161C).
+        Returns parsed 55AA frame dict with version info or None.
+        """
+        self.logger.debug("Querying JK BMS static data (0x161C)")
+        command = self.build_write_command(self.REG_STATIC)
+        raw = self.send_and_receive(command)
+        if not raw:
+            self.logger.error("No response for static data query")
+            return None
+
+        idx = raw.find(b'\x55\xAA')
+        if idx < 0:
+            self.logger.warning("No 55AA frame in static response")
+            return None
+
+        return self.parse_jkbms_static_frame(raw[idx:])
+
+    def get_alarm_data(self):
+        """
+        Query JK BMS alarm status (register 0x12A0, FC 0x03, count 2).
+        Returns parsed alarm dict or None.
+        """
+        self.logger.debug("Querying JK BMS alarm data (0x12A0)")
+        command = self.build_read_command(self.REG_ALARM, 2)
+        self.logger.debug(f"Alarm command: {command.hex().upper()}")
+
+        raw = self.send_and_receive(command)
+        if not raw:
+            self.logger.warning("No response for alarm query")
+            return None
+
+        # Look for Modbus RTU response in the raw data
+        # Alarm FC 0x03 response format: [slave] [0x03] [byte_cnt=4] [data...4] [CRC...2]
+        # The response data starts with slave_address (0x01 default) or 0x0A (from observed logs)
+        # We search for the pattern: any_addr + 0x03 + 0x04 (byte count for 2 registers)
+        alarm_response = None
+        for candidate_addr in [self.slave_address, 0x0A, 0x01, 0x00]:
+            pattern = bytes([candidate_addr, 0x03, 0x04])
+            idx = raw.find(pattern)
+            if idx >= 0 and idx + 9 <= len(raw):
+                alarm_response = raw[idx:idx+9]
+                self.logger.debug(f"Found alarm response at offset {idx} with addr 0x{candidate_addr:02X}")
+                break
+
+        if not alarm_response:
+            self.logger.warning(f"No valid alarm Modbus response found in {len(raw)} bytes")
+            self.logger.debug(f"Raw alarm response: {raw.hex().upper()[:200]}")
+            return None
+
+        return self.parse_alarm_response(alarm_response)
+
+    # ---------------------------------------------------------------------------
+    # Main data gathering (compatible interface with original code)
+    # ---------------------------------------------------------------------------
     def get_analog_data(self, pack_number=None):
         """
-        Get analog data, maintaining the same interface as PACE BMS.
-        
-        Args:
-            pack_number: Pack number (JK BMS usually has only one pack).
-            
-        Returns:
-            list: A list containing analog data.
+        Get all analog data from JK BMS.
+        Returns list of pack dicts compatible with PACE BMS format.
         """
-        try:
-            self.logger.debug("Starting to get JK BMS analog data")
-            
-            # Auto-detect slave address on the first call
-            if not self.address_detected:
-                self.logger.info("First connection, starting auto-detection of slave address...")
-                detected_address = self.auto_detect_slave_address()
-                if detected_address is not None:
-                    self.address_detected = True
-                else:
-                    self.logger.warning("Address detection failed, continuing with default address 0")
-            
-            # Collect all raw data
-            raw_data = {}
-            
-            # Get cell voltages
-            cell_voltages = self.get_cell_voltages(32)  # Supports up to 32 cells
-            if cell_voltages:
-                raw_data['cell_voltages'] = cell_voltages
-            else:
-                self.logger.warning("Failed to get cell voltages")
-                raw_data['cell_voltages'] = []
+        self.logger.debug("Starting to get JK BMS analog data")
 
-            # Get temperatures
-            temperatures = self.get_temperatures()
-            if temperatures:
-                raw_data['temperatures'] = temperatures
-            else:
-                self.logger.warning("Failed to get temperatures")
-                raw_data['temperatures'] = []
+        # Query dynamic data (contains cells, current, voltage, SOC, temps)
+        dynamic = self.get_dynamic_data()
+        if not dynamic:
+            self.logger.warning("Failed to get dynamic data, retrying once...")
+            import time
+            time.sleep(0.5)
+            dynamic = self.get_dynamic_data()
+            if not dynamic:
+                self.logger.error("Failed to get dynamic data after retry")
+                return None
 
-            # Get current
-            current = self.get_battery_current()
-            raw_data['current'] = current if current is not None else 0.0
+        # Query static data for version info (best effort)
+        static = self.get_static_data()
 
-            # Get voltage
-            voltage = self.get_battery_voltage()
-            raw_data['voltage'] = voltage if voltage is not None else 0.0
+        # Build output dict compatible with PACE BMS format
+        pack_data = {}
 
-            # Get power
-            power = self.get_battery_power()
-            raw_data['power'] = power if power is not None else 0.0
+        # Cell voltages (in mV, already parsed from 55AA frame)
+        cells = dynamic.get('cell_voltages', [])
+        pack_data['cell_voltages'] = cells
+        pack_data['view_num_cells'] = len(cells)
+        if cells:
+            pack_data['cell_voltage_max'] = max(cells)
+            pack_data['cell_voltage_min'] = min(cells)
+            pack_data['cell_voltage_max_index'] = cells.index(max(cells)) + 1
+            pack_data['cell_voltage_min_index'] = cells.index(min(cells)) + 1
+            pack_data['cell_voltage_diff'] = max(cells) - min(cells)
+        else:
+            pack_data['cell_voltage_max'] = 0
+            pack_data['cell_voltage_min'] = 0
+            pack_data['cell_voltage_max_index'] = 0
+            pack_data['cell_voltage_min_index'] = 0
+            pack_data['cell_voltage_diff'] = 0
 
-            # Get SOC data
-            soc_data = self.get_soc_data()
-            raw_data['soc_data'] = soc_data if soc_data else {}
+        # Temperatures
+        temps = []
+        for key in ['temp_bat1', 'temp_bat2', 'temp_bat3', 'temp_bat4', 'temp_mos']:
+            val = dynamic.get(key)
+            if val is not None and -50 <= val <= 150:
+                temps.append(round(val, 1))
+        pack_data['temperatures'] = temps
+        pack_data['view_num_temps'] = len(temps)
 
-            # Get balancing current
-            balance_current = self.get_balance_current()
-            raw_data['balance_current'] = balance_current if balance_current is not None else 0.0
+        # Current (A)
+        pack_data['view_current'] = dynamic.get('current_a', 0.0)
 
-            # Get version info
-            version_info = self.get_version_info()
-            raw_data['version_info'] = version_info if version_info else {}
+        # Voltage (V)
+        pack_data['view_voltage'] = dynamic.get('voltage_v', 0.0)
 
-            # Parse data into PACE BMS format
-            analog_data = self.parse_analog_data(raw_data)
-            
-            self.logger.debug(f"Finished getting JK BMS analog data: {analog_data}")
-            return analog_data
+        # Power (kW)
+        power_kw = dynamic.get('power_kw', 0.0)
+        pack_data['view_power'] = power_kw
 
-        except Exception as e:
-            self.logger.error(f"Error getting analog data: {e}")
-            return None
+        # Cumulative energy
+        charged_total, discharged_total = self.calculate_cumulative_energy(power_kw)
+        pack_data['view_energy_charged'] = round(charged_total, 2)
+        pack_data['view_energy_discharged'] = round(discharged_total, 2)
+
+        # SOC & capacity
+        pack_data['view_SOC'] = dynamic.get('soc', 0.0)
+        pack_data['view_remain_capacity'] = dynamic.get('remain_capacity_ah', 0.0)
+        pack_data['view_full_capacity'] = dynamic.get('full_capacity_ah', 0.0)
+        pack_data['view_design_capacity'] = pack_data['view_full_capacity']
+        pack_data['view_cycle_number'] = dynamic.get('cycle_count', 0)
+        pack_data['view_SOH'] = dynamic.get('soh', 0.0)
+
+        # Balance current
+        pack_data['view_balance_current'] = dynamic.get('balance_current_a', 0.0)
+
+        # Version info
+        if static:
+            pack_data['hardware_version'] = static.get('hardware_version', '')
+            pack_data['software_version'] = static.get('software_version', '')
+        else:
+            pack_data['hardware_version'] = ''
+            pack_data['software_version'] = ''
+
+        pack_list = [pack_data]
+        self.logger.debug(f"Finished getting JK BMS analog data: {pack_data}")
+        return pack_list
 
     def get_warning_data(self, pack_number=None):
         """
-        Get warning data, maintaining the same interface as PACE BMS.
-        
-        Args:
-            pack_number: Pack number.
-            
-        Returns:
-            list: A list containing warning data.
+        Get warning/alarm data from JK BMS.
+        Returns list of pack warning dicts compatible with PACE BMS format.
         """
-        try:
-            self.logger.debug("Starting to get JK BMS warning data")
-            
-            # Read alarm status register
-            alarm_values = self.read_register_data('AlarmSta', 2)
-            
-            warning_data = []
-            pack_warning = {
-                'cell_number': len(self.get_cell_voltages(32) or []),
-                'cell_voltage_warnings': [],
-                'temp_sensor_number': len(self.get_temperatures() or []),
-                'temp_sensor_warnings': [],
-                'warn_charge_current': 'normal',
-                'warn_total_voltage': 'normal',
-                'warn_discharge_current': 'normal',
-                'protect_state_1': {},
-                'protect_state_2': {},
-                'instruction_state': {},
-                'control_state': {},
-                'fault_state': {},
-                'balance_state_1': 0,
-                'balance_state_2': 0,
-                'warn_state_1': {},
-                'warn_state_2': {}
-            }
-            
-            if alarm_values and len(alarm_values) >= 2:
-                # Combine 32-bit alarm status
-                alarm_status = (alarm_values[0] << 16) | alarm_values[1]
-                
-                # Parse various alarm statuses
-                pack_warning['protect_state_1'] = {
-                    'protect_short_circuit': bool(alarm_status & (1 << 7)),
-                    'protect_high_discharge_current': bool(alarm_status & (1 << 13)),
-                    'protect_high_charge_current': bool(alarm_status & (1 << 6)),
-                    'protect_low_total_voltage': bool(alarm_status & (1 << 12)),
-                    'protect_high_total_voltage': bool(alarm_status & (1 << 5)),
-                    'protect_low_cell_voltage': bool(alarm_status & (1 << 11)),
-                    'protect_high_cell_voltage': bool(alarm_status & (1 << 4)),
-                }
-                
-                pack_warning['protect_state_2'] = {
-                    'status_fully_charged': False,  # This status does not exist in JK BMS
-                    'protect_low_env_temp': bool(alarm_status & (1 << 9)),
-                    'protect_high_env_temp': bool(alarm_status & (1 << 8)),
-                    'protect_high_MOS_temp': bool(alarm_status & (1 << 1)),
-                    'protect_low_discharge_temp': bool(alarm_status & (1 << 15)),
-                    'protect_low_charge_temp': bool(alarm_status & (1 << 9)),
-                    'protect_high_discharge_temp': bool(alarm_status & (1 << 15)),
-                    'protect_high_charge_temp': bool(alarm_status & (1 << 8)),
-                }
-                
-                pack_warning['fault_state'] = {
-                    'fault_sampling': bool(alarm_status & (1 << 3)),
-                    'fault_cell': bool(alarm_status & (1 << 2)),
-                    'fault_NTC': False,  # Determined by temperature sensor status
-                    'fault_discharge_MOS': bool(alarm_status & (1 << 17)),
-                    'fault_charge_MOS': bool(alarm_status & (1 << 16)),
-                }
+        self.logger.debug("Starting to get JK BMS warning data")
 
-            # Populate cell voltage warnings (normal state)
-            for i in range(pack_warning['cell_number']):
-                pack_warning['cell_voltage_warnings'].append('normal')
-                
-            # Populate temperature sensor warnings (normal state)
-            for i in range(pack_warning['temp_sensor_number']):
-                pack_warning['temp_sensor_warnings'].append('normal')
+        alarm = self.get_alarm_data()
+        cells = self.get_dynamic_data()
 
-            warning_data.append(pack_warning)
-            
-            self.logger.debug(f"Finished getting JK BMS warning data: {warning_data}")
-            return warning_data
+        cell_count = len(cells.get('cell_voltages', [])) if cells else 0
 
-        except Exception as e:
-            self.logger.error(f"Error getting warning data: {e}")
-            return None
+        alarm_bits = {}
+        if alarm:
+            alarm_bits = alarm.get('alarms', {})
 
+        pack_warning = {
+            'cell_number': cell_count,
+            'cell_voltage_warnings': ['normal'] * cell_count,
+            'temp_sensor_number': 0,
+            'temp_sensor_warnings': [],
+            'warn_charge_current': 'normal',
+            'warn_total_voltage': 'normal',
+            'warn_discharge_current': 'normal',
+            'protect_state_1': {
+                'protect_short_circuit': alarm_bits.get('Discharge short-circuit protection', False),
+                'protect_high_discharge_current': alarm_bits.get('Overcurrent discharge protection', False),
+                'protect_high_charge_current': alarm_bits.get('Overcurrent charge protection', False),
+                'protect_low_total_voltage': alarm_bits.get('Battery under-voltage protection', False),
+                'protect_high_total_voltage': alarm_bits.get('Battery over-voltage protection', False),
+                'protect_low_cell_voltage': alarm_bits.get('Cell under-voltage protection', False),
+                'protect_high_cell_voltage': alarm_bits.get('Cell over-voltage protection', False),
+            },
+            'protect_state_2': {
+                'status_fully_charged': False,
+                'protect_low_env_temp': alarm_bits.get('Low temperature charge protection', False),
+                'protect_high_env_temp': alarm_bits.get('Over-temperature charge protection', False),
+                'protect_high_MOS_temp': alarm_bits.get('MOS over-temperature protection', False),
+                'protect_low_discharge_temp': alarm_bits.get('Low temperature charge protection', False),
+                'protect_low_charge_temp': alarm_bits.get('Low temperature charge protection', False),
+                'protect_high_discharge_temp': alarm_bits.get('Over-temperature discharge protection', False),
+                'protect_high_charge_temp': alarm_bits.get('Over-temperature charge protection', False),
+            },
+            'fault_state': {
+                'fault_sampling': alarm_bits.get('Abnormal current sensor', False),
+                'fault_cell': alarm_bits.get('Number of cells does not match parameter', False),
+                'fault_NTC': alarm_bits.get('Temperature sensor anomaly', False),
+                'fault_discharge_MOS': alarm_bits.get('Discharge MOS anomaly', False),
+                'fault_charge_MOS': alarm_bits.get('Charge MOS anomaly', False),
+            },
+            'instruction_state': {},
+            'control_state': {},
+            'balance_state_1': 0,
+            'balance_state_2': 0,
+            'warn_state_1': {},
+            'warn_state_2': {},
+        }
+
+        warning_data = [pack_warning]
+        self.logger.debug(f"Finished getting JK BMS warning data: {warning_data}")
+        return warning_data
+
+    # ---------------------------------------------------------------------------
+    # MQTT Publishing (compatible interface with original code)
+    # ---------------------------------------------------------------------------
     def publish_analog_data_mqtt(self, pack_number=None):
         """
-        Publish analog data to MQTT, maintaining the same interface and format as PACE BMS.
-        
-        Args:
-            pack_number: Pack number.
+        Publish analog data to MQTT.
+        Compatible format with PACE BMS.
         """
-        
+
         units = {
             'view_num_cells': 'cells',
             'cell_voltages': 'mV',
@@ -1069,7 +971,6 @@ class JKBMS485:
             'view_full_capacity': 'measurement',
             'view_cycle_number': 'measurement',
             'view_design_capacity': 'measurement',
-            'view_power': 'measurement',
             'view_energy_charged': 'total',
             'view_energy_discharged': 'total',
             'view_SOH': 'measurement',
@@ -1090,19 +991,18 @@ class JKBMS485:
             self.logger.error("No packs found")
             return None
 
-        # Publish overall data
         self.ha_comm.publish_sensor_state(total_packs_num, 'packs', "total_packs_num")
         self.ha_comm.publish_sensor_discovery("total_packs_num", "packs", icons['total_packs_num'], deviceclasses['total_packs_num'], stateclasses['total_packs_num'])
 
-        total_full_capacity = round(sum(d.get('view_full_capacity', 0) for d in analog_data),2)
+        total_full_capacity = round(sum(d.get('view_full_capacity', 0) for d in analog_data), 2)
         self.ha_comm.publish_sensor_state(total_full_capacity, 'Ah', "total_full_capacity")
         self.ha_comm.publish_sensor_discovery("total_full_capacity", "Ah", icons['total_full_capacity'], deviceclasses['total_full_capacity'], stateclasses['total_full_capacity'])
 
-        total_remain_capacity = round(sum(d.get('view_remain_capacity', 0) for d in analog_data),2)
+        total_remain_capacity = round(sum(d.get('view_remain_capacity', 0) for d in analog_data), 2)
         self.ha_comm.publish_sensor_state(total_remain_capacity, 'Ah', "total_remain_capacity")
         self.ha_comm.publish_sensor_discovery("total_remain_capacity", "Ah", icons['total_remain_capacity'], deviceclasses['total_remain_capacity'], stateclasses['total_remain_capacity'])
 
-        total_current = round(sum(d.get('view_current', 0) for d in analog_data),2)
+        total_current = round(sum(d.get('view_current', 0) for d in analog_data), 2)
         self.ha_comm.publish_sensor_state(total_current, 'A', "total_current")
         self.ha_comm.publish_sensor_discovery("total_current", "A", icons['total_current'], deviceclasses['total_current'], stateclasses['total_current'])
 
@@ -1110,17 +1010,15 @@ class JKBMS485:
         self.ha_comm.publish_sensor_state(total_soc, '%', "total_SOC")
         self.ha_comm.publish_sensor_discovery("total_SOC", "%", icons['total_SOC'], deviceclasses['total_SOC'], stateclasses['total_SOC'])
 
-        # Publish random data (if enabled)
         if self.if_random:
             import random
             random_number = random.randint(1, 100)
             self.ha_comm.publish_sensor_state(random_number, 'R', "random_number")
             self.ha_comm.publish_sensor_discovery("random_number", "R", icons['random_number'], deviceclasses['random_number'], stateclasses['random_number'])
 
-        # Publish detailed data for each pack
         pack_i = 0
         for pack in analog_data:
-            pack_i = pack_i + 1
+            pack_i += 1
             for key, value in pack.items():
                 unit = units.get(key, '')
                 icon = icons.get(key, '')
@@ -1130,31 +1028,27 @@ class JKBMS485:
                 if key == 'cell_voltages':
                     cell_i = 0
                     for cell_voltage in value:
-                        cell_i = cell_i + 1
+                        cell_i += 1
                         self.ha_comm.publish_sensor_state(cell_voltage, unit, f"pack_{pack_i:02}_cell_voltage_{cell_i:02}")
-                        self.ha_comm.publish_sensor_discovery(f"pack_{pack_i:02}_cell_voltage_{cell_i:02}", unit, icon,deviceclass,stateclass)
-                        
+                        self.ha_comm.publish_sensor_discovery(f"pack_{pack_i:02}_cell_voltage_{cell_i:02}", unit, icon, deviceclass, stateclass)
+
                 elif key == 'temperatures':
                     temperature_i = 0
                     for temperature in value:
-                        temperature_i = temperature_i + 1
+                        temperature_i += 1
                         self.ha_comm.publish_sensor_state(temperature, unit, f"pack_{pack_i:02}_temperature_{temperature_i:02}")
-                        self.ha_comm.publish_sensor_discovery(f"pack_{pack_i:02}_temperature_{temperature_i:02}", unit, icon,deviceclass,stateclass)
-                        
+                        self.ha_comm.publish_sensor_discovery(f"pack_{pack_i:02}_temperature_{temperature_i:02}", unit, icon, deviceclass, stateclass)
+
                 else:
-                    # Add debug info, especially for version info
                     if key in ['hardware_version', 'software_version']:
                         self.logger.debug(f"Preparing to publish {key}: value='{value}', unit='{unit}', icon='{icon}'")
-                    
                     self.ha_comm.publish_sensor_state(value, unit, f"pack_{pack_i:02}_{key}")
-                    self.ha_comm.publish_sensor_discovery(f"pack_{pack_i:02}_{key}", unit, icon,deviceclass,stateclass)
+                    self.ha_comm.publish_sensor_discovery(f"pack_{pack_i:02}_{key}", unit, icon, deviceclass, stateclass)
 
     def publish_warning_data_mqtt(self, pack_number=None):
         """
-        Publish warning data to MQTT, maintaining the same interface and format as PACE BMS.
-        
-        Args:
-            pack_number: Pack number.
+        Publish warning data to MQTT.
+        Compatible format with PACE BMS.
         """
         while True:
             warn_data = self.get_warning_data(pack_number)
@@ -1168,113 +1062,24 @@ class JKBMS485:
 
         pack_i = 0
         for pack in warn_data:
-            pack_i = pack_i + 1
+            pack_i += 1
             for key, value in pack.items():
                 if key == 'cell_voltage_warnings':
                     cell_i = 0
                     icon = "mdi:battery-heart-variant"
                     for cell_voltage_warning in value:
-                        cell_i = cell_i + 1
+                        cell_i += 1
                         self.ha_comm.publish_warn_state(cell_voltage_warning, f"pack_{pack_i:02}_cell_voltage_warning_{cell_i:02}")
-                        self.ha_comm.publish_warn_discovery(f"pack_{pack_i:02}_cell_voltage_warning_{cell_i:02}",icon)
-                        
+                        self.ha_comm.publish_warn_discovery(f"pack_{pack_i:02}_cell_voltage_warning_{cell_i:02}", icon)
+
                 elif key == 'protect_state_1':
                     icon = "mdi:battery-alert"
                     for sub_key, sub_value in value.items():
                         self.ha_comm.publish_binary_sensor_state(sub_value, f"pack_{pack_i:02}_{sub_key}")
-                        self.ha_comm.publish_binary_sensor_discovery(f"pack_{pack_i:02}_{sub_key}",icon)
-                        
+                        self.ha_comm.publish_binary_sensor_discovery(f"pack_{pack_i:02}_{sub_key}", icon)
+
                 elif key == 'fault_state':
                     icon = "mdi:alert"
                     for sub_key, sub_value in value.items():
                         self.ha_comm.publish_binary_sensor_state(sub_value, f"pack_{pack_i:02}_{sub_key}")
-                        self.ha_comm.publish_binary_sensor_discovery(f"pack_{pack_i:02}_{sub_key}",icon) 
-
-# Example usage
-if __name__ == "__main__":
-    """
-    Usage example:
-    This example shows how to create a JKBMS485 instance and get data.
-    Note: You need to configure the communication interface and Home Assistant communication first.
-    """
-    
-    # Mock communication interface (replace with a real serial communication class in actual use)
-    class MockBMSComm:
-        def send_data(self, data):
-            print(f"Sending data: {data.hex().upper()}")
-            return True
-            
-        def receive_data(self, return_raw=False):
-            # Simulate returned data (in actual use, return data received from BMS)
-            return b'\x01\x03\x02\x10\x00\x85\xC9'  # Example response data
-    
-    class MockHAComm:
-        def publish_sensor_state(self, value, unit, topic):
-            print(f"Publishing sensor state: {topic} = {value} {unit}")
-            
-        def publish_sensor_discovery(self, name, unit, icon, device_class, state_class):
-            print(f"Publishing sensor discovery: {name}")
-    
-    # Create JK BMS instance
-    mock_bms_comm = MockBMSComm()
-    mock_ha_comm = MockHAComm()
-    
-    jk_bms = JKBMS485(
-        bms_comm=mock_bms_comm,
-        ha_comm=mock_ha_comm,
-        bms_type="JK_BMS_RS485",
-        data_refresh_interval=10,
-        debug=True,
-        if_random=False
-    )
-    
-    print("=== JK BMS RS485 Modbus Communication Class Test ===")
-    print("Class Function Description:")
-    print("1. Supports full Modbus protocol communication")
-    print("2. Provides the same interface and data format as PACE BMS")
-    print("3. Supports reading parameters such as cell voltage, temperature, current, power, etc.")
-    print("4. Supports alarm status monitoring")
-    print("5. Fully compatible with Home Assistant MQTT publishing")
-    print()
-    
-    print("Supported main functions:")
-    print("- get_analog_data(): Get all analog data")
-    print("- get_warning_data(): Get warning data")
-    print("- publish_analog_data_mqtt(): Publish analog data to MQTT")
-    print("- publish_warning_data_mqtt(): Publish warning data to MQTT")
-    print("- get_cell_voltages(): Get cell voltages")
-    print("- get_battery_voltage(): Get total voltage")
-    print("- get_battery_current(): Get current")
-    print("- get_temperatures(): Get temperatures")
-    print("- get_soc_data(): Get SOC related data")
-    print()
-    
-    print("Data format is fully compatible with PACE BMS, including:")
-    print("- Same field names and units")
-    print("- Same MQTT topic structure")
-    print("- Same Home Assistant device classes and state classes")
-    print("- Same icons and display formats")
-    print()
-    
-    # Set slave address
-    jk_bms.set_slave_address(1)
-    
-    # Example of building read command
-    command = jk_bms.build_read_register_command(0x1202, 1)  # Read cell voltage 1
-    print(f"Example of read cell voltage 1 command: {command.hex().upper()}")
-    print()
-    
-    print("=== Usage Instructions ===")
-    print("1. Ensure RS485 interface is connected correctly")
-    print("2. Configure the correct slave address (default 0x01)")
-    print("3. Ensure the baud rate is 115200bps")
-    print("4. Replace MockBMSComm with the actual serial communication class in actual use")
-    print("5. Configure ha_comm with the actual Home Assistant MQTT communication class")
-    print()
-    
-    print("Protocol Features:")
-    print("- Based on standard Modbus RTU protocol")
-    print("- Supports CRC16 check for data integrity")
-    print("- Supports 1-247 slave addresses")
-    print("- Data area base address: 0x1200")
-    print("- Configuration area base address: 0x1000") 
+                        self.ha_comm.publish_binary_sensor_discovery(f"pack_{pack_i:02}_{sub_key}", icon)
