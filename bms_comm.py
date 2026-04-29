@@ -310,6 +310,12 @@ class BMSCommunication:
             idle_timeout = 5
 
             while time.time() - start_time < read_timeout:
+                if not self.bms_connection:
+                    self.logger.warning("JK BMS: No connection, attempting reconnect...")
+                    if not self.connect():
+                        time.sleep(0.5)
+                        continue
+
                 try:
                     original_timeout = self.bms_connection.gettimeout()
                     self.bms_connection.settimeout(0.2)
@@ -323,7 +329,19 @@ class BMSCommunication:
                         got_data = True
                         idle_count = 0
                     else:
-                        idle_count += 1
+                        # recv() returned b'' — server closed the TCP connection
+                        self.logger.warning("JK BMS: Connection closed by remote (recv=b''), reconnecting...")
+                        try:
+                            self.bms_connection.close()
+                        except Exception:
+                            pass
+                        self.bms_connection = None
+                        if self.connect():
+                            self.logger.info("JK BMS: Reconnected successfully")
+                            idle_count = 0
+                        else:
+                            self.logger.error("JK BMS: Reconnect failed, aborting read")
+                            break
 
                 except _socket.timeout:
                     idle_count += 1
