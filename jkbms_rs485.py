@@ -137,12 +137,29 @@ class JKBMS485:
         Passively receive 55AA frames from the JK BMS broadcast stream.
         The BMS continuously broadcasts data without needing any command.
 
+        Frame byte[4] indicates frame type:
+          0x01 = Dynamic data (cell voltages, current, SOC, etc.) — uint16le cells at offset 6
+          0x02 = Static/Setup data (config registers) — uint32le values at offset 6
+
         Returns:
             list of 55AA bytes frames found in the buffer
         """
         raw_data = self.bms_comm.receive_jkbms_passive(timeout)
         if not raw_data:
+            self.logger.warning("receive_55aa_frames: no data received from BMS (raw_data is None/empty)")
             return []
+
+        self.logger.debug(
+            f"receive_55aa_frames: got {len(raw_data)} bytes raw.\n"
+            + '\n'.join(
+                '  {:04X}: {:48s}  |{}|'.format(
+                    i,
+                    ' '.join(f'{b:02X}' for b in raw_data[i:i+16]),
+                    ''.join(chr(b) if 32 <= b < 127 else '.' for b in raw_data[i:i+16])
+                )
+                for i in range(0, len(raw_data), 16)
+            )
+        )
 
         frames = []
         search_start = 0
@@ -155,16 +172,25 @@ class JKBMS485:
             FRAME_SIZE = 308
             if start + FRAME_SIZE <= len(raw_data):
                 frame = raw_data[start:start + FRAME_SIZE]
+                frame_type = frame[4] if len(frame) > 4 else 0
+                self.logger.debug(
+                    f"receive_55aa_frames: found frame at offset {start}, "
+                    f"frame_type=0x{frame_type:02X} "
+                    f"({'dynamic' if frame_type == 0x01 else 'static/setup' if frame_type == 0x02 else 'unknown'})"
+                )
                 frames.append(frame)
                 search_start = start + FRAME_SIZE
             else:
-                # Incomplete frame at end of buffer — skip it
+                self.logger.warning(
+                    f"receive_55aa_frames: 55AA marker at offset {start}, "
+                    f"only {len(raw_data) - start} bytes remain (need {FRAME_SIZE}) — incomplete frame"
+                )
                 break
 
         if frames:
-            self.logger.debug(f"Extracted {len(frames)} 55AA frame(s) from {len(raw_data)} bytes")
+            self.logger.info(f"receive_55aa_frames: extracted {len(frames)} 55AA frame(s) from {len(raw_data)} bytes")
         else:
-            self.logger.debug(f"No 55AA frame found in {len(raw_data)} bytes of broadcast data")
+            self.logger.warning(f"receive_55aa_frames: NO 55AA frame found in {len(raw_data)} bytes")
 
         return frames
 
@@ -630,28 +656,42 @@ class JKBMS485:
         """
         Read JK BMS dynamic data from passively received broadcast.
         The BMS automatically broadcasts 55AA frames — no command needed.
-        Returns parsed 55AA frame dict or None.
+
+        Frame type is at byte[4]:
+          0x01 = Dynamic data frame (cell voltages, current, SOC, temps)
+          0x02 = Static/Setup frame (config registers, different layout)
+
+        Returns parsed 55AA dynamic frame dict or None.
         """
-        # Check if we already have 55AA frames in the buffer
+        def _try_frames(frames):
+            for frame in frames:
+                frame_type = frame[4] if len(frame) > 4 else 0
+                if frame_type != 0x01:
+                    self.logger.debug(
+                        f"get_dynamic_data: skipping frame_type=0x{frame_type:02X} (not dynamic)"
+                    )
+                    continue
+                result = self.parse_jkbms_55aa_frame(frame)
+                if result.get('cell_voltages'):
+                    if self.debug and self.logger.isEnabledFor(logging.DEBUG):
+                        self.dump_frame_analysis(frame)
+                    return result
+            return None
+
+        # First attempt
         frames = self.receive_55aa_frames(timeout=1.0)
-        for frame in frames:
-            result = self.parse_jkbms_55aa_frame(frame)
-            if result.get('cell_voltages'):
-                if self.debug and self.logger.isEnabledFor(logging.DEBUG):
-                    self.dump_frame_analysis(frame)
-                return result
+        result = _try_frames(frames)
+        if result:
+            return result
 
         # No valid dynamic frame yet — wait for next broadcast cycle
-        self.logger.debug("No 55AA frame in buffer, waiting for next broadcast...")
+        self.logger.debug("No dynamic 55AA frame in first read, waiting for next broadcast...")
         import time
         time.sleep(0.5)
         frames = self.receive_55aa_frames(timeout=2.0)
-        for frame in frames:
-            result = self.parse_jkbms_55aa_frame(frame)
-            if result.get('cell_voltages'):
-                if self.debug and self.logger.isEnabledFor(logging.DEBUG):
-                    self.dump_frame_analysis(frame)
-                return result
+        result = _try_frames(frames)
+        if result:
+            return result
 
         self.logger.warning("No valid dynamic 55AA frame received after waiting")
         return None

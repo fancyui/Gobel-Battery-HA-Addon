@@ -86,9 +86,7 @@ def initiate_bms_communication():
     return bms_comm.connect()
 
 def schedule_bms_reinit():
-    initiate_bms_communication()
-    # threading.Timer(60, schedule_bms_reinit).start()
-    # logger.info(f"schedule_bms_reinit start")
+    return initiate_bms_communication()
 
 def run():
 
@@ -109,10 +107,8 @@ def run():
         return
     mqtt_client.loop_start()
 
-    # Schedule the BMS re-initialization
-    schedule_bms_reinit()
-
-    if not bms_comm.connect():
+    # Schedule the BMS re-initialization (this already calls connect())
+    if not schedule_bms_reinit():
         logger.info("BMS Connection failed")
         return
 
