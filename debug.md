@@ -82,3 +82,173 @@ Loading options.json
 
 [2026-04-29 14:57:46.910]# RECV HEX/11 <<<
 01 10 16 1E 00 01 02 00 00 D2 2F 
+
+
+
+
+Sensors
+Pack 01 Cell Voltage 01
+3,540 mV
+Pack 01 Cell Voltage 02
+Unknown
+Pack 01 Cell Voltage 03
+Unknown
+Pack 01 Cell Voltage 04
+Unknown
+Pack 01 Cell Voltage 05
+Unknown
+Pack 01 Cell Voltage 06
+Unknown
+Pack 01 Cell Voltage 07
+Unknown
+Pack 01 Cell Voltage 08
+Unknown
+Pack 01 Cell Voltage 09
+Unknown
+Pack 01 Cell Voltage 10
+Unknown
+Pack 01 Cell Voltage 11
+Unknown
+Pack 01 Cell Voltage 12
+Unknown
+Pack 01 Cell Voltage 13
+Unknown
+Pack 01 Cell Voltage 14
+Unknown
+Pack 01 Cell Voltage 15
+Unknown
+Pack 01 Cell Voltage 16
+Unknown
+Pack 01 Cell Voltage Diff
+0 mV
+Pack 01 Cell Voltage Max
+3,540 mV
+Pack 01 Cell Voltage Max Index
+1
+Pack 01 Cell Voltage Min
+3,540 mV
+Pack 01 Cell Voltage Min Index
+1
+Pack 01 Cell Voltage Warning 01
+normal
+Pack 01 Cell Voltage Warning 02
+Unknown
+Pack 01 Cell Voltage Warning 03
+Unknown
+Pack 01 Cell Voltage Warning 04
+Unknown
+Pack 01 Cell Voltage Warning 05
+Unknown
+Pack 01 Cell Voltage Warning 06
+Unknown
+Pack 01 Cell Voltage Warning 07
+Unknown
+Pack 01 Cell Voltage Warning 08
+Unknown
+Pack 01 Cell Voltage Warning 09
+Unknown
+Pack 01 Cell Voltage Warning 10
+Unknown
+Pack 01 Cell Voltage Warning 11
+Unknown
+Pack 01 Cell Voltage Warning 12
+Unknown
+Pack 01 Cell Voltage Warning 13
+Unknown
+Pack 01 Cell Voltage Warning 14
+Unknown
+Pack 01 Cell Voltage Warning 15
+Unknown
+Pack 01 Cell Voltage Warning 16
+Unknown
+Pack 01 Fault Cell
+Off
+Pack 01 Fault Charge MOS
+Off
+Pack 01 Fault Discharge MOS
+Off
+Pack 01 Fault NTC
+Off
+Pack 01 Fault Sampling
+Off
+Pack 01 Hardware Version
+Pack 01 Protect High Cell Voltage
+Off
+Pack 01 Protect High Charge Current
+Off
+Pack 01 Protect High Discharge Current
+Off
+Pack 01 Protect High Total Voltage
+Off
+Pack 01 Protect Low Cell Voltage
+Off
+Pack 01 Protect Low Total Voltage
+Off
+Pack 01 Protect Short Circuit
+Off
+Pack 01 Software Version
+Pack 01 Temperature 01
+0.0 °C
+Pack 01 Temperature 02
+0.0 °C
+Pack 01 Temperature 03
+0.0 °C
+Pack 01 Temperature 04
+0.0 °C
+Pack 01 Temperature 05
+0.0 °C
+Pack 01 View Balance Current
+0.00 A
+Pack 01 View Current
+0.00 A
+Pack 01 View Cycle Number
+0 cycles
+Pack 01 View Design Capacity
+0.0 Ah
+Pack 01 View Energy Charged
+0 Wh
+Pack 01 View Energy Discharged
+0 Wh
+Pack 01 View Full Capacity
+0.0 Ah
+Pack 01 View Num Cells
+1 cells
+Pack 01 View Num Temps
+5 NTCs
+Pack 01 View Remain Capacity
+0.0 Ah
+Pack 01 View SOC
+0.0%
+Pack 01 View SOH
+0.0%
+Pack 01 View Voltage
+0 V
+Total Current
+0.00 A
+Total Full Capacity
+0.0 Ah
+Total Packs Num
+1 packs
+Total Remain Capacity
+0.0 Ah
+Total SOC
+0%
+Logbook
+
+2026-04-29 15:51:25,125 - jkbms_rs485 - WARNING - receive_55aa_frames: NO 55AA frame found in 66 bytes
+2026-04-29 15:51:27,762 - jkbms_rs485 - WARNING - receive_55aa_frames: NO 55AA frame found in 132 bytes
+2026-04-29 15:51:27,762 - jkbms_rs485 - WARNING - No valid dynamic 55AA frame received after waiting
+2026-04-29 15:51:27,763 - jkbms_rs485 - WARNING - Failed to get dynamic data, retrying once...
+2026-04-29 15:51:29,303 - jkbms_rs485 - WARNING - receive_55aa_frames: NO 55AA frame found in 77 bytes
+2026-04-29 15:51:31,943 - jkbms_rs485 - INFO - receive_55aa_frames: extracted 2 55AA frame(s) from 726 bytes
+2026-04-29 15:51:33,043 - jkbms_rs485 - WARNING - receive_55aa_frames: NO 55AA frame found in 55 bytes
+2026-04-29 15:51:36,343 - jkbms_rs485 - WARNING - receive_55aa_frames: NO 55AA frame found in 55 bytes
+2026-04-29 15:51:38,983 - jkbms_rs485 - INFO - receive_55aa_frames: extracted 2 55AA frame(s) from 726 bytes
+2026-04-29 15:51:45,145 - jkbms_rs485 - INFO - receive_55aa_frames: extracted 2 55AA frame(s) from 902 bytes
+2026-04-29 15:51:46,243 - jkbms_rs485 - WARNING - receive_55aa_frames: NO 55AA frame found in 55 bytes
+2026-04-29 15:51:49,544 - jkbms_rs485 - WARNING - receive_55aa_frames: NO 55AA frame found in 55 bytes
+2026-04-29 15:51:52,184 - jkbms_rs485 - INFO - receive_55aa_frames: extracted 2 55AA frame(s) from 726 bytes
+2026-04-29 15:51:58,344 - jkbms_rs485 - WARNING - receive_55aa_frames: NO 55AA frame found in 308 bytes
+2026-04-29 15:52:00,984 - jkbms_rs485 - INFO - receive_55aa_frames: extracted 2 55AA frame(s) from 726 bytes
+2026-04-29 15:52:02,084 - jkbms_rs485 - WARNING - receive_55aa_frames: NO 55AA frame found in 55 bytes
+2026-04-29 15:52:05,384 - jkbms_rs485 - WARNING - receive_55aa_frames: NO 55AA frame found in 55 bytes
