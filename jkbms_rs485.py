@@ -7,19 +7,14 @@ import logging
 class JKBMS485:
     """
     JK BMS RS485 Communication Class
-    Implements JK BMS RS485 protocol (as used by jkbms-rs485-addon Node-RED reference).
+    Implements JK BMS RS485 protocol (passive listening mode).
 
     Protocol summary:
-    - Data query: Modbus FC 0x10 (Write Multiple Registers) with value 0x0000
-      * 0x161C -> Static data (hardware/software version, serial, etc.)
-      * 0x161E -> Setup/Config data
-      * 0x1620 -> Dynamic data (cell voltages, current, SOC, temperatures)
-      The BMS responds with a JK proprietary 55AA data frame, not standard Modbus.
-    - Alarm query: Modbus FC 0x03 (Read Holding Registers) of 0x12A0, count 2
-      The BMS responds with standard Modbus RTU for this register.
-    - Note: Standard Modbus FC 0x03 reads of 0x1200-0x1420 registers
-      return 'Illegal Data Address' (01 83 02 C0 F1) on this firmware.
-      Only FC 0x10 write-triggered 55AA frames + FC 0x03 alarm read work.
+    - The JK BMS automatically broadcasts data frames without needing any query commands.
+    - 55AA frames (308 bytes) contain battery data: cell voltages, current, SOC, temps.
+    - The BMS broadcasts every ~200ms — this class passively listens and parses.
+    - If no battery data is available, short 11-byte Modbus ACK frames are received instead.
+    - No commands are sent; the BMS acts as a continuous broadcaster.
 
     Frame offsets calibrated for firmware 9.04 (JK_PB1A16S10P, 16S LFP).
     Other firmware versions may have different 55AA frame layouts.
@@ -133,14 +128,52 @@ class JKBMS485:
         self.logger.debug(f"Write query command for 0x{register_address:04X}: {command.hex().upper()}")
         return command
 
+    # ---------------------------------------------------------------------------
+    # Passive data reception (BMS broadcasts 55AA frames automatically)
+    # ---------------------------------------------------------------------------
+
+    def receive_55aa_frames(self, timeout=2.0):
+        """
+        Passively receive 55AA frames from the JK BMS broadcast stream.
+        The BMS continuously broadcasts data without needing any command.
+
+        Returns:
+            list of 55AA bytes frames found in the buffer
+        """
+        raw_data = self.bms_comm.receive_jkbms_passive(timeout)
+        if not raw_data:
+            return []
+
+        frames = []
+        search_start = 0
+        while search_start < len(raw_data):
+            start = raw_data.find(b'\x55\xAA', search_start)
+            if start < 0:
+                break
+
+            # Fixed frame size: 308 bytes for JK 55AA protocol
+            FRAME_SIZE = 308
+            if start + FRAME_SIZE <= len(raw_data):
+                frame = raw_data[start:start + FRAME_SIZE]
+                frames.append(frame)
+                search_start = start + FRAME_SIZE
+            else:
+                # Incomplete frame at end of buffer — skip it
+                break
+
+        if frames:
+            self.logger.debug(f"Extracted {len(frames)} 55AA frame(s) from {len(raw_data)} bytes")
+        else:
+            self.logger.debug(f"No 55AA frame found in {len(raw_data)} bytes of broadcast data")
+
+        return frames
+
     def send_and_receive(self, command):
         """
-        Send a command and receive raw response using the JK-specific receive method.
-        Flushes stale broadcast frames from the input buffer before sending.
+        Legacy method: send a command and receive response.
+        Kept for backward compatibility. Prefer passive receive_55aa_frames().
         """
-        # Flush any stale 55AA broadcast data from the TCP buffer
         self.bms_comm.flush_jkbms_buffer()
-
         if not self.bms_comm.send_data(command):
             self.logger.error("Failed to send command")
             return None
@@ -595,69 +628,69 @@ class JKBMS485:
     # ---------------------------------------------------------------------------
     def get_dynamic_data(self):
         """
-        Query JK BMS dynamic data (register 0x1620).
+        Read JK BMS dynamic data from passively received broadcast.
+        The BMS automatically broadcasts 55AA frames — no command needed.
         Returns parsed 55AA frame dict or None.
         """
-        self.logger.debug("Querying JK BMS dynamic data (0x1620)")
-        command = self.build_write_command(self.REG_DYNAMIC)
-        raw = self.send_and_receive(command)
-        if not raw:
-            self.logger.error("No response for dynamic data query")
-            return None
+        # Check if we already have 55AA frames in the buffer
+        frames = self.receive_55aa_frames(timeout=1.0)
+        for frame in frames:
+            result = self.parse_jkbms_55aa_frame(frame)
+            if result.get('cell_voltages'):
+                if self.debug and self.logger.isEnabledFor(logging.DEBUG):
+                    self.dump_frame_analysis(frame)
+                return result
 
-        # Find the 55AA frame in the response (there may be Modbus ACK frames before it)
-        idx = raw.find(b'\x55\xAA')
-        if idx < 0:
-            self.logger.error(f"No 55AA frame found in response (len={len(raw)})")
-            self.logger.debug(f"Raw response hex: {raw.hex().upper()[:200]}")
-            return None
+        # No valid dynamic frame yet — wait for next broadcast cycle
+        self.logger.debug("No 55AA frame in buffer, waiting for next broadcast...")
+        import time
+        time.sleep(0.5)
+        frames = self.receive_55aa_frames(timeout=2.0)
+        for frame in frames:
+            result = self.parse_jkbms_55aa_frame(frame)
+            if result.get('cell_voltages'):
+                if self.debug and self.logger.isEnabledFor(logging.DEBUG):
+                    self.dump_frame_analysis(frame)
+                return result
 
-        frame = raw[idx:]
-        self.logger.debug(f"Found 55AA frame at offset {idx}, frame len={len(frame)}")
-
-        # In debug mode, dump frame analysis
-        if self.debug and self.logger.isEnabledFor(logging.DEBUG):
-            self.dump_frame_analysis(frame)
-
-        return self.parse_jkbms_55aa_frame(frame)
+        self.logger.warning("No valid dynamic 55AA frame received after waiting")
+        return None
 
     def get_static_data(self):
         """
-        Query JK BMS static data (register 0x161C).
+        Read JK BMS static data from passively received broadcast.
+        The BMS broadcasts static data frames periodically — no command needed.
         Returns parsed 55AA frame dict with version info or None.
         """
-        self.logger.debug("Querying JK BMS static data (0x161C)")
-        command = self.build_write_command(self.REG_STATIC)
-        raw = self.send_and_receive(command)
-        if not raw:
-            self.logger.error("No response for static data query")
-            return None
+        frames = self.receive_55aa_frames(timeout=1.0)
+        for frame in frames:
+            # Static frames have ASCII text at offset 6 (BMS name like "JK_PB...")
+            if len(frame) >= 19:
+                try:
+                    text_at_6 = frame[6:19].decode('ascii', errors='ignore').strip('\x00').strip()
+                    if text_at_6 and any(c.isalpha() for c in text_at_6):
+                        result = self.parse_jkbms_static_frame(frame)
+                        if result:
+                            return result
+                except Exception:
+                    continue
 
-        idx = raw.find(b'\x55\xAA')
-        if idx < 0:
-            self.logger.warning("No 55AA frame in static response")
-            return None
-
-        return self.parse_jkbms_static_frame(raw[idx:])
+        self.logger.debug("No static 55AA frame in buffer")
+        return None
 
     def get_alarm_data(self):
         """
-        Query JK BMS alarm status (register 0x12A0, FC 0x03, count 2).
+        Read alarm/status information from passively received broadcast data.
+        Additionally checks if alarm Modbus responses happen to be in the stream.
         Returns parsed alarm dict or None.
         """
-        self.logger.debug("Querying JK BMS alarm data (0x12A0)")
-        command = self.build_read_command(self.REG_ALARM, 2)
-        self.logger.debug(f"Alarm command: {command.hex().upper()}")
-
-        raw = self.send_and_receive(command)
+        # Try to find alarm data in the passive broadcast
+        raw = self.bms_comm.receive_jkbms_passive(read_timeout=1.0)
         if not raw:
-            self.logger.warning("No response for alarm query")
             return None
 
         # Look for Modbus RTU response in the raw data
         # Alarm FC 0x03 response format: [slave] [0x03] [byte_cnt=4] [data...4] [CRC...2]
-        # The response data starts with slave_address (0x01 default) or 0x0A (from observed logs)
-        # We search for the pattern: any_addr + 0x03 + 0x04 (byte count for 2 registers)
         alarm_response = None
         for candidate_addr in [self.slave_address, 0x0A, 0x01, 0x00]:
             pattern = bytes([candidate_addr, 0x03, 0x04])
@@ -668,8 +701,7 @@ class JKBMS485:
                 break
 
         if not alarm_response:
-            self.logger.warning(f"No valid alarm Modbus response found in {len(raw)} bytes")
-            self.logger.debug(f"Raw alarm response: {raw.hex().upper()[:200]}")
+            self.logger.debug("No alarm data in passive broadcast stream")
             return None
 
         return self.parse_alarm_response(alarm_response)

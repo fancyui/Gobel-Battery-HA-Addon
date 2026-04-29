@@ -232,6 +232,7 @@ class BMSCommunication:
         Reads all available bytes from TCP without Modbus framing assumptions.
         The JK BMS responds with JK proprietary 55AA frames which need to be parsed
         at the protocol level, not here.
+        Used in command-based mode (diagnose_jkbms.py).
         """
         try:
             import time
@@ -285,5 +286,65 @@ class BMSCommunication:
 
         except Exception as e:
             self.logger.error(f"JK BMS receive error: {e}")
+            return None
+
+    def receive_jkbms_passive(self, read_timeout=2.0):
+        """
+        Passively read JK BMS broadcast data without sending any command.
+        The JK BMS continuously broadcasts 55AA frames every ~200ms.
+
+        Args:
+            read_timeout: Maximum time in seconds to wait for initial data.
+                          Once data starts arriving, reads until idle.
+        Returns:
+            bytes: All data accumulated, or None if no data received.
+        """
+        try:
+            import time
+            import socket as _socket
+
+            start_time = time.time()
+            all_data = b''
+            idle_count = 0
+            got_data = False
+            idle_timeout = 5
+
+            while time.time() - start_time < read_timeout:
+                try:
+                    original_timeout = self.bms_connection.gettimeout()
+                    self.bms_connection.settimeout(0.2)
+
+                    chunk = self.bms_connection.recv(4096)
+                    self.bms_connection.settimeout(original_timeout)
+
+                    if chunk:
+                        all_data += chunk
+                        self.logger.debug(f"JK BMS: Received {len(chunk)} bytes, total {len(all_data)} bytes")
+                        got_data = True
+                        idle_count = 0
+                    else:
+                        idle_count += 1
+
+                except _socket.timeout:
+                    idle_count += 1
+
+                except Exception as e:
+                    self.logger.warning(f"JK BMS receive error: {e}")
+                    idle_count += 1
+
+                if got_data and idle_count >= idle_timeout:
+                    break
+
+                time.sleep(0.05)
+
+            if all_data:
+                self.logger.debug(f"JK BMS: Passively received {len(all_data)} bytes")
+                return all_data
+            else:
+                self.logger.debug("JK BMS: No data in passive read")
+                return None
+
+        except Exception as e:
+            self.logger.error(f"JK BMS passive receive error: {e}")
             return None
 
