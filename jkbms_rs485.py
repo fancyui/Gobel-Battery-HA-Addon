@@ -135,62 +135,75 @@ class JKBMS485:
     def receive_55aa_frames(self, timeout=2.0):
         """
         Passively receive 55AA frames from the JK BMS broadcast stream.
-        The BMS continuously broadcasts data without needing any command.
 
-        Frame byte[4] indicates frame type:
-          0x01 = Dynamic data (cell voltages, current, SOC, etc.) — uint16le cells at offset 6
-          0x02 = Static/Setup data (config registers) — uint32le values at offset 6
+        Protocol structure (from JK-BMS-RS485-Protocol.md):
+          Each received block = 300-byte 55AA frame + 8-byte Modbus ACK = 308 bytes total
+          byte[4] = Pack ID (NOT frame type)
+          The trailing 8-byte Modbus ACK contains the register address that triggered this frame:
+            bytes[292-293] of the 300-byte frame = offset 292 within the 55AA block
+            In the 308-byte block: bytes[300+2..300+3] = register address
+              0x1620 → Dynamic data frame  (Trame 3)
+              0x161E → Setup/Config frame  (Trame 2)
+              0x161C → Static data frame   (Trame 1)
 
         Returns:
-            list of 55AA bytes frames found in the buffer
+            list of tuples (frame_300bytes, reg_addr) for each complete 55AA block found
         """
         raw_data = self.bms_comm.receive_jkbms_passive(timeout)
         if not raw_data:
             self.logger.warning("receive_55aa_frames: no data received from BMS (raw_data is None/empty)")
             return []
 
-        self.logger.debug(
-            f"receive_55aa_frames: got {len(raw_data)} bytes raw.\n"
-            + '\n'.join(
-                '  {:04X}: {:48s}  |{}|'.format(
-                    i,
-                    ' '.join(f'{b:02X}' for b in raw_data[i:i+16]),
-                    ''.join(chr(b) if 32 <= b < 127 else '.' for b in raw_data[i:i+16])
-                )
-                for i in range(0, len(raw_data), 16)
+        # Always print full raw hex at WARNING level so it shows without debug mode
+        hex_lines = '\n'.join(
+            '  {:04X}: {:48s}  |{}|'.format(
+                i,
+                ' '.join(f'{b:02X}' for b in raw_data[i:i+16]),
+                ''.join(chr(b) if 32 <= b < 127 else '.' for b in raw_data[i:i+16])
             )
+            for i in range(0, len(raw_data), 16)
+        )
+        self.logger.warning(
+            f"receive_55aa_frames: got {len(raw_data)} bytes raw data:\n{hex_lines}"
         )
 
-        frames = []
+        BLOCK_SIZE = 308   # 300-byte 55AA frame + 8-byte Modbus ACK
+        FRAME_SIZE = 300   # Pure 55AA frame data
+
+        frames = []  # list of (frame_300, reg_addr)
         search_start = 0
         while search_start < len(raw_data):
             start = raw_data.find(b'\x55\xAA', search_start)
             if start < 0:
                 break
 
-            # Fixed frame size: 308 bytes for JK 55AA protocol
-            FRAME_SIZE = 308
-            if start + FRAME_SIZE <= len(raw_data):
-                frame = raw_data[start:start + FRAME_SIZE]
-                frame_type = frame[4] if len(frame) > 4 else 0
-                self.logger.debug(
-                    f"receive_55aa_frames: found frame at offset {start}, "
-                    f"frame_type=0x{frame_type:02X} "
-                    f"({'dynamic' if frame_type == 0x01 else 'static/setup' if frame_type == 0x02 else 'unknown'})"
+            if start + BLOCK_SIZE <= len(raw_data):
+                block = raw_data[start:start + BLOCK_SIZE]
+                frame = block[:FRAME_SIZE]          # 300-byte 55AA data
+                # Modbus ACK starts at offset 300: [slave][0x10][reg_hi][reg_lo]...
+                reg_hi = block[302]
+                reg_lo = block[303]
+                reg_addr = (reg_hi << 8) | reg_lo
+                pack_id = frame[4] if len(frame) > 4 else 0
+                self.logger.warning(
+                    f"receive_55aa_frames: block at offset {start}, "
+                    f"pack_id={pack_id}, reg=0x{reg_addr:04X} "
+                    f"({'DYNAMIC' if reg_addr == 0x1620 else 'SETUP' if reg_addr == 0x161E else 'STATIC' if reg_addr == 0x161C else 'UNKNOWN'})"
                 )
-                frames.append(frame)
-                search_start = start + FRAME_SIZE
+                frames.append((frame, reg_addr))
+                search_start = start + BLOCK_SIZE
             else:
+                remaining = len(raw_data) - start
                 self.logger.warning(
                     f"receive_55aa_frames: 55AA marker at offset {start}, "
-                    f"only {len(raw_data) - start} bytes remain (need {FRAME_SIZE}) — incomplete frame"
+                    f"only {remaining} bytes remain (need {BLOCK_SIZE}) — incomplete block"
                 )
                 break
 
         if frames:
-            self.logger.info(f"receive_55aa_frames: extracted {len(frames)} 55AA frame(s) from {len(raw_data)} bytes")
+            self.logger.warning(f"receive_55aa_frames: extracted {len(frames)} 55AA block(s) from {len(raw_data)} bytes")
         else:
-            self.logger.warning(f"receive_55aa_frames: NO 55AA frame found in {len(raw_data)} bytes")
+            self.logger.warning(f"receive_55aa_frames: NO 55AA block found in {len(raw_data)} bytes")
 
         return frames
 
@@ -657,18 +670,16 @@ class JKBMS485:
         Read JK BMS dynamic data from passively received broadcast.
         The BMS automatically broadcasts 55AA frames — no command needed.
 
-        Frame type is at byte[4]:
-          0x01 = Dynamic data frame (cell voltages, current, SOC, temps)
-          0x02 = Static/Setup frame (config registers, different layout)
+        Dynamic frames are identified by the trailing Modbus ACK register = 0x1620.
+        byte[4] in the 55AA header is the Pack ID, NOT a frame type indicator.
 
         Returns parsed 55AA dynamic frame dict or None.
         """
-        def _try_frames(frames):
-            for frame in frames:
-                frame_type = frame[4] if len(frame) > 4 else 0
-                if frame_type != 0x01:
+        def _try_frames(frame_list):
+            for frame, reg_addr in frame_list:
+                if reg_addr != 0x1620:
                     self.logger.debug(
-                        f"get_dynamic_data: skipping frame_type=0x{frame_type:02X} (not dynamic)"
+                        f"get_dynamic_data: skipping reg=0x{reg_addr:04X} (not dynamic 0x1620)"
                     )
                     continue
                 result = self.parse_jkbms_55aa_frame(frame)
@@ -676,6 +687,11 @@ class JKBMS485:
                     if self.debug and self.logger.isEnabledFor(logging.DEBUG):
                         self.dump_frame_analysis(frame)
                     return result
+                else:
+                    self.logger.warning(
+                        f"get_dynamic_data: dynamic frame (reg=0x1620) parsed but no cell_voltages found. "
+                        f"pack_id={frame[4]}, result={result}"
+                    )
             return None
 
         # First attempt
@@ -699,23 +715,18 @@ class JKBMS485:
     def get_static_data(self):
         """
         Read JK BMS static data from passively received broadcast.
-        The BMS broadcasts static data frames periodically — no command needed.
+        Static frames are identified by trailing ACK register 0x161C.
         Returns parsed 55AA frame dict with version info or None.
         """
-        frames = self.receive_55aa_frames(timeout=1.0)
-        for frame in frames:
-            # Static frames have ASCII text at offset 6 (BMS name like "JK_PB...")
-            if len(frame) >= 19:
-                try:
-                    text_at_6 = frame[6:19].decode('ascii', errors='ignore').strip('\x00').strip()
-                    if text_at_6 and any(c.isalpha() for c in text_at_6):
-                        result = self.parse_jkbms_static_frame(frame)
-                        if result:
-                            return result
-                except Exception:
-                    continue
+        frame_list = self.receive_55aa_frames(timeout=1.0)
+        for frame, reg_addr in frame_list:
+            if reg_addr != 0x161C:
+                continue
+            result = self.parse_jkbms_static_frame(frame)
+            if result:
+                return result
 
-        self.logger.debug("No static 55AA frame in buffer")
+        self.logger.debug("No static 55AA frame (reg=0x161C) in buffer")
         return None
 
     def get_alarm_data(self):
