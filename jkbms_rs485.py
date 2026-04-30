@@ -20,9 +20,10 @@ class JKBMS485:
     Other firmware versions may have different 55AA frame layouts.
     """
 
-    def __init__(self, bms_comm, ha_comm, bms_type, data_refresh_interval, debug, if_random):
+    def __init__(self, bms_comm, ha_comm, bms_type, data_refresh_interval, debug, if_random, ha_comm_jk=None):
         self.bms_comm = bms_comm
         self.ha_comm = ha_comm
+        self.ha_comm_jk = ha_comm_jk          # JK-native MQTT publisher (HA_MQTT_JK or None)
         self.bms_type = bms_type
         self.data_refresh_interval = data_refresh_interval
         self.debug = debug
@@ -848,6 +849,172 @@ class JKBMS485:
         self.logger.debug(f"Finished getting JK BMS analog data: {pack_data}")
         return pack_list
 
+    # ---------------------------------------------------------------------------
+    # JK-native data (NEW pipeline — NOT PACE-compatible)
+    # ---------------------------------------------------------------------------
+
+    def get_jk_native_data(self):
+        """
+        Get all analog data from JK BMS in JK-native format.
+
+        Returns a single dict with clean JK key names (no 'view_' prefix).
+        Unlike get_analog_data(), this does NOT wrap in a list or
+        convert to PACE-compatible format.
+
+        Keys returned:
+            cell_voltages, cell_voltage_max, cell_voltage_min,
+            cell_voltage_diff, num_cells, temperatures, num_temps,
+            temp_mos, current, voltage, power, soc, remain_capacity,
+            full_capacity, design_capacity, cycle_count, soh,
+            balance_current, charge_mos, discharge_mos, balance_mos,
+            energy_charged, energy_discharged, hardware_version,
+            software_version
+        """
+        self.logger.debug("Getting JK BMS native data")
+
+        dynamic = self.get_dynamic_data()
+        if not dynamic:
+            self.logger.warning("Failed to get dynamic data, retrying once...")
+            import time
+            time.sleep(0.5)
+            dynamic = self.get_dynamic_data()
+            if not dynamic:
+                self.logger.error("Failed to get dynamic data after retry")
+                return None
+
+        static = self.get_static_data()
+        data = {}
+
+        # Cell voltages
+        cells = dynamic.get('cell_voltages', [])
+        data['cell_voltages'] = cells
+        data['num_cells'] = len(cells)
+        if cells:
+            data['cell_voltage_max'] = max(cells)
+            data['cell_voltage_min'] = min(cells)
+            data['cell_voltage_diff'] = max(cells) - min(cells)
+
+        # Temperatures (battery NTCs only)
+        temps = []
+        for key in ['temp_bat1', 'temp_bat2', 'temp_bat3', 'temp_bat4']:
+            val = dynamic.get(key)
+            if val is not None:
+                temps.append(round(val, 1))
+        data['temperatures'] = temps
+        data['num_temps'] = len(temps)
+
+        mos_temp = dynamic.get('temp_mos')
+        if mos_temp is not None:
+            data['temp_mos'] = round(mos_temp, 1)
+
+        # Electrical
+        data['current'] = dynamic.get('current_a', 0.0)
+        data['voltage'] = dynamic.get('voltage_v', 0.0)
+        data['power'] = dynamic.get('power_kw', 0.0)
+
+        # Capacity / SOC
+        data['soc'] = dynamic.get('soc', 0.0)
+        data['remain_capacity'] = dynamic.get('remain_capacity_ah', 0.0)
+        data['full_capacity'] = dynamic.get('full_capacity_ah', 0.0)
+        data['design_capacity'] = data['full_capacity']
+        data['cycle_count'] = dynamic.get('cycle_count', 0)
+        data['soh'] = dynamic.get('soh', 0.0)
+
+        # Balance
+        data['balance_current'] = dynamic.get('balance_current_a', 0.0)
+
+        # MOS states
+        data['charge_mos'] = dynamic.get('charge_mos', False)
+        data['discharge_mos'] = dynamic.get('discharge_mos', False)
+        data['balance_mos'] = dynamic.get('balance_mos', False)
+
+        # Cumulative energy
+        power_kw = dynamic.get('power_kw', 0.0)
+        charged, discharged = self.calculate_cumulative_energy(power_kw)
+        data['energy_charged'] = round(charged, 2)
+        data['energy_discharged'] = round(discharged, 2)
+
+        # Version info
+        if static:
+            data['hardware_version'] = static.get('hardware_version', '')
+            data['software_version'] = static.get('software_version', '')
+        else:
+            data['hardware_version'] = ''
+            data['software_version'] = ''
+
+        self.logger.debug(f"Finished getting JK BMS native data: {data}")
+        return data
+
+    def parse_jkbms_setup_frame(self, data):
+        """
+        Parse JK BMS setup/config 55AA frame (register 0x161E).
+
+        The setup frame contains voltage thresholds, current limits,
+        and other configuration parameters stored as uint32le at
+        4-byte-aligned offsets (high 16 bits are typically 0x0000).
+
+        Offset mapping is firmware-version-dependent and **tentative**
+        for firmware 9.04 (16S LFP). Labels should be confirmed with
+        manufacturer documentation.
+
+        Args:
+            data: Raw 300-byte 55AA frame
+
+        Returns:
+            Dict with setup parameter keys, or empty dict on failure.
+        """
+        result = {}
+        if not data or len(data) < 6 or data[0] != 0x55 or data[1] != 0xAA:
+            return result
+
+        pack_id = data[4]
+        result['pack_id'] = pack_id
+
+        # Field map: offset -> (key, description)
+        # Values stored as uint32le; high 16 bits are padding (0x0000).
+        # These labels are best guesses for FW 9.04 (16S LFP).
+        fields = {
+            6:   ('cell_ovp_protect',       'Cell overvoltage protection'),
+            10:  ('cell_uvp_protect',       'Cell undervoltage protection'),
+            14:  ('cell_ovp_recover',       'Cell OVP recovery threshold'),
+            18:  ('cell_uvp_recover',       'Cell UVP recovery threshold'),
+            22:  ('battery_ovp_protect',    'Battery overvoltage protection'),
+            26:  ('balancer_start_delta',   'Balancer start voltage delta'),
+            30:  ('battery_uvp_protect',    'Battery undervoltage protection'),
+            34:  ('discharge_ocp_threshold','Discharge OCP threshold (mA)'),
+            38:  ('charge_ocp_threshold',   'Charge OCP threshold (mA)'),
+            42:  ('cell_balance_start',     'Cell balance start voltage'),
+            46:  ('cell_balance_stop',      'Cell balance stop voltage'),
+        }
+
+        for offset, (key, desc) in fields.items():
+            if offset + 4 <= len(data):
+                raw = struct.unpack_from('<I', data, offset)[0]
+                if 0 < raw < 50000:     # plausibility check
+                    result[key] = raw
+                    self.logger.debug(f"  setup[{offset:3d}] {key}: {raw} ({desc})")
+
+        self.logger.debug(f"Parsed setup frame (pack {pack_id}): {result}")
+        return result
+
+    def get_setup_data(self):
+        """
+        Read JK BMS setup/config data from passively received broadcast.
+        Setup frames are identified by trailing ACK register 0x161E.
+
+        Returns parsed dict (from parse_jkbms_setup_frame) or None.
+        """
+        frame_list = self.receive_55aa_frames(timeout=1.0)
+        for frame, reg_addr in frame_list:
+            if reg_addr != 0x161E:
+                continue
+            result = self.parse_jkbms_setup_frame(frame)
+            if result:
+                return result
+
+        self.logger.debug("No setup 55AA frame (reg=0x161E) in buffer")
+        return None
+
     def get_warning_data(self, pack_number=None):
         """
         Get warning/alarm data from JK BMS.
@@ -916,9 +1083,32 @@ class JKBMS485:
     def publish_analog_data_mqtt(self, pack_number=None):
         """
         Publish analog data to MQTT.
-        Compatible format with PACE BMS.
+
+        When self.ha_comm_jk is set (HA_MQTT_JK instance), uses JK-native
+        entity naming. Otherwise falls back to PACE-compatible naming
+        via self.ha_comm (backward compatibility path).
         """
 
+        # ----- JK-native pipeline -----
+        if self.ha_comm_jk:
+            retry_count = 0
+            data = None
+            while retry_count < 3:
+                data = self.get_jk_native_data()
+                if data is not None:
+                    break
+                retry_count += 1
+                import time
+                time.sleep(0.5)
+
+            if data is None:
+                self.logger.error("Failed to get JK native data after retries")
+                return
+
+            self.ha_comm_jk.publish_analog_data(data)
+            return
+
+        # ----- Legacy PACE-compatible pipeline (unchanged) -----
         units = {
             'view_num_cells': 'cells',
             'cell_voltages': 'mV',
@@ -1131,8 +1321,28 @@ class JKBMS485:
     def publish_warning_data_mqtt(self, pack_number=None):
         """
         Publish warning data to MQTT.
-        Compatible format with PACE BMS.
+
+        When self.ha_comm_jk is set (HA_MQTT_JK instance), uses JK-native
+        entity naming. Otherwise falls back to PACE-compatible naming
+        via self.ha_comm (backward compatibility path).
         """
+
+        # ----- JK-native pipeline -----
+        if self.ha_comm_jk:
+            warn_data = None
+            while True:
+                warn_data = self.get_warning_data(pack_number)
+                if warn_data is not None:
+                    break
+
+            if not warn_data:
+                self.logger.error("No warning data to publish")
+                return
+
+            self.ha_comm_jk.publish_warning_data(warn_data)
+            return
+
+        # ----- Legacy PACE-compatible pipeline (unchanged) -----
         while True:
             warn_data = self.get_warning_data(pack_number)
             if warn_data is not None:

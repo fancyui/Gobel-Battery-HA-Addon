@@ -12,6 +12,7 @@ from tdtbms_rs232 import TDTBMS232
 from jkbms_rs485 import JKBMS485
 from ha_rest_api import HA_REST_API
 from ha_mqtt import HA_MQTT
+from ha_mqtt_jk import HA_MQTT_JK
 
 # Define the load_config function
 def load_config():
@@ -107,6 +108,9 @@ def run():
         return
     mqtt_client.loop_start()
 
+    # JK-native MQTT publisher (lightweight wrapper, created unconditionally)
+    ha_comm_jk = HA_MQTT_JK(ha_comm)
+
     # Schedule the BMS re-initialization (this already calls connect())
     if not schedule_bms_reinit():
         logger.info("BMS Connection failed")
@@ -183,6 +187,7 @@ def run():
             bms = JKBMS485(
                 bms_comm=bms_comm,
                 ha_comm=ha_comm,
+                ha_comm_jk=ha_comm_jk,
                 bms_type=bms_type,
                 data_refresh_interval=data_refresh_interval,
                 debug=debug,
