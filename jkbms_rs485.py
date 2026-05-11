@@ -155,12 +155,6 @@ class JKBMS485:
             self.logger.warning("receive_55aa_frames: no data received from BMS (raw_data is None/empty)")
             return []
 
-        # Output raw data as continuous hex string
-        hex_str = ' '.join(f'{b:02X}' for b in raw_data)
-        self.logger.warning(
-            f"receive_55aa_frames: got {len(raw_data)} bytes raw data: {hex_str}"
-        )
-
         BLOCK_SIZE = 308   # 300-byte 55AA frame + 8-byte Modbus ACK
         FRAME_SIZE = 300   # Pure 55AA frame data
 
@@ -179,10 +173,15 @@ class JKBMS485:
                 reg_lo = block[303]
                 reg_addr = (reg_hi << 8) | reg_lo
                 pack_id = frame[4] if len(frame) > 4 else 0
+                frame_hex = '\n'.join(
+                    ' '.join(f'{b:02X}' for b in frame[i:i+32])
+                    for i in range(0, len(frame), 32)
+                )
                 self.logger.warning(
                     f"receive_55aa_frames: block at offset {start}, "
                     f"pack_id={pack_id}, reg=0x{reg_addr:04X} "
                     f"({'DYNAMIC' if reg_addr == 0x1620 else 'SETUP' if reg_addr == 0x161E else 'STATIC' if reg_addr == 0x161C else 'UNKNOWN'})"
+                    f"\n{frame_hex}"
                 )
                 frames.append((frame, reg_addr))
                 search_start = start + BLOCK_SIZE
