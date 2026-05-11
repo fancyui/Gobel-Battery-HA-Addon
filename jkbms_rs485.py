@@ -155,17 +155,10 @@ class JKBMS485:
             self.logger.warning("receive_55aa_frames: no data received from BMS (raw_data is None/empty)")
             return []
 
-        # Always print full raw hex at WARNING level so it shows without debug mode
-        hex_lines = '\n'.join(
-            '  {:04X}: {:48s}  |{}|'.format(
-                i,
-                ' '.join(f'{b:02X}' for b in raw_data[i:i+16]),
-                ''.join(chr(b) if 32 <= b < 127 else '.' for b in raw_data[i:i+16])
-            )
-            for i in range(0, len(raw_data), 16)
-        )
+        # Output raw data as continuous hex string
+        hex_str = ' '.join(f'{b:02X}' for b in raw_data)
         self.logger.warning(
-            f"receive_55aa_frames: got {len(raw_data)} bytes raw data:\n{hex_lines}"
+            f"receive_55aa_frames: got {len(raw_data)} bytes raw data: {hex_str}"
         )
 
         BLOCK_SIZE = 308   # 300-byte 55AA frame + 8-byte Modbus ACK
