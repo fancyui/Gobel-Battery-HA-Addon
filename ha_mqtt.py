@@ -51,6 +51,7 @@ class HA_MQTT:
         # self.logger.debug(f"Publishing discovery to topic: {topic}")
         payload = {
             "name": " ".join(self.cap_first(word) for word in entity_id.split("_")),
+            "has_entity_name": False,
             "state_topic": f"{main_topic}/{self.device_name}_{entity_id}/state",
             "unique_id": f"{self.device_name}_{entity_id}",
             "icon": icon,
@@ -104,6 +105,7 @@ class HA_MQTT:
         # self.logger.debug(f"Publishing discovery to topic: {topic}")
         payload = {
             "name": " ".join(self.cap_first(word) for word in entity_id.split("_")),
+            "has_entity_name": False,
             "state_topic": f"{main_topic}/{self.device_name}_{entity_id}/state",
             "unique_id": f"{self.device_name}_{entity_id}",
             "event_types": ["normal", 
@@ -143,6 +145,7 @@ class HA_MQTT:
         # self.logger.debug(f"Publishing discovery to topic: {topic}")
         payload = {
             "name": " ".join(self.cap_first(word) for word in entity_id.split("_")),
+            "has_entity_name": False,
             "state_topic": f"{main_topic}/{self.device_name}_{entity_id}/state",
             "unique_id": f"{self.device_name}_{entity_id}",
             "payload_on": True,
@@ -180,6 +183,7 @@ class HA_MQTT:
         # self.logger.debug(f"Publishing discovery to topic: {topic}")
         payload = {
             "name": " ".join(self.cap_first(word) for word in entity_id.split("_")),
+            "has_entity_name": False,
             "state_topic": f"{main_topic}/{self.device_name}_{entity_id}/state",
             "unique_id": f"{self.device_name}_{entity_id}",
             "icon": icon,
