@@ -40,9 +40,9 @@ class HA_MQTT_JK:
     # Internal helpers
     # ------------------------------------------------------------------ #
 
-    def _pub_sensor(self, entity_id, value, unit, icon, devclass, stateclass):
+    def _pub_sensor(self, entity_id, value, unit, icon, devclass, stateclass, precision=None):
         """Publish discovery + state for a single sensor entity."""
-        self.mqtt.publish_sensor_discovery(entity_id, unit, icon, devclass, stateclass)
+        self.mqtt.publish_sensor_discovery(entity_id, unit, icon, devclass, stateclass, precision=precision)
         self.mqtt.publish_sensor_state(value, unit, entity_id)
 
     def _pub_binary(self, entity_id, value, icon):
@@ -127,11 +127,13 @@ class HA_MQTT_JK:
         for key, (unit, icon, devclass, stateclass) in total_defs.items():
             if key in totals:
                 val = totals[key]
+                prec = None
                 if key == 'voltage':
                     val = f"{float(val):.2f}"
+                    prec = 2
                 self._pub_sensor(
                     f'total_{key}', val,
-                    unit, icon, devclass, stateclass
+                    unit, icon, devclass, stateclass, precision=prec
                 )
 
     # ------------------------------------------------------------------ #
@@ -185,23 +187,25 @@ class HA_MQTT_JK:
             'temp_mos':          ('°C', 'mdi:thermometer', 'temperature', 'measurement'),
             'total_runtime_h':   ('h', 'mdi:clock-outline', 'null', 'measurement'),
             'heat_current':      ('A', 'mdi:current-dc', 'current', 'measurement'),
-            'sys_run_ticks':     ('ticks', 'mdi:clock', 'null', 'measurement'),
+            'sys_run_ticks':     ('', 'mdi:clock', 'null', 'null'),
             'fault_count':       ('faults', 'mdi:alert-circle-outline', 'null', 'measurement'),
             'time_enter_sleep_h':('h', 'mdi:sleep', 'null', 'measurement'),
             'wire_alarm':        ('', 'mdi:alert', 'null', 'measurement'),
             'user_alarm_1':      ('', 'mdi:alert', 'null', 'measurement'),
             'temp_sensor_presence': ('', 'mdi:thermometer-alert', 'null', 'measurement'),
-            'rtc_time':          ('timestamp', 'mdi:calendar-clock', 'null', 'measurement'),
+            'rtc_time':          ('', 'mdi:calendar-clock', 'null', 'null'),
         }
 
         for key, (unit, icon, devclass, stateclass) in analog_defs.items():
             if key in pack:
                 val = pack[key]
+                prec = None
                 if key == 'voltage':
                     val = f"{float(val):.2f}"
+                    prec = 2
                 self._pub_sensor(
                     f'{prefix}_{key}', val,
-                    unit, icon, devclass, stateclass
+                    unit, icon, devclass, stateclass, precision=prec
                 )
 
         # Binary sensors (MOS states and others)

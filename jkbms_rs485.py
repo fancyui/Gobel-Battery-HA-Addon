@@ -1170,9 +1170,20 @@ class JKBMS485:
                 data['heat_current'] = dynamic['heat_current_a']
             data['charger_plugged'] = bool(dynamic.get('charger_plugged', 0))
             if 'sys_run_ticks' in dynamic:
-                data['sys_run_ticks'] = dynamic['sys_run_ticks']
+                ticks = dynamic['sys_run_ticks']
+                days = ticks // 86400
+                hours = (ticks % 86400) // 3600
+                minutes = (ticks % 3600) // 60
+                seconds = ticks % 60
+                data['sys_run_ticks'] = f"{days}d {hours}h {minutes}m {seconds}s"
             if 'rtc_time' in dynamic:
-                data['rtc_time'] = dynamic['rtc_time']
+                import datetime
+                try:
+                    epoch = datetime.datetime(2020, 1, 1)
+                    dt = epoch + datetime.timedelta(seconds=dynamic['rtc_time'])
+                    data['rtc_time'] = dt.strftime('%Y-%m-%d %H:%M:%S')
+                except Exception:
+                    data['rtc_time'] = str(dynamic['rtc_time'])
             if 'fault_count' in dynamic:
                 data['fault_count'] = dynamic['fault_count']
             if 'time_enter_sleep' in dynamic:

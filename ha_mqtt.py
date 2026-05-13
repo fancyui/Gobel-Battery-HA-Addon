@@ -45,7 +45,7 @@ class HA_MQTT:
             self.logger.error(f"Failed to connect to MQTT broker: {e}")
         return self.mqtt_client
 
-    def publish_sensor_discovery(self, entity_id, unit, icon, deviceclass, stateclass):
+    def publish_sensor_discovery(self, entity_id, unit, icon, deviceclass, stateclass, precision=None):
         main_topic = 'sensor'
         topic = f"{self.host_name}/{main_topic}/{self.device_name}_{entity_id}/config"
         # self.logger.debug(f"Publishing discovery to topic: {topic}")
@@ -69,6 +69,10 @@ class HA_MQTT:
             
         if deviceclass != 'null':
             payload["device_class"] = deviceclass
+
+        if precision is not None:
+            payload["suggested_display_precision"] = precision
+            
         # self.logger.debug(f"Discovery payload: {json.dumps(payload)}")
 
         try:
