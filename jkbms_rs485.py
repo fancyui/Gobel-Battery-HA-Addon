@@ -1153,6 +1153,32 @@ class JKBMS485:
             data['energy_charged'] = round(charged, 2)
             data['energy_discharged'] = round(discharged, 2)
 
+            # Advanced details (requested by user)
+            if 'cell_resistances' in dynamic:
+                data['cell_resistances'] = dynamic['cell_resistances']
+            if 'wire_alarm' in dynamic:
+                data['wire_alarm'] = dynamic['wire_alarm']
+            data['precharge_state'] = bool(dynamic.get('precharge_state', 0))
+            if 'user_alarm_1' in dynamic:
+                data['user_alarm_1'] = dynamic['user_alarm_1']
+            if 'total_runtime_s' in dynamic:
+                data['total_runtime_h'] = round(dynamic['total_runtime_s'] / 3600.0, 2)
+            if 'temp_sensor_presence' in dynamic:
+                data['temp_sensor_presence'] = dynamic['temp_sensor_presence']
+            data['heating_state'] = bool(dynamic.get('heating_state', 0))
+            if 'heat_current_a' in dynamic:
+                data['heat_current'] = dynamic['heat_current_a']
+            data['charger_plugged'] = bool(dynamic.get('charger_plugged', 0))
+            if 'sys_run_ticks' in dynamic:
+                data['sys_run_ticks'] = dynamic['sys_run_ticks']
+            if 'rtc_time' in dynamic:
+                data['rtc_time'] = dynamic['rtc_time']
+            if 'fault_count' in dynamic:
+                data['fault_count'] = dynamic['fault_count']
+            if 'time_enter_sleep' in dynamic:
+                data['time_enter_sleep_h'] = round(dynamic['time_enter_sleep'] / 3600.0, 2)
+            data['pcl_module_sta'] = bool(dynamic.get('pcl_module_sta', 0))
+
             # Version info
             if static:
                 data['hardware_version'] = static.get('hardware_version', '')
