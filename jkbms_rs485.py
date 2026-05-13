@@ -42,6 +42,47 @@ class JKBMS485:
 
         # Slave address: default 0x01 as used by reference implementation
         self.slave_address = 0x01
+        
+        # Cumulative energy tracking
+        self.pack_energy = {}  # dict of pack_id -> {'charged': 0.0, 'discharged': 0.0, 'last_time': float}
+
+    # ---------------------------------------------------------------------------
+    # Cumulative Energy
+    # ---------------------------------------------------------------------------
+    def calculate_cumulative_energy(self, pack_id, power_kw):
+        """
+        Calculate cumulative energy (Wh) per pack based on power and time delta.
+        """
+        import time
+        current_time = time.time()
+        
+        if pack_id not in self.pack_energy:
+            self.pack_energy[pack_id] = {'charged': 0.0, 'discharged': 0.0, 'last_time': current_time}
+            return 0.0, 0.0
+            
+        pack_data = self.pack_energy[pack_id]
+        time_diff = current_time - pack_data['last_time']
+        
+        # Abnormal interval detection (>5 mins)
+        if time_diff > 300:
+            self.logger.warning(f"Abnormal time interval for pack {pack_id}: {time_diff:.1f}s, resetting time base")
+            pack_data['last_time'] = current_time
+            return pack_data['charged'], pack_data['discharged']
+            
+        # Ignore very short intervals (<1s)
+        if time_diff < 1:
+            return pack_data['charged'], pack_data['discharged']
+            
+        # kW to W, seconds to hours -> Wh
+        energy_increment = abs(power_kw) * time_diff / 3600 * 1000
+        
+        if power_kw >= 0:
+            pack_data['charged'] += energy_increment
+        else:
+            pack_data['discharged'] += energy_increment
+            
+        pack_data['last_time'] = current_time
+        return pack_data['charged'], pack_data['discharged']
 
     # ---------------------------------------------------------------------------
     # CRC16 Modbus
@@ -1108,7 +1149,7 @@ class JKBMS485:
 
             # Cumulative energy
             power_kw = dynamic.get('power_kw', 0.0)
-            charged, discharged = self.calculate_cumulative_energy(power_kw)
+            charged, discharged = self.calculate_cumulative_energy(pack_id, power_kw)
             data['energy_charged'] = round(charged, 2)
             data['energy_discharged'] = round(discharged, 2)
 
