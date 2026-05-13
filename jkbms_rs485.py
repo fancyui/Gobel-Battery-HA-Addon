@@ -1043,17 +1043,19 @@ class JKBMS485:
         """
         self.logger.debug("Getting JK BMS native data")
 
-        dynamic_results = self.get_dynamic_data()
+        dynamic_results, setup_results, static_results = self.get_all_frames_data()
         if not dynamic_results:
             self.logger.warning("Failed to get dynamic data, retrying once...")
             import time
             time.sleep(0.5)
-            dynamic_results = self.get_dynamic_data()
+            dyn2, set2, stat2 = self.get_all_frames_data()
+            dynamic_results.update(dyn2)
+            setup_results.update(set2)
+            static_results.update(stat2)
             if not dynamic_results:
                 self.logger.error("Failed to get dynamic data after retry")
                 return []
 
-        static_results = self.get_static_data()
         pack_list = []
 
         for pack_id, dynamic in dynamic_results.items():
@@ -1201,7 +1203,7 @@ class JKBMS485:
         self.logger.debug("Starting to get JK BMS warning data")
 
         alarm = self.get_alarm_data()
-        dynamic_results = self.get_dynamic_data()
+        dynamic_results, _, _ = self.get_all_frames_data()
         
         warning_data = []
         for pack_id, dynamic in dynamic_results.items():
