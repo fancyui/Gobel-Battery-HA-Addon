@@ -778,30 +778,30 @@ class JKBMS485:
     def _decode_alarms(self, alarm_value):
         """Decode 32-bit alarm bitfield into structured dict."""
         alarm_bits = {
-            0: "Balancing resistance too high",
+            0: "Battery SCP",
             1: "MOS over-temperature protection",
-            2: "Number of cells does not match parameter",
-            3: "Abnormal current sensor",
-            4: "Cell over-voltage protection",
-            5: "Battery over-voltage protection",
-            6: "Overcurrent charge protection",
-            7: "Charge short-circuit protection",
-            8: "Over-temperature charge protection",
-            9: "Low temperature charge protection",
-            10: "Internal communication anomaly",
-            11: "Cell under-voltage protection",
-            12: "Battery under-voltage protection",
-            13: "Overcurrent discharge protection",
-            14: "Discharge short-circuit protection",
-            15: "Over-temperature discharge protection",
-            16: "Charge MOS anomaly",
-            17: "Discharge MOS anomaly",
+            2: "Cell qty mismatch",
+            3: "Cell OVP",
+            4: "Cell UVP",
+            5: "Battery OVP",
+            6: "Battery UVP",
+            7: "Charge OCP",
+            8: "Discharge OCP",
+            9: "Charge over-temperature",
+            10: "Aux CPU comm fault",
+            11: "Cell UVP (2nd)",
+            12: "Battery OVP (2nd)",
+            13: "Battery UVP (2nd)",
+            14: "Charge OCP (2nd)",
+            15: "Discharge OCP (2nd)",
+            16: "Charge low-temperature protection",
+            17: "Discharge over-temperature",
             18: "GPS disconnected",
-            19: "Please modify the authorization password in time",
-            20: "Discharge activation failure",
-            21: "Battery over-temperature alarm",
+            19: "Password modify reminder",
+            20: "Discharge activate failure",
+            21: "Bat temp sensor anomaly",
             22: "Temperature sensor anomaly",
-            23: "Parallel module anomaly",
+            23: "Parallel module fault",
         }
 
         active = {}
@@ -1243,58 +1243,35 @@ class JKBMS485:
         """
         self.logger.debug("Starting to get JK BMS warning data")
 
-        alarm = self.get_alarm_data()
         dynamic_results, _, _ = self.get_all_frames_data()
         
         warning_data = []
         for pack_id, dynamic in dynamic_results.items():
-            cell_count = len(dynamic.get('cell_voltages', []))
-
-            alarm_bits = {}
-            if alarm:
-                alarm_bits = alarm.get('alarms', {})
+            raw_alarm = dynamic.get('alarm_bits', 0)
+            decoded = self._decode_alarms(raw_alarm)
+            alarm_bits = decoded.get('alarms', {})
 
             pack_warning = {
                 'pack_id': pack_id,
-                'cell_number': cell_count,
-                'cell_voltage_warnings': ['normal'] * cell_count,
-                'temp_sensor_number': 0,
-                'temp_sensor_warnings': [],
-                'warn_charge_current': 'normal',
-                'warn_total_voltage': 'normal',
-                'warn_discharge_current': 'normal',
                 'protect_state_1': {
-                    'protect_short_circuit': alarm_bits.get('Discharge short-circuit protection', False),
-                    'protect_high_discharge_current': alarm_bits.get('Overcurrent discharge protection', False),
-                    'protect_high_charge_current': alarm_bits.get('Overcurrent charge protection', False),
-                    'protect_low_total_voltage': alarm_bits.get('Battery under-voltage protection', False),
-                    'protect_high_total_voltage': alarm_bits.get('Battery over-voltage protection', False),
-                    'protect_low_cell_voltage': alarm_bits.get('Cell under-voltage protection', False),
-                    'protect_high_cell_voltage': alarm_bits.get('Cell over-voltage protection', False),
+                    'protect_short_circuit': alarm_bits.get('Battery SCP', False),
+                    'protect_high_discharge_current': alarm_bits.get('Discharge OCP', False),
+                    'protect_high_charge_current': alarm_bits.get('Charge OCP', False),
+                    'protect_low_total_voltage': alarm_bits.get('Battery UVP', False),
+                    'protect_high_total_voltage': alarm_bits.get('Battery OVP', False),
+                    'protect_low_cell_voltage': alarm_bits.get('Cell UVP', False),
+                    'protect_high_cell_voltage': alarm_bits.get('Cell OVP', False),
                 },
                 'protect_state_2': {
-                    'status_fully_charged': False,
-                    'protect_low_env_temp': alarm_bits.get('Low temperature charge protection', False),
-                    'protect_high_env_temp': alarm_bits.get('Over-temperature charge protection', False),
+                    'protect_low_charge_temp': alarm_bits.get('Charge low-temperature protection', False),
+                    'protect_high_charge_temp': alarm_bits.get('Charge over-temperature', False),
                     'protect_high_MOS_temp': alarm_bits.get('MOS over-temperature protection', False),
-                    'protect_low_discharge_temp': alarm_bits.get('Low temperature charge protection', False),
-                    'protect_low_charge_temp': alarm_bits.get('Low temperature charge protection', False),
-                    'protect_high_discharge_temp': alarm_bits.get('Over-temperature discharge protection', False),
-                    'protect_high_charge_temp': alarm_bits.get('Over-temperature charge protection', False),
+                    'protect_high_discharge_temp': alarm_bits.get('Discharge over-temperature', False),
                 },
                 'fault_state': {
-                    'fault_sampling': alarm_bits.get('Abnormal current sensor', False),
-                    'fault_cell': alarm_bits.get('Number of cells does not match parameter', False),
-                    'fault_NTC': alarm_bits.get('Temperature sensor anomaly', False),
-                    'fault_discharge_MOS': alarm_bits.get('Discharge MOS anomaly', False),
-                    'fault_charge_MOS': alarm_bits.get('Charge MOS anomaly', False),
+                    'fault_cell': alarm_bits.get('Cell qty mismatch', False),
+                    'fault_NTC': alarm_bits.get('Temperature sensor anomaly', False) or alarm_bits.get('Bat temp sensor anomaly', False),
                 },
-                'instruction_state': {},
-                'control_state': {},
-                'balance_state_1': 0,
-                'balance_state_2': 0,
-                'warn_state_1': {},
-                'warn_state_2': {},
             }
             warning_data.append(pack_warning)
 
