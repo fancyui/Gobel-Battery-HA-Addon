@@ -3,6 +3,14 @@
 
 ---------------
 
+
+## 1.9.45
+
+-   [JKBMS] Refined multi-pack integration and setup configuration parameters (Reg=0x161E).
+-   [PACE232] Added heating film status (status_heating) to instruction_state.
+
+---------------
+
 ## 1.9.21
 
 -   Add build.yaml to fix Docker build failure (missing BUILD_FROM arg).
