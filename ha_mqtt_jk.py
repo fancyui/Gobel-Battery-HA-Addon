@@ -274,19 +274,42 @@ class HA_MQTT_JK:
             'vol_start_balan':   ('balance_start_voltage', 'V', 'mdi:scale-balance', 'voltage', 'measurement'),
             'dev_addr':          ('device_address', '', 'mdi:identifier', 'null', 'null'),
             'tim_precharge':     ('precharge_delay', 's', 'mdi:clock-start', 'null', 'measurement'),
-            'func_bit_field':    ('function_bit_field', '', 'mdi:cog', 'null', 'null'),
             'tim_smart_sleep':   ('smart_sleep_time', 'h', 'mdi:sleep', 'null', 'measurement'),
+            # Decoded Function Bits
+            'func_heat_en':              ('function_heating_enabled', '', 'mdi:radiator', 'null', 'null'),
+            'func_disable_temp_sensor':  ('function_disable_temp_sensors', '', 'mdi:thermometer-off', 'null', 'null'),
+            'func_gps_heartbeat':        ('function_gps_heartbeat', '', 'mdi:heart-pulse', 'null', 'null'),
+            'func_port_switch_rs485':    ('function_port_switch_rs485', '', 'mdi:serial-port', 'null', 'null'),
+            'func_lcd_always_on':        ('function_lcd_always_on', '', 'mdi:monitor-screenshot', 'null', 'null'),
+            'func_special_charger':      ('function_special_charger_mode', '', 'mdi:battery-charging-wireless', 'null', 'null'),
+            'func_smart_sleep':          ('function_smart_sleep_enabled', '', 'mdi:sleep', 'null', 'null'),
+            'func_disable_pcl_module':   ('function_disable_pcl_module', '', 'mdi:connection-off', 'null', 'null'),
+            'func_timed_stored_data':    ('function_timed_data_storage', '', 'mdi:database-clock', 'null', 'null'),
+            'func_charging_float_mode':  ('function_charging_float_mode', '', 'mdi:battery-charging-high', 'null', 'null'),
         }
 
         for internal_key, (display_key, unit, icon, devclass, stateclass) in setup_mappings.items():
             if internal_key in settings:
                 val = settings[internal_key]
                 entity_id = f'{prefix}_{display_key}'
-                # Binary settings
-                if internal_key in ['bat_charge_en', 'bat_discharge_en', 'balan_en']:
+                prec = None
+                if unit == 'V':
+                    val = f"{float(val):.3f}"
+                    prec = 3
+                
+                # Binary settings (Original ones + Decoded Function Bits)
+                binary_keys = [
+                    'bat_charge_en', 'bat_discharge_en', 'balan_en',
+                    'func_heat_en', 'func_disable_temp_sensor', 'func_gps_heartbeat',
+                    'func_port_switch_rs485', 'func_lcd_always_on', 'func_special_charger',
+                    'func_smart_sleep', 'func_disable_pcl_module', 'func_timed_stored_data',
+                    'func_charging_float_mode'
+                ]
+                
+                if internal_key in binary_keys:
                     self._pub_binary(entity_id, bool(val), icon)
                 else:
-                    self._pub_sensor(entity_id, val, unit, icon, devclass, stateclass)
+                    self._pub_sensor(entity_id, val, unit, icon, devclass, stateclass, precision=prec)
 
     # ------------------------------------------------------------------ #
     # Warning / alarm data

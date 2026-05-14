@@ -1200,6 +1200,19 @@ class JKBMS485:
 
             # Setup / Config info
             if setup:
+                # Decode func_bit_field if present
+                if 'func_bit_field' in setup:
+                    fbits = setup['func_bit_field']
+                    setup['func_heat_en'] = bool(fbits & (1 << 0))
+                    setup['func_disable_temp_sensor'] = bool(fbits & (1 << 1))
+                    setup['func_gps_heartbeat'] = bool(fbits & (1 << 2))
+                    setup['func_port_switch_rs485'] = bool(fbits & (1 << 3))
+                    setup['func_lcd_always_on'] = bool(fbits & (1 << 4))
+                    setup['func_special_charger'] = bool(fbits & (1 << 5))
+                    setup['func_smart_sleep'] = bool(fbits & (1 << 6))
+                    setup['func_disable_pcl_module'] = bool(fbits & (1 << 7))
+                    setup['func_timed_stored_data'] = bool(fbits & (1 << 8))
+                    setup['func_charging_float_mode'] = bool(fbits & (1 << 9))
                 data['settings'] = setup
 
             # Version info
