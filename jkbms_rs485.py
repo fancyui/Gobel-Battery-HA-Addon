@@ -1165,7 +1165,6 @@ class JKBMS485:
                 data['total_runtime'] = round(dynamic['total_runtime_s'] / 3600.0, 2)
             if 'temp_sensor_presence' in dynamic:
                 presence = dynamic['temp_sensor_presence']
-                data['temp_sensor_presence'] = presence
                 data['temp_sensor_mos_ok'] = bool(presence & (1 << 0))
                 data['temp_sensor_bat1_ok'] = bool(presence & (1 << 1))
                 data['temp_sensor_bat2_ok'] = bool(presence & (1 << 2))

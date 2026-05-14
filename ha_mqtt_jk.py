@@ -192,7 +192,6 @@ class HA_MQTT_JK:
             'time_enter_sleep_h':('h', 'mdi:sleep', 'null', 'measurement'),
             'wire_alarm':        ('', 'mdi:alert', 'null', 'measurement'),
             'user_alarm_1':      ('', 'mdi:alert', 'null', 'measurement'),
-            'temp_sensor_presence': ('', 'mdi:thermometer-alert', 'null', 'measurement'),
             'bms_time':          ('', 'mdi:calendar-clock', 'null', 'null'),
         }
 
