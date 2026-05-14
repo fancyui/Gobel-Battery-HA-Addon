@@ -1,0 +1,277 @@
+55AA Frame: 300 bytes + 8-byte Modbus ACK = 308 bytes total
+  Header:       55 AA
+  Function:     0xEB (EB)  Sub: 0x90 (90)
+  Frame Type:   0x02 (DYNAMIC)  [02=DYNAMIC, 01=SETUP]
+  Reserved:     0x00
+
+======================================================================
+  1. CELL VOLTAGES  (offset 6-37, register 0x0000-0x001E) [VERIFIED]
+======================================================================
+  Cell 1  off=  6  reg=0x0000   3292 mV = 3.292 V  #############################
+  Cell 2  off=  8  reg=0x0002   3292 mV = 3.292 V  #############################
+  Cell 3  off= 10  reg=0x0004   3292 mV = 3.292 V  #############################
+  Cell 4  off= 12  reg=0x0006   3292 mV = 3.292 V  #############################
+  Cell 5  off= 14  reg=0x0008   3257 mV = 3.257 V  #############################
+  Cell 6  off= 16  reg=0x000A   3291 mV = 3.291 V  #############################
+  Cell 7  off= 18  reg=0x000C   3292 mV = 3.292 V  #############################
+  Cell 8  off= 20  reg=0x000E   3291 mV = 3.291 V  #############################
+  Cell 9  off= 22  reg=0x0010   3257 mV = 3.257 V  #############################
+  Cell10  off= 24  reg=0x0012   3292 mV = 3.292 V  #############################
+  Cell11  off= 26  reg=0x0014   3291 mV = 3.291 V  #############################
+  Cell12  off= 28  reg=0x0016   3292 mV = 3.292 V  #############################
+  Cell13  off= 30  reg=0x0018   3292 mV = 3.292 V  #############################
+  Cell14  off= 32  reg=0x001A   3292 mV = 3.292 V  #############################
+  Cell15  off= 34  reg=0x001C   3292 mV = 3.292 V  #############################
+  Cell16  off= 36  reg=0x001E   3292 mV = 3.292 V  #############################
+
+  Active cells:  16
+  Range:         3257 - 3292 mV  (delta 35 mV)
+  Total:         52.599 V
+  Average:       3287 mV
+
+======================================================================
+  2. CELL STATUS / PRESENCE  (offset 70, reg 0x0040, CellSta) [DOC]
+======================================================================
+  Raw:  0x0000FFFF  binary: 00000000000000001111111111111111
+  Protocol doc: 'CellSta' BIT[n]=1 = cell n present
+  Cells present: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]  (16 cells)
+
+======================================================================
+  3. CELL VOLTAGE STATISTICS  (offset 74-79, reg 0x0044-0x0049) [DOC]
+======================================================================
+  Average voltage:     3288 mV  (3.288 V)  [reg 0x0044]
+  Cell voltage delta:  35 mV  (max-min = 35 mV)  [reg 0x0046]
+  Max voltage cell #:  0  [reg 0x0048]
+  Min voltage cell #:  4  [reg 0x0049 -- note: cell 5 has min=3257mV]
+
+======================================================================
+  4. WIRE RESISTANCES  (offset 80-111, reg 0x004A-0x0068) [VERIFIED]
+======================================================================
+  Wire 0  off= 80  reg=0x004A    74 mohm = 0.074 ohm
+  Wire 1  off= 82  reg=0x004C    71 mohm = 0.071 ohm
+  Wire 2  off= 84  reg=0x004E    72 mohm = 0.072 ohm
+  Wire 3  off= 86  reg=0x0050    69 mohm = 0.069 ohm
+  Wire 4  off= 88  reg=0x0052    73 mohm = 0.073 ohm
+  Wire 5  off= 90  reg=0x0054    70 mohm = 0.070 ohm
+  Wire 6  off= 92  reg=0x0056    76 mohm = 0.076 ohm
+  Wire 7  off= 94  reg=0x0058    73 mohm = 0.073 ohm
+  Wire 8  off= 96  reg=0x005A    73 mohm = 0.073 ohm
+  Wire 9  off= 98  reg=0x005C    71 mohm = 0.071 ohm
+  Wire10  off=100  reg=0x005E    74 mohm = 0.074 ohm
+  Wire11  off=102  reg=0x0060    71 mohm = 0.071 ohm
+  Wire12  off=104  reg=0x0062    79 mohm = 0.079 ohm
+  Wire13  off=106  reg=0x0064    77 mohm = 0.077 ohm
+  Wire14  off=108  reg=0x0066    74 mohm = 0.074 ohm
+  Wire15  off=110  reg=0x0068    73 mohm = 0.073 ohm
+  Wire16  off=112  reg=0x006A     0 mohm = 0.000 ohm
+  Wire17  off=114  reg=0x006C     0 mohm = 0.000 ohm
+  Wire18  off=116  reg=0x006E     0 mohm = 0.000 ohm
+  Wire19  off=118  reg=0x0070     0 mohm = 0.000 ohm
+  Wire20  off=120  reg=0x0072     0 mohm = 0.000 ohm
+  Wire21  off=122  reg=0x0074     0 mohm = 0.000 ohm
+  Wire22  off=124  reg=0x0076     0 mohm = 0.000 ohm
+  Wire23  off=126  reg=0x0078     0 mohm = 0.000 ohm
+  Wire24  off=128  reg=0x007A     0 mohm = 0.000 ohm
+  Wire25  off=130  reg=0x007C     0 mohm = 0.000 ohm
+  Wire26  off=132  reg=0x007E     0 mohm = 0.000 ohm
+  Wire27  off=134  reg=0x0080     0 mohm = 0.000 ohm
+  Wire28  off=136  reg=0x0082     0 mohm = 0.000 ohm
+  Wire29  off=138  reg=0x0084     0 mohm = 0.000 ohm
+  Wire30  off=140  reg=0x0086     0 mohm = 0.000 ohm
+  Wire31  off=142  reg=0x0088     0 mohm = 0.000 ohm
+
+======================================================================
+  5. MOS TEMPERATURE  (offset 144, reg 0x008A) [VERIFIED]
+======================================================================
+  MOS temp:  25.9 C  (raw int16 = 259, /10)
+
+======================================================================
+  6. BALANCE WIRE RESISTANCE ALARM  (offset 146, reg 0x008C) [DOC]
+======================================================================
+  Raw:  0x00000000
+  BIT[n]=1 -> balance wire n has alarm
+  All balance wires normal (no alarm)
+
+======================================================================
+  7. ELECTRICAL DATA  (offset 150-161, reg 0x0090/0x1200, 0x0094, 0x0098) [VERIFIED]
+======================================================================
+  Total voltage:   52600 mV  = 52.600 V  (uint32le, reg 0x0090 base 0x1200)
+  Power:           0 mW  = 0.0 W = 0.000 kW  (uint32le, reg 0x0094)
+  Current:         0 mA  = 0.00 A  [IDLE]  (int32le, reg 0x0098)
+
+======================================================================
+  8. BATTERY TEMPERATURES  [VERIFIED]
+======================================================================
+  Battery temp 1        off=162  reg=0x009C  25.3 C  (raw=253)
+  Battery temp 2        off=164  reg=0x009E  25.1 C  (raw=251)
+  Battery temp 3        off=254  reg=0x00F8  25.9 C  (raw=259)
+  Battery temp 4        off=256  reg=0x00FA  25.2 C  (raw=252)
+  Battery temp 5        off=258  reg=0x00FC  25.1 C  (raw=251)
+
+======================================================================
+  9. ALARM / PROTECTION BITS  (offset 166, reg 0x00A0, UINT32le) [VERIFIED]
+======================================================================
+  Raw bytes around offset 166:
+  009C: 00 00 00 00 00 00 FD 00 FB 00 00 00 08 00 00 00   <-ImA  <-T1  <-T2  <-ALARM***  <-BalA
+  00AC: 00 61 93 7A 01 00 A0 86 01 00 00 00 00 00 14 00   <-BatSta  <-SOC  <-RemainCap  <-FullCap  <-Cycles  <-CycleCap
+  00BC: 00 00 64 00 00 00 72 D5 19 00 01 01 00 00 00 00   <-SOH  <-Prechg  <-Runtime  <-ChgMOS  <-DchMOS  <-BalMOS
+  00CC: 00 00 00 00 00 00 00 00 00 00 FF 00 01 00 00 00   
+
+  Raw alarm value:  0x00080000  (524288)
+  Binary:           00000000000010000000000000000000
+
+  Active alarms (1):
+    BIT19  [FAULT]  Password modify reminder
+           (请及时修改授权密码)
+
+======================================================================
+  10. BALANCE CURRENT  (offset 170, reg 0x00A4) [VERIFIED]
+======================================================================
+  Balance current:  0 mA = 0.000 A
+
+======================================================================
+  11. BATTERY STATUS & SOC  (offset 172-173, reg 0x00A6) [VERIFIED]
+======================================================================
+  Battery status:     0 (Standby/Off)  [reg 0x00A6, BatSta]
+  SOC:               97 %                                          [reg 0x00A7, SOCStateOfCharge]
+
+======================================================================
+  12. CAPACITIES  [VERIFIED]
+======================================================================
+  Remain capacity:    96915 mAh = 96.915 Ah  (off=174, reg 0x00A8, SOCCapRemain)
+  Full capacity:      100000 mAh = 100.000 Ah  (off=178, reg 0x00AC, SOCFullChargeCap)
+  Cycle count:        0                    (off=182, reg 0x00B0, SOCCycleCount)
+  Cycle capacity:     20 mAh                (off=186, reg 0x00B4, SOCCycleCap)
+
+======================================================================
+  13. SOH, PRECHARGE, USER ALARMS, RUNTIME  [VERIFIED+DOC]
+======================================================================
+  SOH:               100 %        (off=190, reg 0x00B8)
+  Precharge:         OFF         (off=191, reg 0x00B9)
+  UserAlarm1:        0           (off=192, reg 0x00BA) [DOC]
+  Runtime:           1693042 s = 470.3 h  (off=194, reg 0x00BC, as UINT32)
+  Charge MOS:        ON          (off=198, reg 0x00C0)
+  Discharge MOS:     ON          (off=199, reg 0x00C1)
+  Balance MOS/byte:  OFF          (off=200, reg 0x00C2 low byte)
+  UserAlarm2(reg):   0           (off=200, reg 0x00C2, as UINT16) [DOC]
+
+======================================================================
+  14. PROTECTION RELEASE DELAY TIMES  (reg 0x00C4-0x00CE) [DOC]
+======================================================================
+  reg 0x00C4 off=202      0 s  -- Discharge OCP release time
+  reg 0x00C6 off=204      0 s  -- Discharge SCP release time
+  reg 0x00C8 off=206      0 s  -- Charge OCP release time
+  reg 0x00CA off=208      0 s  -- Charge SCP release time
+  reg 0x00CC off=210      0 s  -- Cell UVP release time
+  reg 0x00CE off=212      0 s  -- Cell OVP release time
+
+======================================================================
+  15. TEMPERATURE SENSOR PRESENCE  (offset 214, reg 0x00D0) [DOC]
+======================================================================
+  Raw:          0xFF
+  BIT=1 -> sensor PRESENT (normal); BIT=0 -> sensor ABSENT
+    BIT0:  [PRESENT]  MOS temp sensor
+    BIT1:  [PRESENT]  Bat temp sensor 1
+    BIT2:  [PRESENT]  Bat temp sensor 2
+    BIT3:  [PRESENT]  Bat temp sensor 3
+    BIT4:  [PRESENT]  Bat temp sensor 4
+    BIT5:  [PRESENT]  Bat temp sensor 5
+  Heating:      OFF  (off=215, reg 0x00D1)
+
+======================================================================
+  16. EMERGENCY / CURRENT CORRECTION / SENSOR VOLTAGES  (reg 0x00D4-0x00E4) [DOC]
+======================================================================
+  Emergency switch time:          0 s          (reg 0x00D4, TimeEmergency)
+  Discharge current correction:   10087            (reg 0x00D6) [unit TBD]
+  Charge current sensor voltage:  0 mV           (reg 0x00D8)
+  Discharge current sensor V:     0 mV           (reg 0x00DA)
+  Voltage calibration factor:     2.957608         (reg 0x00DC, float32)
+  Battery voltage (0.01V):        5260 -> 52.60 V   (reg 0x00E4, BatVol)
+
+======================================================================
+  17. HEATING CURRENT / CHARGER / SYSTEM UPTIME  (reg 0x00E6-0x00F0) [DOC]
+======================================================================
+  Heating current:     0 mA = 0.000 A  (reg 0x00E6)
+  Charger plugged:     NO           (reg 0x00EF)
+  System run time:     96308 ticks = 9631 s = 2.7 h  (reg 0x00F0, 0.1s/tick)
+
+======================================================================
+  18. RTC TIME / SLEEP / PCL MODULE / FAULT COUNT  (reg 0x0100-0x010C) [DOC]
+======================================================================
+  RTC time:           200678054 s  →  2026-05-11 15:54:14  (reg 0x0100, since 2020-01-01)
+  Fault count:        118             (off=266)
+  Enter sleep time:   76770 s = 21.3 h  (reg 0x0108, TimeEnterSleep)
+  PCL module:         OFF         (reg 0x010C, PCLModuleSta: 1=打开, 0=关闭)
+
+======================================================================
+  20. TRAILING MODBUS ACK  (bytes 300-307)
+======================================================================
+  Raw hex:  00 10 16 20 00 01 05 9A
+  Byte 300 (Pack ID):      0x00 (0)
+  Byte 301 (Function):     0x10 (Write Multiple)
+  Byte 302-303 (Reg addr): 0x1620 (DYNAMIC)
+  Byte 304-305 (Count):    0x0001
+  Byte 306-307 (CRC):      0x9A05
+
+  IMPORTANT: Byte 300 (0x00) is the Pack ID (0=pack1, 1=pack2).
+             Byte 4 of 55AA header (0x02) is the Frame Type.
+             These are DIFFERENT fields!
+
+======================================================================
+  21. FULL 300-BYTE 55AA FRAME HEX DUMP
+======================================================================
+  0000: 55 AA EB 90 02 00 DC 0C DC 0C DC 0C DC 0C B9 0C   U...............
+  0010: DB 0C DC 0C DB 0C B9 0C DC 0C DB 0C DC 0C DC 0C   ................
+  0020: DC 0C DC 0C DC 0C 00 00 00 00 00 00 00 00 00 00   ................
+  0030: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+  0040: 00 00 00 00 00 00 FF FF 00 00 D8 0C 23 00 00 04   ............#...
+  0050: 4A 00 47 00 48 00 45 00 49 00 46 00 4C 00 49 00   J.G.H.E.I.F.L.I.
+  0060: 49 00 47 00 4A 00 47 00 4F 00 4D 00 4A 00 49 00   I.G.J.G.O.M.J.I.
+  0070: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+  0080: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+  0090: 03 01 00 00 00 00 78 CD 00 00 00 00 00 00 00 00   ......x.........
+  00A0: 00 00 FD 00 FB 00 00 00 08 00 00 00 00 61 93 7A   .............a.z
+  00B0: 01 00 A0 86 01 00 00 00 00 00 14 00 00 00 64 00   ..............d.
+  00C0: 00 00 72 D5 19 00 01 01 00 00 00 00 00 00 00 00   ..r.............
+  00D0: 00 00 00 00 00 00 FF 00 01 00 00 00 67 27 00 00   ............g'..
+  00E0: 00 00 71 49 3D 40 00 00 00 00 8C 14 00 00 00 01   ..qI=@..........
+  00F0: 01 01 00 01 01 00 34 78 01 00 00 00 00 00 03 01   ......4x........
+  0100: FC 00 FB 00 10 27 A6 1A F6 0B 76 00 00 00 E2 2B   .....'....v....+
+  0110: 01 00 00 00 00 01 00 00 00 00 00 00 00 00 00 FE   ................
+  0120: FF 7F DC 2F 01 01 B0 0F 07 00 00 E5               .../........
+
+======================================================================
+  SUMMARY
+======================================================================
+  Frame Type:                    0x02 (DYNAMIC)
+  Pack ID (in ACK):              0
+  Frame type (from ACK reg):     0x1620 (DYNAMIC)
+  Cells:                         16 active
+  Cell range:                    3257-3292 mV  (delta 35 mV)
+  Total voltage:                 52.600 V
+  Current:                       0.00 A  [IDLE]
+  Power:                         0.0 W
+  SOC:                           97 %
+  SOH:                           100 %
+  MOS temp:                      25.9 C
+  Balance current:               0 mA
+  Charge MOS:                    ON
+  Discharge MOS:                 ON
+  Cycle count:                   0
+  Remain / Full capacity:        96.92 / 100.00 Ah
+  Runtime:                       1693042 s = 470.3 h
+  System run time:               9631 s = 2.7 h
+  RTC time:                      2026-05-11 15:54:14
+  Enter sleep time:              76770 s = 21.3 h
+  PCL module:                    OFF
+  UserAlarm1 / UserAlarm2:       0 / 0
+  Alarm bitfield:                0x00080000
+  Active alarm count:            1
+    - BIT19: Password modify reminder (请及时修改授权密码)
+  All temp sensors:              ALL PRESENT
+  Charger plugged:               NO
+  Heating:                       OFF
+
+  Legend: [VERIFIED] = offset confirmed by working parser
+          [DOC]       = offset from protocol document (frame = reg + 6)
+                        May be incorrect if 55AA layout differs from register map

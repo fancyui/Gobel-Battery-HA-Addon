@@ -29,10 +29,6 @@ class JKBMS485:
         self.debug = debug
         self.if_random = if_random
 
-        # Cumulative energy variables
-        self.total_energy_charged = 0.0
-        self.total_energy_discharged = 0.0
-        self.last_energy_time = None
 
         logging.basicConfig(level=logging.DEBUG if debug else logging.INFO,
                             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -46,6 +42,47 @@ class JKBMS485:
 
         # Slave address: default 0x01 as used by reference implementation
         self.slave_address = 0x01
+        
+        # Cumulative energy tracking
+        self.pack_energy = {}  # dict of pack_id -> {'charged': 0.0, 'discharged': 0.0, 'last_time': float}
+
+    # ---------------------------------------------------------------------------
+    # Cumulative Energy
+    # ---------------------------------------------------------------------------
+    def calculate_cumulative_energy(self, pack_id, power_kw):
+        """
+        Calculate cumulative energy (Wh) per pack based on power and time delta.
+        """
+        import time
+        current_time = time.time()
+        
+        if pack_id not in self.pack_energy:
+            self.pack_energy[pack_id] = {'charged': 0.0, 'discharged': 0.0, 'last_time': current_time}
+            return 0.0, 0.0
+            
+        pack_data = self.pack_energy[pack_id]
+        time_diff = current_time - pack_data['last_time']
+        
+        # Abnormal interval detection (>5 mins)
+        if time_diff > 300:
+            self.logger.warning(f"Abnormal time interval for pack {pack_id}: {time_diff:.1f}s, resetting time base")
+            pack_data['last_time'] = current_time
+            return pack_data['charged'], pack_data['discharged']
+            
+        # Ignore very short intervals (<1s)
+        if time_diff < 1:
+            return pack_data['charged'], pack_data['discharged']
+            
+        # kW to W, seconds to hours -> Wh
+        energy_increment = abs(power_kw) * time_diff / 3600 * 1000
+        
+        if power_kw >= 0:
+            pack_data['charged'] += energy_increment
+        else:
+            pack_data['discharged'] += energy_increment
+            
+        pack_data['last_time'] = current_time
+        return pack_data['charged'], pack_data['discharged']
 
     # ---------------------------------------------------------------------------
     # CRC16 Modbus
@@ -62,35 +99,6 @@ class JKBMS485:
                     crc >>= 1
         return crc
 
-    # ---------------------------------------------------------------------------
-    # Energy calculation (same as original, uses time intervals)
-    # ---------------------------------------------------------------------------
-    def calculate_cumulative_energy(self, current_power_kw):
-        import time
-        current_time = time.time()
-        if self.last_energy_time is None:
-            self.last_energy_time = current_time
-            return self.total_energy_charged, self.total_energy_discharged
-        time_interval = current_time - self.last_energy_time
-        self.last_energy_time = current_time
-        if time_interval <= 0 or time_interval > 300:
-            self.logger.warning(f"Abnormal time interval: {time_interval}s, skipping energy calculation")
-            return self.total_energy_charged, self.total_energy_discharged
-        if current_power_kw is not None:
-            energy_delta = abs(current_power_kw) * time_interval * 1000 / 3600
-            if current_power_kw >= 0:
-                self.total_energy_charged += energy_delta
-                self.logger.debug(f"Charge energy delta: {energy_delta:.3f}Wh, cumulative: {self.total_energy_charged:.3f}Wh")
-            else:
-                self.total_energy_discharged += energy_delta
-                self.logger.debug(f"Discharge energy delta: {energy_delta:.3f}Wh, cumulative: {self.total_energy_discharged:.3f}Wh")
-        return self.total_energy_charged, self.total_energy_discharged
-
-    def reset_cumulative_energy(self):
-        self.total_energy_charged = 0.0
-        self.total_energy_discharged = 0.0
-        self.last_energy_time = None
-        self.logger.info("Cumulative energy counters have been reset")
 
     # ---------------------------------------------------------------------------
     # Command builders
@@ -172,7 +180,7 @@ class JKBMS485:
                 reg_hi = block[302]
                 reg_lo = block[303]
                 reg_addr = (reg_hi << 8) | reg_lo
-                pack_id = frame[4] if len(frame) > 4 else 0
+                pack_id = block[300]
                 frame_hex = '\n'.join(
                     ' '.join(f'{b:02X}' for b in frame[i:i+32])
                     for i in range(0, len(frame), 32)
@@ -183,7 +191,7 @@ class JKBMS485:
                     f"({'DYNAMIC' if reg_addr == 0x1620 else 'SETUP' if reg_addr == 0x161E else 'STATIC' if reg_addr == 0x161C else 'UNKNOWN'})"
                     f"\n{frame_hex}"
                 )
-                frames.append((frame, reg_addr))
+                frames.append((frame, reg_addr, pack_id))
                 search_start = start + BLOCK_SIZE
             else:
                 remaining = len(raw_data) - start
@@ -292,11 +300,26 @@ class JKBMS485:
         if cell_resistances:
             result['cell_resistances'] = cell_resistances
 
+        # ---- Cell exist state: uint32le at offset 70 ----
+        if 74 <= len(data):
+            result['cell_exist_state'] = struct.unpack_from('<I', data, 70)[0]
+
+        # ---- Voltage stats: avg (74-75), diff (76-77), max_idx (78), min_idx (79) ----
+        if 80 <= len(data):
+            result['cell_voltage_avg'] = struct.unpack_from('<H', data, 74)[0]
+            result['cell_voltage_diff'] = struct.unpack_from('<H', data, 76)[0]
+            result['cell_voltage_max_index'] = int(data[78])
+            result['cell_voltage_min_index'] = int(data[79])
+
         # ---- MOS temp: int16le at offset 144 (/10 = °C) ----
-        if 145 < len(data):
+        if 146 <= len(data):
             raw_mos = struct.unpack_from('<h', data, 144)[0]
             if -500 < raw_mos < 1500:
                 result['temp_mos'] = raw_mos / 10.0
+
+        # ---- Wire alarms: uint32le at offset 146 ----
+        if 150 <= len(data):
+            result['wire_alarm'] = struct.unpack_from('<I', data, 146)[0]
 
         # ---- Total voltage (high precision): uint32le at offset 150 (mV) ----
         if 154 <= len(data):
@@ -314,12 +337,13 @@ class JKBMS485:
             raw_c = struct.unpack_from('<i', data, 158)[0]
             result['current_a'] = raw_c / 1000.0  # mA → A
 
-        # ---- Battery temp sensors: int16le at 162, 164, 254, 258 (/10 = °C) ----
+        # ---- Battery temp sensors: int16le at 162, 164, 254, 256, 258 (/10 = °C) ----
         temps = {
             'temp_bat1': 162,
             'temp_bat2': 164,
             'temp_bat3': 254,
-            'temp_bat4': 258,
+            'temp_bat4': 256,
+            'temp_bat5': 258,
         }
         for name, off in temps.items():
             if off + 2 <= len(data):
@@ -333,8 +357,16 @@ class JKBMS485:
             if -10000 < raw_bal < 10000:
                 result['balance_current_a'] = raw_bal / 1000.0  # mA → A
 
+        # ---- Alarm bits: uint32le at offset 166 ----
+        if 170 <= len(data):
+            result['alarm_bits'] = struct.unpack_from('<I', data, 166)[0]
+
+        # ---- Battery state: uint8 at 172 ----
+        if 173 <= len(data):
+            result['battery_state'] = int(data[172])
+
         # ---- SOC: uint8 at offset 173 (%) ----
-        if 173 < len(data):
+        if 174 <= len(data):
             soc_val = data[173]
             if 0 <= soc_val <= 100:
                 result['soc'] = float(soc_val)
@@ -355,11 +387,24 @@ class JKBMS485:
             if 0 <= cc < 65000:
                 result['cycle_count'] = cc
 
+        # ---- Cycle capacity: uint32le at offset 186 (mAh) ----
+        if 190 <= len(data):
+            cycle_cap = struct.unpack_from('<I', data, 186)[0]
+            result['cycle_capacity_ah'] = cycle_cap / 1000.0
+
         # ---- SOH: uint8 at offset 190 (%) ----
         if 190 < len(data):
             soh = data[190]
             if 0 < soh <= 100:
                 result['soh'] = float(soh)
+
+        # ---- Precharge state: uint8 at 191 ----
+        if 192 <= len(data):
+            result['precharge_state'] = int(data[191])
+
+        # ---- User Alarm 1: uint16le at 192 ----
+        if 194 <= len(data):
+            result['user_alarm_1'] = struct.unpack_from('<H', data, 192)[0]
 
         # ---- Total runtime: uint32le at offset 194 (s) ----
         if 198 <= len(data):
@@ -372,17 +417,65 @@ class JKBMS485:
             result['discharge_mos'] = bool(data[199])
             result['balance_mos'] = bool(data[200])
 
+        # ---- Protect release delays (202-213) ----
+        if 214 <= len(data):
+            result['time_de_ocpr'] = struct.unpack_from('<H', data, 202)[0]
+            result['time_de_scpr'] = struct.unpack_from('<H', data, 204)[0]
+            result['time_ch_ocpr'] = struct.unpack_from('<H', data, 206)[0]
+            result['time_ch_uvpr'] = struct.unpack_from('<H', data, 208)[0]
+            result['time_uvpr'] = struct.unpack_from('<H', data, 210)[0]
+            result['time_ovpr'] = struct.unpack_from('<H', data, 212)[0]
+
+        # ---- Temp sensor presence (214), Heating state (215) ----
+        if 216 <= len(data):
+            result['temp_sensor_presence'] = int(data[214])
+            result['heating_state'] = int(data[215])
+
+        # ---- Emergency switch time (218-219) ----
+        if 220 <= len(data):
+            result['time_emergency'] = struct.unpack_from('<H', data, 218)[0]
+
+        # ---- Correct factor / sensor voltage (220-229) ----
+        if 230 <= len(data):
+            result['vol_bat_cur_correct'] = struct.unpack_from('<H', data, 220)[0]
+            result['vol_charge_cur'] = struct.unpack_from('<H', data, 222)[0]
+            result['vol_discharge_cur'] = struct.unpack_from('<H', data, 224)[0]
+            result['bat_vol_correct'] = struct.unpack_from('<f', data, 226)[0]
+
         # ---- Total voltage (standard precision): uint16le at 234 (/100 = V) ----
         if 236 <= len(data):
             raw_sv = struct.unpack_from('<H', data, 234)[0]
             if raw_sv > 0:
-                # Only set if voltage_v wasn't set from offset 150
                 if 'voltage_v' not in result:
                     result['voltage_v'] = raw_sv / 100.0
 
+        # ---- HeatCurrent (236-237) ----
+        if 238 <= len(data):
+            result['heat_current_a'] = struct.unpack_from('<h', data, 236)[0] / 1000.0
+
+        # ---- Charger plugged (245) ----
+        if 246 <= len(data):
+            result['charger_plugged'] = int(data[245])
+
+        # ---- SysRunTicks (246-249) ----
+        if 250 <= len(data):
+            result['sys_run_ticks'] = struct.unpack_from('<I', data, 246)[0]
+
+        # ---- RTC Time (262-265) ----
+        if 266 <= len(data):
+            result['rtc_time'] = struct.unpack_from('<I', data, 262)[0]
+
         # ---- Fault record count: uint8 at offset 266 ----
-        if 266 < len(data):
+        if 267 <= len(data):
             result['fault_count'] = int(data[266])
+
+        # ---- TimeEnterSleep (270-273) ----
+        if 274 <= len(data):
+            result['time_enter_sleep'] = struct.unpack_from('<I', data, 270)[0]
+
+        # ---- PCLModuleSta (274) ----
+        if 275 <= len(data):
+            result['pcl_module_sta'] = int(data[274])
 
         self.logger.debug(f"Parsed 55AA frame: {result}")
         return result
@@ -589,6 +682,73 @@ class JKBMS485:
         self.logger.debug(f"Parsed static frame: {result}")
         return result
 
+    def parse_jkbms_setup_frame(self, data):
+        """
+        Parse JK BMS setup data 55AA frame (from register 0x161E).
+        """
+        result = {}
+        if not data or len(data) < 6 or data[0] != 0x55 or data[1] != 0xAA:
+            return result
+
+        if 50 <= len(data):
+            result['vol_smart_sleep'] = struct.unpack_from('<I', data, 6)[0] / 1000.0
+            result['vol_cell_uvp'] = struct.unpack_from('<I', data, 10)[0] / 1000.0
+            result['vol_cell_uvpr'] = struct.unpack_from('<I', data, 14)[0] / 1000.0
+            result['vol_cell_ovp'] = struct.unpack_from('<I', data, 18)[0] / 1000.0
+            result['vol_cell_ovpr'] = struct.unpack_from('<I', data, 22)[0] / 1000.0
+            result['vol_balan_trig'] = struct.unpack_from('<I', data, 26)[0] / 1000.0
+            result['vol_soc_100'] = struct.unpack_from('<I', data, 30)[0] / 1000.0
+            result['vol_soc_0'] = struct.unpack_from('<I', data, 34)[0] / 1000.0
+            result['vol_bat_uvp'] = struct.unpack_from('<I', data, 38)[0] / 1000.0
+            result['vol_bat_ovp'] = struct.unpack_from('<I', data, 42)[0] / 1000.0
+            result['vol_sys_pwr_off'] = struct.unpack_from('<I', data, 46)[0] / 1000.0
+
+        if 82 <= len(data):
+            result['cur_bat_c_oc'] = struct.unpack_from('<i', data, 50)[0] / 1000.0
+            result['tim_bat_c_ocp_dly'] = struct.unpack_from('<I', data, 54)[0]
+            result['tim_bat_c_ocpr_dly'] = struct.unpack_from('<I', data, 58)[0]
+            result['cur_bat_dc_oc'] = struct.unpack_from('<I', data, 62)[0] / 1000.0
+            result['tim_bat_dc_ocp_dly'] = struct.unpack_from('<I', data, 66)[0]
+            result['tim_bat_dc_ocpr_dly'] = struct.unpack_from('<I', data, 70)[0]
+            result['tim_bat_scpr_dly'] = struct.unpack_from('<I', data, 74)[0]
+            result['cur_balan_max'] = struct.unpack_from('<I', data, 78)[0] / 1000.0
+
+        if 114 <= len(data):
+            result['tmp_bat_cot'] = struct.unpack_from('<i', data, 82)[0] / 10.0
+            result['tmp_bat_cotpr'] = struct.unpack_from('<i', data, 86)[0] / 10.0
+            result['tmp_bat_dot'] = struct.unpack_from('<i', data, 90)[0] / 10.0
+            result['tmp_bat_dotpr'] = struct.unpack_from('<i', data, 94)[0] / 10.0
+            result['tmp_bat_cut'] = struct.unpack_from('<i', data, 98)[0] / 10.0
+            result['tmp_bat_cutpr'] = struct.unpack_from('<i', data, 102)[0] / 10.0
+            result['tmp_mos_otp'] = struct.unpack_from('<i', data, 106)[0] / 10.0
+            result['tmp_mos_otpr'] = struct.unpack_from('<i', data, 110)[0] / 10.0
+
+        if 138 <= len(data):
+            result['cell_count'] = struct.unpack_from('<I', data, 114)[0]
+            result['bat_charge_en'] = struct.unpack_from('<I', data, 118)[0]
+            result['bat_discharge_en'] = struct.unpack_from('<I', data, 122)[0]
+            result['balan_en'] = struct.unpack_from('<I', data, 126)[0]
+            result['cap_bat_cell'] = struct.unpack_from('<I', data, 130)[0] / 1000.0
+            result['scp_delay'] = struct.unpack_from('<I', data, 134)[0]
+
+        if 142 <= len(data):
+            result['vol_start_balan'] = struct.unpack_from('<I', data, 138)[0] / 1000.0
+
+        if 270 <= len(data):
+            calibs = []
+            for i in range(32):
+                calibs.append(struct.unpack_from('<i', data, 142 + i*4)[0])
+            result['wire_res_calib'] = calibs
+
+        if 287 <= len(data):
+            result['dev_addr'] = struct.unpack_from('<I', data, 270)[0]
+            result['tim_precharge'] = struct.unpack_from('<I', data, 274)[0]
+            result['func_bit_field'] = struct.unpack_from('<H', data, 282)[0]
+            result['tim_smart_sleep'] = int(data[286])
+
+        self.logger.debug(f"Parsed setup frame: {result}")
+        return result
+
     def parse_alarm_response(self, response):
         """
         Parse alarm response from Modbus FC 0x03 read of 0x12A0.
@@ -618,30 +778,30 @@ class JKBMS485:
     def _decode_alarms(self, alarm_value):
         """Decode 32-bit alarm bitfield into structured dict."""
         alarm_bits = {
-            0: "Balancing resistance too high",
+            0: "Battery SCP",
             1: "MOS over-temperature protection",
-            2: "Number of cells does not match parameter",
-            3: "Abnormal current sensor",
-            4: "Cell over-voltage protection",
-            5: "Battery over-voltage protection",
-            6: "Overcurrent charge protection",
-            7: "Charge short-circuit protection",
-            8: "Over-temperature charge protection",
-            9: "Low temperature charge protection",
-            10: "Internal communication anomaly",
-            11: "Cell under-voltage protection",
-            12: "Battery under-voltage protection",
-            13: "Overcurrent discharge protection",
-            14: "Discharge short-circuit protection",
-            15: "Over-temperature discharge protection",
-            16: "Charge MOS anomaly",
-            17: "Discharge MOS anomaly",
+            2: "Cell qty mismatch",
+            3: "Cell OVP",
+            4: "Cell UVP",
+            5: "Battery OVP",
+            6: "Battery UVP",
+            7: "Charge OCP",
+            8: "Discharge OCP",
+            9: "Charge over-temperature",
+            10: "Aux CPU comm fault",
+            11: "Cell UVP (2nd)",
+            12: "Battery OVP (2nd)",
+            13: "Battery UVP (2nd)",
+            14: "Charge OCP (2nd)",
+            15: "Discharge OCP (2nd)",
+            16: "Charge low-temperature protection",
+            17: "Discharge over-temperature",
             18: "GPS disconnected",
-            19: "Please modify the authorization password in time",
-            20: "Discharge activation failure",
-            21: "Battery over-temperature alarm",
+            19: "Password modify reminder",
+            20: "Discharge activate failure",
+            21: "Bat temp sensor anomaly",
             22: "Temperature sensor anomaly",
-            23: "Parallel module anomaly",
+            23: "Parallel module fault",
         }
 
         active = {}
@@ -658,69 +818,31 @@ class JKBMS485:
     # ---------------------------------------------------------------------------
     # Data retrieval methods
     # ---------------------------------------------------------------------------
-    def get_dynamic_data(self):
+    def get_all_frames_data(self):
         """
-        Read JK BMS dynamic data from passively received broadcast.
-        The BMS automatically broadcasts 55AA frames — no command needed.
-
-        Dynamic frames are identified by the trailing Modbus ACK register = 0x1620.
-        byte[4] in the 55AA header is the Pack ID, NOT a frame type indicator.
-
-        Returns parsed 55AA dynamic frame dict or None.
+        Fetch all available 55AA frames (Dynamic, Setup, Static) from passively received broadcast.
+        Returns three dictionaries: dynamic_results, setup_results, static_results.
         """
-        def _try_frames(frame_list):
-            for frame, reg_addr in frame_list:
-                if reg_addr != 0x1620:
-                    self.logger.debug(
-                        f"get_dynamic_data: skipping reg=0x{reg_addr:04X} (not dynamic 0x1620)"
-                    )
-                    continue
-                result = self.parse_jkbms_55aa_frame(frame)
-                if result.get('cell_voltages'):
-                    if self.debug and self.logger.isEnabledFor(logging.DEBUG):
-                        self.dump_frame_analysis(frame)
-                    return result
-                else:
-                    self.logger.warning(
-                        f"get_dynamic_data: dynamic frame (reg=0x1620) parsed but no cell_voltages found. "
-                        f"pack_id={frame[4]}, result={result}"
-                    )
-            return None
+        dynamic_results = {}
+        setup_results = {}
+        static_results = {}
 
-        # First attempt
         frames = self.receive_55aa_frames(timeout=1.0)
-        result = _try_frames(frames)
-        if result:
-            return result
+        for frame, reg_addr, pack_id in frames:
+            if reg_addr == 0x1620:
+                res = self.parse_jkbms_55aa_frame(frame)
+                if res.get('cell_voltages'):
+                    dynamic_results[pack_id] = res
+            elif reg_addr == 0x161E:
+                res = self.parse_jkbms_setup_frame(frame)
+                if res:
+                    setup_results[pack_id] = res
+            elif reg_addr == 0x161C:
+                res = self.parse_jkbms_static_frame(frame)
+                if res:
+                    static_results[pack_id] = res
 
-        # No valid dynamic frame yet — wait for next broadcast cycle
-        self.logger.debug("No dynamic 55AA frame in first read, waiting for next broadcast...")
-        import time
-        time.sleep(0.5)
-        frames = self.receive_55aa_frames(timeout=2.0)
-        result = _try_frames(frames)
-        if result:
-            return result
-
-        self.logger.warning("No valid dynamic 55AA frame received after waiting")
-        return None
-
-    def get_static_data(self):
-        """
-        Read JK BMS static data from passively received broadcast.
-        Static frames are identified by trailing ACK register 0x161C.
-        Returns parsed 55AA frame dict with version info or None.
-        """
-        frame_list = self.receive_55aa_frames(timeout=1.0)
-        for frame, reg_addr in frame_list:
-            if reg_addr != 0x161C:
-                continue
-            result = self.parse_jkbms_static_frame(frame)
-            if result:
-                return result
-
-        self.logger.debug("No static 55AA frame (reg=0x161C) in buffer")
-        return None
+        return dynamic_results, setup_results, static_results
 
     def get_alarm_data(self):
         """
@@ -760,85 +882,193 @@ class JKBMS485:
         """
         self.logger.debug("Starting to get JK BMS analog data")
 
-        # Query dynamic data (contains cells, current, voltage, SOC, temps)
-        dynamic = self.get_dynamic_data()
-        if not dynamic:
+        dynamic_results, setup_results, static_results = self.get_all_frames_data()
+        if not dynamic_results:
             self.logger.warning("Failed to get dynamic data, retrying once...")
             import time
             time.sleep(0.5)
-            dynamic = self.get_dynamic_data()
-            if not dynamic:
+            dyn2, set2, stat2 = self.get_all_frames_data()
+            dynamic_results.update(dyn2)
+            setup_results.update(set2)
+            static_results.update(stat2)
+            if not dynamic_results:
                 self.logger.error("Failed to get dynamic data after retry")
-                return None
+                return []
 
-        # Query static data for version info (best effort)
-        static = self.get_static_data()
+        # Request setup frame if not captured passively
+        if not setup_results:
+            self.logger.debug("Setup frame not captured passively, sending active request...")
+            cmd = self.build_write_command(self.REG_SETUP)
+            self.bms_comm.send_data(cmd)
+            import time
+            time.sleep(0.5)
+            _, set2, _ = self.get_all_frames_data()
+            setup_results.update(set2)
 
-        # Build output dict compatible with PACE BMS format
-        pack_data = {}
+        pack_list = []
+        for pack_id, dynamic in dynamic_results.items():
+            static = static_results.get(pack_id) if static_results else None
+            setup = setup_results.get(pack_id) if setup_results else None
+            pack_data = {}
+            pack_data['pack_id'] = pack_id
 
-        # Cell voltages (in mV, already parsed from 55AA frame)
-        cells = dynamic.get('cell_voltages', [])
-        pack_data['cell_voltages'] = cells
-        pack_data['view_num_cells'] = len(cells)
-        if cells:
-            pack_data['cell_voltage_max'] = max(cells)
-            pack_data['cell_voltage_min'] = min(cells)
-            pack_data['cell_voltage_max_index'] = cells.index(max(cells)) + 1
-            pack_data['cell_voltage_min_index'] = cells.index(min(cells)) + 1
-            pack_data['cell_voltage_diff'] = max(cells) - min(cells)
-        else:
-            pack_data['cell_voltage_max'] = 0
-            pack_data['cell_voltage_min'] = 0
-            pack_data['cell_voltage_max_index'] = 0
-            pack_data['cell_voltage_min_index'] = 0
-            pack_data['cell_voltage_diff'] = 0
+            # Cell voltages
+            cells = dynamic.get('cell_voltages', [])
+            pack_data['cell_voltages'] = cells
+            pack_data['view_num_cells'] = len(cells)
+            if cells:
+                # pacebms 命名格式: cell_voltage_max, cell_voltage_min
+                pack_data['cell_voltage_max'] = max(cells)
+                pack_data['cell_voltage_min'] = min(cells)
+                # pacebms 使用 1-based index，协议提取的是 0-based
+                pack_data['cell_voltage_max_index'] = dynamic.get('cell_voltage_max_index', cells.index(max(cells))) + 1
+                pack_data['cell_voltage_min_index'] = dynamic.get('cell_voltage_min_index', cells.index(min(cells))) + 1
+                pack_data['cell_voltage_diff'] = dynamic.get('cell_voltage_diff', max(cells) - min(cells))
+                
+                if 'cell_voltage_avg' in dynamic:
+                    pack_data['cell_voltage_avg'] = dynamic['cell_voltage_avg']
+            else:
+                pack_data['cell_voltage_max'] = 0
+                pack_data['cell_voltage_min'] = 0
+                pack_data['cell_voltage_max_index'] = 0
+                pack_data['cell_voltage_min_index'] = 0
+                pack_data['cell_voltage_diff'] = 0
 
-        # Temperatures
-        temps = []
-        for key in ['temp_bat1', 'temp_bat2', 'temp_bat3', 'temp_bat4', 'temp_mos']:
-            val = dynamic.get(key)
-            if val is not None and -50 <= val <= 150:
-                temps.append(round(val, 1))
-        pack_data['temperatures'] = temps
-        pack_data['view_num_temps'] = len(temps)
+            # Cell resistances
+            if 'cell_resistances' in dynamic:
+                pack_data['cell_resistances'] = dynamic['cell_resistances']
 
-        # Current (A)
-        pack_data['view_current'] = dynamic.get('current_a', 0.0)
+            # Temperatures (Protocol specifies Bat1-5 and MOS)
+            temps = []
+            for key in ['temp_bat1', 'temp_bat2', 'temp_bat3', 'temp_bat4', 'temp_bat5', 'temp_mos']:
+                val = dynamic.get(key)
+                if val is not None and -50 <= val <= 150:
+                    temps.append(round(val, 1))
+            pack_data['temperatures'] = temps
+            pack_data['view_num_temps'] = len(temps)
 
-        # Voltage (V)
-        pack_data['view_voltage'] = dynamic.get('voltage_v', 0.0)
+            # Current, Voltage, Power
+            pack_data['view_current'] = dynamic.get('current_a', 0.0)
+            pack_data['view_voltage'] = dynamic.get('voltage_v', 0.0)
+            pack_data['view_power'] = dynamic.get('power_kw', 0.0)
 
-        # Power (kW)
-        power_kw = dynamic.get('power_kw', 0.0)
-        pack_data['view_power'] = power_kw
+            # Balance current
+            if 'balance_current_a' in dynamic:
+                pack_data['view_balance_current'] = dynamic['balance_current_a']
 
-        # Cumulative energy
-        charged_total, discharged_total = self.calculate_cumulative_energy(power_kw)
-        pack_data['view_energy_charged'] = round(charged_total, 2)
-        pack_data['view_energy_discharged'] = round(discharged_total, 2)
+            # SOC & capacity
+            pack_data['view_SOC'] = dynamic.get('soc', 0.0)
+            pack_data['view_remain_capacity'] = dynamic.get('remain_capacity_ah', 0.0)
+            pack_data['view_full_capacity'] = dynamic.get('full_capacity_ah', 0.0)
+            # view_design_capacity 不在 DYNAMIC 帧协议内，取消发送
+            
+            pack_data['view_cycle_number'] = dynamic.get('cycle_count', 0)
+            if 'cycle_capacity_ah' in dynamic:
+                pack_data['view_cycle_capacity'] = dynamic['cycle_capacity_ah']
+            pack_data['view_SOH'] = dynamic.get('soh', 0.0)
 
-        # SOC & capacity
-        pack_data['view_SOC'] = dynamic.get('soc', 0.0)
-        pack_data['view_remain_capacity'] = dynamic.get('remain_capacity_ah', 0.0)
-        pack_data['view_full_capacity'] = dynamic.get('full_capacity_ah', 0.0)
-        pack_data['view_design_capacity'] = pack_data['view_full_capacity']
-        pack_data['view_cycle_number'] = dynamic.get('cycle_count', 0)
-        pack_data['view_SOH'] = dynamic.get('soh', 0.0)
+            if 'total_runtime_s' in dynamic:
+                pack_data['view_run_time'] = dynamic['total_runtime_s']
+            
+            if 'battery_state' in dynamic:
+                pack_data['battery_state'] = dynamic['battery_state']
 
-        # Balance current
-        pack_data['view_balance_current'] = dynamic.get('balance_current_a', 0.0)
+            if 'charge_mos' in dynamic:
+                pack_data['charge_mos_state'] = dynamic['charge_mos']
+                pack_data['discharge_mos_state'] = dynamic['discharge_mos']
+                pack_data['balance_mos_state'] = dynamic['balance_mos']
 
-        # Version info
-        if static:
-            pack_data['hardware_version'] = static.get('hardware_version', '')
-            pack_data['software_version'] = static.get('software_version', '')
-        else:
-            pack_data['hardware_version'] = ''
-            pack_data['software_version'] = ''
+            mappings = {
+                'cell_exist_state': 'view_cell_exist_state',
+                'wire_alarm': 'view_wire_alarm',
+                'alarm_bits': 'view_alarm_bits',
+                'precharge_state': 'view_precharge_state',
+                'user_alarm_1': 'view_user_alarm_1',
+                'time_de_ocpr': 'view_time_de_ocpr',
+                'time_de_scpr': 'view_time_de_scpr',
+                'time_ch_ocpr': 'view_time_ch_ocpr',
+                'time_ch_uvpr': 'view_time_ch_uvpr',
+                'time_uvpr': 'view_time_uvpr',
+                'time_ovpr': 'view_time_ovpr',
+                'temp_sensor_presence': 'view_temp_sensor_presence',
+                'heating_state': 'view_heating_state',
+                'time_emergency': 'view_time_emergency',
+                'vol_bat_cur_correct': 'view_vol_bat_cur_correct',
+                'vol_charge_cur': 'view_vol_charge_cur',
+                'vol_discharge_cur': 'view_vol_discharge_cur',
+                'bat_vol_correct': 'view_bat_vol_correct',
+                'heat_current_a': 'view_heat_current',
+                'charger_plugged': 'view_charger_plugged',
+                'sys_run_ticks': 'view_sys_run_ticks',
+                'rtc_time': 'view_rtc_time',
+                'fault_count': 'view_fault_count',
+                'time_enter_sleep': 'view_time_enter_sleep',
+                'pcl_module_sta': 'view_pcl_module_sta'
+            }
+            for dyn_k, pac_k in mappings.items():
+                if dyn_k in dynamic:
+                    pack_data[pac_k] = dynamic[dyn_k]
 
-        pack_list = [pack_data]
-        self.logger.debug(f"Finished getting JK BMS analog data: {pack_data}")
+            # SETUP Data Mapping
+            if setup:
+                setup_mappings = {
+                    'vol_smart_sleep': 'view_vol_smart_sleep',
+                    'vol_cell_uvp': 'view_vol_cell_uvp',
+                    'vol_cell_uvpr': 'view_vol_cell_uvpr',
+                    'vol_cell_ovp': 'view_vol_cell_ovp',
+                    'vol_cell_ovpr': 'view_vol_cell_ovpr',
+                    'vol_balan_trig': 'view_vol_balan_trig',
+                    'vol_soc_100': 'view_vol_soc_100',
+                    'vol_soc_0': 'view_vol_soc_0',
+                    'vol_bat_uvp': 'view_vol_bat_uvp',
+                    'vol_bat_ovp': 'view_vol_bat_ovp',
+                    'vol_sys_pwr_off': 'view_vol_sys_pwr_off',
+                    'cur_bat_c_oc': 'view_cur_bat_c_oc',
+                    'tim_bat_c_ocp_dly': 'view_tim_bat_c_ocp_dly',
+                    'tim_bat_c_ocpr_dly': 'view_tim_bat_c_ocpr_dly',
+                    'cur_bat_dc_oc': 'view_cur_bat_dc_oc',
+                    'tim_bat_dc_ocp_dly': 'view_tim_bat_dc_ocp_dly',
+                    'tim_bat_dc_ocpr_dly': 'view_tim_bat_dc_ocpr_dly',
+                    'tim_bat_scpr_dly': 'view_tim_bat_scpr_dly',
+                    'cur_balan_max': 'view_cur_balan_max',
+                    'tmp_bat_cot': 'view_tmp_bat_cot',
+                    'tmp_bat_cotpr': 'view_tmp_bat_cotpr',
+                    'tmp_bat_dot': 'view_tmp_bat_dot',
+                    'tmp_bat_dotpr': 'view_tmp_bat_dotpr',
+                    'tmp_bat_cut': 'view_tmp_bat_cut',
+                    'tmp_bat_cutpr': 'view_tmp_bat_cutpr',
+                    'tmp_mos_otp': 'view_tmp_mos_otp',
+                    'tmp_mos_otpr': 'view_tmp_mos_otpr',
+                    'cell_count': 'view_setup_cell_count',
+                    'bat_charge_en': 'view_bat_charge_en',
+                    'bat_discharge_en': 'view_bat_discharge_en',
+                    'balan_en': 'view_balan_en',
+                    'cap_bat_cell': 'view_cap_bat_cell',
+                    'scp_delay': 'view_scp_delay',
+                    'vol_start_balan': 'view_vol_start_balan',
+                    'dev_addr': 'view_dev_addr',
+                    'tim_precharge': 'view_tim_precharge',
+                    'func_bit_field': 'view_func_bit_field',
+                    'tim_smart_sleep': 'view_tim_smart_sleep'
+                }
+                for set_k, pac_k in setup_mappings.items():
+                    if set_k in setup:
+                        pack_data[pac_k] = setup[set_k]
+                
+                if 'wire_res_calib' in setup:
+                    pack_data['wire_res_calib'] = setup['wire_res_calib']
+
+            # Version info
+            if static:
+                pack_data['hardware_version'] = static.get('hardware_version', '')
+                pack_data['software_version'] = static.get('software_version', '')
+            else:
+                pack_data['hardware_version'] = ''
+                pack_data['software_version'] = ''
+
+            pack_list.append(pack_data)
+
+        self.logger.debug(f"Finished getting JK BMS analog data: {pack_list}")
         return pack_list
 
     # ---------------------------------------------------------------------------
@@ -849,145 +1079,154 @@ class JKBMS485:
         """
         Get all analog data from JK BMS in JK-native format.
 
-        Returns a single dict with clean JK key names (no 'view_' prefix).
-        Unlike get_analog_data(), this does NOT wrap in a list or
-        convert to PACE-compatible format.
-
-        Keys returned:
-            cell_voltages, cell_voltage_max, cell_voltage_min,
-            cell_voltage_diff, num_cells, temperatures, num_temps,
-            temp_mos, current, voltage, power, soc, remain_capacity,
-            full_capacity, design_capacity, cycle_count, soh,
-            balance_current, charge_mos, discharge_mos, balance_mos,
-            energy_charged, energy_discharged, hardware_version,
-            software_version
+        Returns a list of dicts with clean JK key names (no 'view_' prefix).
+        Unlike get_analog_data(), this does NOT convert to PACE-compatible format.
         """
         self.logger.debug("Getting JK BMS native data")
 
-        dynamic = self.get_dynamic_data()
-        if not dynamic:
+        dynamic_results, setup_results, static_results = self.get_all_frames_data()
+        if not dynamic_results:
             self.logger.warning("Failed to get dynamic data, retrying once...")
             import time
             time.sleep(0.5)
-            dynamic = self.get_dynamic_data()
-            if not dynamic:
+            dyn2, set2, stat2 = self.get_all_frames_data()
+            dynamic_results.update(dyn2)
+            setup_results.update(set2)
+            static_results.update(stat2)
+            if not dynamic_results:
                 self.logger.error("Failed to get dynamic data after retry")
-                return None
+                return []
 
-        static = self.get_static_data()
-        data = {}
+        pack_list = []
 
-        # Cell voltages
-        cells = dynamic.get('cell_voltages', [])
-        data['cell_voltages'] = cells
-        data['num_cells'] = len(cells)
-        if cells:
-            data['cell_voltage_max'] = max(cells)
-            data['cell_voltage_min'] = min(cells)
-            data['cell_voltage_diff'] = max(cells) - min(cells)
+        for pack_id, dynamic in dynamic_results.items():
+            static = static_results.get(pack_id) if static_results else None
+            setup = setup_results.get(pack_id) if setup_results else None
+            data = {}
+            data['pack_id'] = pack_id
 
-        # Temperatures (battery NTCs only)
-        temps = []
-        for key in ['temp_bat1', 'temp_bat2', 'temp_bat3', 'temp_bat4']:
-            val = dynamic.get(key)
-            if val is not None:
-                temps.append(round(val, 1))
-        data['temperatures'] = temps
-        data['num_temps'] = len(temps)
+            # Cell voltages
+            cells = dynamic.get('cell_voltages', [])
+            data['cell_voltages'] = cells
+            data['num_cells'] = len(cells)
+            if cells:
+                data['cell_voltage_max'] = max(cells)
+                data['cell_voltage_min'] = min(cells)
+                data['cell_voltage_diff'] = max(cells) - min(cells)
 
-        mos_temp = dynamic.get('temp_mos')
-        if mos_temp is not None:
-            data['temp_mos'] = round(mos_temp, 1)
+            # Temperatures (battery NTCs only)
+            temps = []
+            for key in ['temp_bat1', 'temp_bat2', 'temp_bat3', 'temp_bat4', 'temp_bat5']:
+                val = dynamic.get(key)
+                if val is not None:
+                    temps.append(round(val, 1))
+            data['temperatures'] = temps
+            data['num_temps'] = len(temps)
 
-        # Electrical
-        data['current'] = dynamic.get('current_a', 0.0)
-        data['voltage'] = dynamic.get('voltage_v', 0.0)
-        data['power'] = dynamic.get('power_kw', 0.0)
+            mos_temp = dynamic.get('temp_mos')
+            if mos_temp is not None:
+                data['temp_mos'] = round(mos_temp, 1)
 
-        # Capacity / SOC
-        data['soc'] = dynamic.get('soc', 0.0)
-        data['remain_capacity'] = dynamic.get('remain_capacity_ah', 0.0)
-        data['full_capacity'] = dynamic.get('full_capacity_ah', 0.0)
-        data['design_capacity'] = data['full_capacity']
-        data['cycle_count'] = dynamic.get('cycle_count', 0)
-        data['soh'] = dynamic.get('soh', 0.0)
+            # Electrical
+            data['current'] = dynamic.get('current_a', 0.0)
+            data['voltage'] = dynamic.get('voltage_v', 0.0)
+            data['power'] = dynamic.get('power_kw', 0.0)
 
-        # Balance
-        data['balance_current'] = dynamic.get('balance_current_a', 0.0)
+            # Capacity / SOC
+            data['soc'] = dynamic.get('soc', 0.0)
+            data['remain_capacity'] = dynamic.get('remain_capacity_ah', 0.0)
+            data['full_capacity'] = dynamic.get('full_capacity_ah', 0.0)
+            data['design_capacity'] = data['full_capacity']
+            data['cycle_count'] = dynamic.get('cycle_count', 0)
+            data['soh'] = dynamic.get('soh', 0.0)
 
-        # MOS states
-        data['charge_mos'] = dynamic.get('charge_mos', False)
-        data['discharge_mos'] = dynamic.get('discharge_mos', False)
-        data['balance_mos'] = dynamic.get('balance_mos', False)
+            # Balance
+            data['balance_current'] = dynamic.get('balance_current_a', 0.0)
 
-        # Cumulative energy
-        power_kw = dynamic.get('power_kw', 0.0)
-        charged, discharged = self.calculate_cumulative_energy(power_kw)
-        data['energy_charged'] = round(charged, 2)
-        data['energy_discharged'] = round(discharged, 2)
+            # MOS states
+            data['charge_mos'] = dynamic.get('charge_mos', False)
+            data['discharge_mos'] = dynamic.get('discharge_mos', False)
+            data['balance_mos'] = dynamic.get('balance_mos', False)
 
-        # Version info
-        if static:
-            data['hardware_version'] = static.get('hardware_version', '')
-            data['software_version'] = static.get('software_version', '')
-        else:
-            data['hardware_version'] = ''
-            data['software_version'] = ''
+            # Cumulative energy
+            power_kw = dynamic.get('power_kw', 0.0)
+            charged, discharged = self.calculate_cumulative_energy(pack_id, power_kw)
+            data['energy_charged'] = round(charged, 2)
+            data['energy_discharged'] = round(discharged, 2)
 
-        self.logger.debug(f"Finished getting JK BMS native data: {data}")
-        return data
+            # Advanced details (requested by user)
+            if 'cell_resistances' in dynamic:
+                data['cell_resistances'] = dynamic['cell_resistances']
+            if 'wire_alarm' in dynamic:
+                data['wire_alarm'] = dynamic['wire_alarm']
+            data['precharge_state'] = bool(dynamic.get('precharge_state', 0))
+            if 'user_alarm_1' in dynamic:
+                data['user_alarm_1'] = dynamic['user_alarm_1']
+            if 'total_runtime_s' in dynamic:
+                data['total_runtime'] = round(dynamic['total_runtime_s'] / 3600.0, 2)
+            if 'temp_sensor_presence' in dynamic:
+                presence = dynamic['temp_sensor_presence']
+                data['temp_sensor_mos_ok'] = bool(presence & (1 << 0))
+                data['temp_sensor_bat1_ok'] = bool(presence & (1 << 1))
+                data['temp_sensor_bat2_ok'] = bool(presence & (1 << 2))
+                data['temp_sensor_bat3_ok'] = bool(presence & (1 << 3))
+                data['temp_sensor_bat4_ok'] = bool(presence & (1 << 4))
+                data['temp_sensor_bat5_ok'] = bool(presence & (1 << 5))
+            data['heating_state'] = bool(dynamic.get('heating_state', 0))
+            if 'heat_current_a' in dynamic:
+                data['heat_current'] = dynamic['heat_current_a']
+            data['charger_plugged'] = bool(dynamic.get('charger_plugged', 0))
+            if 'sys_run_ticks' in dynamic:
+                # SysRunTicks is in 0.1s units
+                total_seconds = dynamic['sys_run_ticks'] // 10
+                days = total_seconds // 86400
+                hours = (total_seconds % 86400) // 3600
+                minutes = (total_seconds % 3600) // 60
+                seconds = total_seconds % 60
+                data['system_uptime'] = f"{days}d {hours}h {minutes}m {seconds}s"
+            if 'rtc_time' in dynamic:
+                import datetime
+                try:
+                    epoch = datetime.datetime(2020, 1, 1)
+                    dt = epoch + datetime.timedelta(seconds=dynamic['rtc_time'])
+                    data['bms_time'] = dt.strftime('%Y-%m-%d %H:%M:%S')
+                except Exception:
+                    data['bms_time'] = str(dynamic['rtc_time'])
+            if 'fault_count' in dynamic:
+                data['fault_count'] = dynamic['fault_count']
+            if 'time_enter_sleep' in dynamic:
+                data['time_enter_sleep_h'] = round(dynamic['time_enter_sleep'] / 3600.0, 2)
+            data['pcl_module_sta'] = bool(dynamic.get('pcl_module_sta', 0))
 
-    def parse_jkbms_setup_frame(self, data):
-        """
-        Parse JK BMS setup/config 55AA frame (register 0x161E).
+            # Setup / Config info
+            if setup:
+                # Decode func_bit_field if present
+                if 'func_bit_field' in setup:
+                    fbits = setup['func_bit_field']
+                    setup['func_heat_en'] = bool(fbits & (1 << 0))
+                    setup['func_disable_temp_sensor'] = bool(fbits & (1 << 1))
+                    setup['func_gps_heartbeat'] = bool(fbits & (1 << 2))
+                    setup['func_port_switch_rs485'] = bool(fbits & (1 << 3))
+                    setup['func_lcd_always_on'] = bool(fbits & (1 << 4))
+                    setup['func_special_charger'] = bool(fbits & (1 << 5))
+                    setup['func_smart_sleep'] = bool(fbits & (1 << 6))
+                    setup['func_disable_pcl_module'] = bool(fbits & (1 << 7))
+                    setup['func_timed_stored_data'] = bool(fbits & (1 << 8))
+                    setup['func_charging_float_mode'] = bool(fbits & (1 << 9))
+                data['settings'] = setup
 
-        The setup frame contains voltage thresholds, current limits,
-        and other configuration parameters stored as uint32le at
-        4-byte-aligned offsets (high 16 bits are typically 0x0000).
+            # Version info
+            if static:
+                data['hardware_version'] = static.get('hardware_version', '')
+                data['software_version'] = static.get('software_version', '')
+            else:
+                data['hardware_version'] = ''
+                data['software_version'] = ''
 
-        Offset mapping is firmware-version-dependent and **tentative**
-        for firmware 9.04 (16S LFP). Labels should be confirmed with
-        manufacturer documentation.
+            pack_list.append(data)
 
-        Args:
-            data: Raw 300-byte 55AA frame
-
-        Returns:
-            Dict with setup parameter keys, or empty dict on failure.
-        """
-        result = {}
-        if not data or len(data) < 6 or data[0] != 0x55 or data[1] != 0xAA:
-            return result
-
-        pack_id = data[4]
-        result['pack_id'] = pack_id
-
-        # Field map: offset -> (key, description)
-        # Values stored as uint32le; high 16 bits are padding (0x0000).
-        # These labels are best guesses for FW 9.04 (16S LFP).
-        fields = {
-            6:   ('cell_ovp_protect',       'Cell overvoltage protection'),
-            10:  ('cell_uvp_protect',       'Cell undervoltage protection'),
-            14:  ('cell_ovp_recover',       'Cell OVP recovery threshold'),
-            18:  ('cell_uvp_recover',       'Cell UVP recovery threshold'),
-            22:  ('battery_ovp_protect',    'Battery overvoltage protection'),
-            26:  ('balancer_start_delta',   'Balancer start voltage delta'),
-            30:  ('battery_uvp_protect',    'Battery undervoltage protection'),
-            34:  ('discharge_ocp_threshold','Discharge OCP threshold (mA)'),
-            38:  ('charge_ocp_threshold',   'Charge OCP threshold (mA)'),
-            42:  ('cell_balance_start',     'Cell balance start voltage'),
-            46:  ('cell_balance_stop',      'Cell balance stop voltage'),
-        }
-
-        for offset, (key, desc) in fields.items():
-            if offset + 4 <= len(data):
-                raw = struct.unpack_from('<I', data, offset)[0]
-                if 0 < raw < 50000:     # plausibility check
-                    result[key] = raw
-                    self.logger.debug(f"  setup[{offset:3d}] {key}: {raw} ({desc})")
-
-        self.logger.debug(f"Parsed setup frame (pack {pack_id}): {result}")
-        return result
+        self.logger.debug(f"Finished getting JK BMS native data: {pack_list}")
+        return pack_list
 
     def get_setup_data(self):
         """
@@ -1014,58 +1253,38 @@ class JKBMS485:
         """
         self.logger.debug("Starting to get JK BMS warning data")
 
-        alarm = self.get_alarm_data()
-        cells = self.get_dynamic_data()
+        dynamic_results, _, _ = self.get_all_frames_data()
+        
+        warning_data = []
+        for pack_id, dynamic in dynamic_results.items():
+            raw_alarm = dynamic.get('alarm_bits', 0)
+            decoded = self._decode_alarms(raw_alarm)
+            alarm_bits = decoded.get('alarms', {})
 
-        cell_count = len(cells.get('cell_voltages', [])) if cells else 0
+            pack_warning = {
+                'pack_id': pack_id,
+                'protect_state_1': {
+                    'protect_short_circuit': alarm_bits.get('Battery SCP', False),
+                    'protect_high_discharge_current': alarm_bits.get('Discharge OCP', False),
+                    'protect_high_charge_current': alarm_bits.get('Charge OCP', False),
+                    'protect_low_total_voltage': alarm_bits.get('Battery UVP', False),
+                    'protect_high_total_voltage': alarm_bits.get('Battery OVP', False),
+                    'protect_low_cell_voltage': alarm_bits.get('Cell UVP', False),
+                    'protect_high_cell_voltage': alarm_bits.get('Cell OVP', False),
+                },
+                'protect_state_2': {
+                    'protect_low_charge_temp': alarm_bits.get('Charge low-temperature protection', False),
+                    'protect_high_charge_temp': alarm_bits.get('Charge over-temperature', False),
+                    'protect_high_MOS_temp': alarm_bits.get('MOS over-temperature protection', False),
+                    'protect_high_discharge_temp': alarm_bits.get('Discharge over-temperature', False),
+                },
+                'fault_state': {
+                    'fault_cell': alarm_bits.get('Cell qty mismatch', False),
+                    'fault_NTC': alarm_bits.get('Temperature sensor anomaly', False) or alarm_bits.get('Bat temp sensor anomaly', False),
+                },
+            }
+            warning_data.append(pack_warning)
 
-        alarm_bits = {}
-        if alarm:
-            alarm_bits = alarm.get('alarms', {})
-
-        pack_warning = {
-            'cell_number': cell_count,
-            'cell_voltage_warnings': ['normal'] * cell_count,
-            'temp_sensor_number': 0,
-            'temp_sensor_warnings': [],
-            'warn_charge_current': 'normal',
-            'warn_total_voltage': 'normal',
-            'warn_discharge_current': 'normal',
-            'protect_state_1': {
-                'protect_short_circuit': alarm_bits.get('Discharge short-circuit protection', False),
-                'protect_high_discharge_current': alarm_bits.get('Overcurrent discharge protection', False),
-                'protect_high_charge_current': alarm_bits.get('Overcurrent charge protection', False),
-                'protect_low_total_voltage': alarm_bits.get('Battery under-voltage protection', False),
-                'protect_high_total_voltage': alarm_bits.get('Battery over-voltage protection', False),
-                'protect_low_cell_voltage': alarm_bits.get('Cell under-voltage protection', False),
-                'protect_high_cell_voltage': alarm_bits.get('Cell over-voltage protection', False),
-            },
-            'protect_state_2': {
-                'status_fully_charged': False,
-                'protect_low_env_temp': alarm_bits.get('Low temperature charge protection', False),
-                'protect_high_env_temp': alarm_bits.get('Over-temperature charge protection', False),
-                'protect_high_MOS_temp': alarm_bits.get('MOS over-temperature protection', False),
-                'protect_low_discharge_temp': alarm_bits.get('Low temperature charge protection', False),
-                'protect_low_charge_temp': alarm_bits.get('Low temperature charge protection', False),
-                'protect_high_discharge_temp': alarm_bits.get('Over-temperature discharge protection', False),
-                'protect_high_charge_temp': alarm_bits.get('Over-temperature charge protection', False),
-            },
-            'fault_state': {
-                'fault_sampling': alarm_bits.get('Abnormal current sensor', False),
-                'fault_cell': alarm_bits.get('Number of cells does not match parameter', False),
-                'fault_NTC': alarm_bits.get('Temperature sensor anomaly', False),
-                'fault_discharge_MOS': alarm_bits.get('Discharge MOS anomaly', False),
-                'fault_charge_MOS': alarm_bits.get('Charge MOS anomaly', False),
-            },
-            'instruction_state': {},
-            'control_state': {},
-            'balance_state_1': 0,
-            'balance_state_2': 0,
-            'warn_state_1': {},
-            'warn_state_2': {},
-        }
-
-        warning_data = [pack_warning]
         self.logger.debug(f"Finished getting JK BMS warning data: {warning_data}")
         return warning_data
 
@@ -1281,10 +1500,11 @@ class JKBMS485:
             self.ha_comm.publish_sensor_state(random_number, 'R', "random_number")
             self.ha_comm.publish_sensor_discovery("random_number", "R", icons['random_number'], deviceclasses['random_number'], stateclasses['random_number'])
 
-        pack_i = 0
         for pack in analog_data:
-            pack_i += 1
+            pack_i = pack.get('pack_id', 0) + 1
             for key, value in pack.items():
+                if key == 'pack_id':
+                    continue
                 unit = units.get(key, '')
                 icon = icons.get(key, '')
                 deviceclass = deviceclasses.get(key, '')
@@ -1345,10 +1565,11 @@ class JKBMS485:
             self.logger.error("No packs found")
             return None
 
-        pack_i = 0
         for pack in warn_data:
-            pack_i += 1
+            pack_i = pack.get('pack_id', 0) + 1
             for key, value in pack.items():
+                if key == 'pack_id':
+                    continue
                 if key == 'cell_voltage_warnings':
                     cell_i = 0
                     icon = "mdi:battery-heart-variant"
