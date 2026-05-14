@@ -1162,28 +1162,36 @@ class JKBMS485:
             if 'user_alarm_1' in dynamic:
                 data['user_alarm_1'] = dynamic['user_alarm_1']
             if 'total_runtime_s' in dynamic:
-                data['total_runtime_h'] = round(dynamic['total_runtime_s'] / 3600.0, 2)
+                data['total_runtime'] = round(dynamic['total_runtime_s'] / 3600.0, 2)
             if 'temp_sensor_presence' in dynamic:
-                data['temp_sensor_presence'] = dynamic['temp_sensor_presence']
+                presence = dynamic['temp_sensor_presence']
+                data['temp_sensor_presence'] = presence
+                data['temp_sensor_mos_ok'] = bool(presence & (1 << 0))
+                data['temp_sensor_bat1_ok'] = bool(presence & (1 << 1))
+                data['temp_sensor_bat2_ok'] = bool(presence & (1 << 2))
+                data['temp_sensor_bat3_ok'] = bool(presence & (1 << 3))
+                data['temp_sensor_bat4_ok'] = bool(presence & (1 << 4))
+                data['temp_sensor_bat5_ok'] = bool(presence & (1 << 5))
             data['heating_state'] = bool(dynamic.get('heating_state', 0))
             if 'heat_current_a' in dynamic:
                 data['heat_current'] = dynamic['heat_current_a']
             data['charger_plugged'] = bool(dynamic.get('charger_plugged', 0))
             if 'sys_run_ticks' in dynamic:
-                ticks = dynamic['sys_run_ticks']
-                days = ticks // 86400
-                hours = (ticks % 86400) // 3600
-                minutes = (ticks % 3600) // 60
-                seconds = ticks % 60
-                data['sys_run_ticks'] = f"{days}d {hours}h {minutes}m {seconds}s"
+                # SysRunTicks is in 0.1s units
+                total_seconds = dynamic['sys_run_ticks'] // 10
+                days = total_seconds // 86400
+                hours = (total_seconds % 86400) // 3600
+                minutes = (total_seconds % 3600) // 60
+                seconds = total_seconds % 60
+                data['system_uptime'] = f"{days}d {hours}h {minutes}m {seconds}s"
             if 'rtc_time' in dynamic:
                 import datetime
                 try:
                     epoch = datetime.datetime(2020, 1, 1)
                     dt = epoch + datetime.timedelta(seconds=dynamic['rtc_time'])
-                    data['rtc_time'] = dt.strftime('%Y-%m-%d %H:%M:%S')
+                    data['bms_time'] = dt.strftime('%Y-%m-%d %H:%M:%S')
                 except Exception:
-                    data['rtc_time'] = str(dynamic['rtc_time'])
+                    data['bms_time'] = str(dynamic['rtc_time'])
             if 'fault_count' in dynamic:
                 data['fault_count'] = dynamic['fault_count']
             if 'time_enter_sleep' in dynamic:

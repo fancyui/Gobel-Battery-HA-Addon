@@ -185,15 +185,15 @@ class HA_MQTT_JK:
             'software_version':  ('', 'mdi:application-cog', 'null', 'null'),
             'num_temps':         ('NTCs', 'mdi:database', 'null', 'measurement'),
             'temp_mos':          ('°C', 'mdi:thermometer', 'temperature', 'measurement'),
-            'total_runtime_h':   ('h', 'mdi:clock-outline', 'null', 'measurement'),
+            'total_runtime':      ('h', 'mdi:clock-outline', 'null', 'measurement'),
             'heat_current':      ('A', 'mdi:current-dc', 'current', 'measurement'),
-            'sys_run_ticks':     ('', 'mdi:clock', 'null', 'null'),
+            'system_uptime':     ('', 'mdi:clock', 'null', 'null'),
             'fault_count':       ('faults', 'mdi:alert-circle-outline', 'null', 'measurement'),
             'time_enter_sleep_h':('h', 'mdi:sleep', 'null', 'measurement'),
             'wire_alarm':        ('', 'mdi:alert', 'null', 'measurement'),
             'user_alarm_1':      ('', 'mdi:alert', 'null', 'measurement'),
             'temp_sensor_presence': ('', 'mdi:thermometer-alert', 'null', 'measurement'),
-            'rtc_time':          ('', 'mdi:calendar-clock', 'null', 'null'),
+            'bms_time':          ('', 'mdi:calendar-clock', 'null', 'null'),
         }
 
         for key, (unit, icon, devclass, stateclass) in analog_defs.items():
@@ -217,6 +217,12 @@ class HA_MQTT_JK:
             'heating_state':   'mdi:radiator',
             'charger_plugged': 'mdi:power-plug',
             'pcl_module_sta':  'mdi:connection',
+            'temp_sensor_mos_ok':  'mdi:thermometer-check',
+            'temp_sensor_bat1_ok': 'mdi:thermometer-check',
+            'temp_sensor_bat2_ok': 'mdi:thermometer-check',
+            'temp_sensor_bat3_ok': 'mdi:thermometer-check',
+            'temp_sensor_bat4_ok': 'mdi:thermometer-check',
+            'temp_sensor_bat5_ok': 'mdi:thermometer-check',
         }
         for key, icon in binary_defs.items():
             if key in pack:
