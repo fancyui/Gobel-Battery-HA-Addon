@@ -1,0 +1,135 @@
+55AA SETUP Frame: 300 bytes + 32-byte Modbus ACK = 332 bytes total
+  Header:       55 AA
+  Function:     0xEB (EB)  Sub: 0x90 (90)
+  Frame Type:   0x01 (SETUP)  [01=SETUP, 02=DYNAMIC]
+  Reserved:     0x00
+
+  Trailing data (32 bytes): 00 00 20 A1 07 00 50 12 3C 32 18 FE FF FF FF 9F E9 6D 02 00 00 00 00 5D 00 10 16 1E 00 01 64 56
+  Last 8 bytes (Modbus ACK): 00 10 16 1E 00 01 64 56
+  Pack ID:      0
+  Function:     0x10
+  Reg addr:     0x161E (SETUP)
+  Count:        0x0001
+  CRC:          0x5664
+
+======================================================================
+  1. BATTERY TYPE & PROTECTION VOLTAGES (reg 0x0000-0x0028)
+======================================================================
+  reg 0x0000  off=  6      3540 raw  →     3.540 V  [进入休眠电压]  (VolSmartSleep)
+  reg 0x0004  off= 10      2500 raw  →     2.500 V  [单体欠压保护]  (VolCellUVP)
+  reg 0x0008  off= 14      2900 raw  →     2.900 V  [单体欠压恢复电压]  (VolCellUVPR)
+  reg 0x000C  off= 18      3650 raw  →     3.650 V  [单体过压保护]  (VolCellOVP)
+  reg 0x0010  off= 22      3400 raw  →     3.400 V  [单体过压恢复电压]  (VolCellOVPR)
+  reg 0x0014  off= 26        10 raw  →     0.010 V  [均衡开启压差]  (VolBalanTrig)
+  reg 0x0018  off= 30      3445 raw  →     3.445 V  [SOC=100%电压]  (VolSOC100%)
+  reg 0x001C  off= 34      2700 raw  →     2.700 V  [SOC=0%电压]  (VolSOC0%)
+  reg 0x0020  off= 38      3450 raw  →     3.450 V  [整组欠压保护]  (VolBatUVP)
+  reg 0x0024  off= 42      3400 raw  →     3.400 V  [整组过压保护]  (VolBatOVP)
+  reg 0x0028  off= 46      2490 raw  →     2.490 V  [自动关机电压]  (VolSysPwrOff)
+
+======================================================================
+  2. PROTECTION CURRENTS & DELAYS (reg 0x002C-0x0048)
+======================================================================
+  reg 0x002C  off= 50     30000   mA  [持续充电电流]  (CurBatCOC)
+  reg 0x0030  off= 54         3    s  [充电过流保护延迟]  (TIMBatCOCPDly)
+  reg 0x0034  off= 58        60    s  [充电过流保护解除]  (TIMBatCOCPRDly)
+  reg 0x0038  off= 62    100000   mA  [持续放电电流]  (CurBatDcOC)
+  reg 0x003C  off= 66       300    s  [放电过流保护延迟]  (TIMBatDcOCPDly)
+  reg 0x0040  off= 70        70    s  [放电过流保护解除]  (TIMBatDcOCPRDly)
+  reg 0x0044  off= 74        30    s  [短路保护解除]  (TIMBatSCPRDly)
+  reg 0x0048  off= 78      1000   mA  [最大均衡电流]  (CurBalanMax)
+
+======================================================================
+  3. TEMPERATURE PROTECTIONS (reg 0x004C-0x0068)
+======================================================================
+  reg 0x004C  off= 82     600 raw  →     60.0 °C  [充电过温保护]  (TMPBatCOT)
+  reg 0x0050  off= 86     550 raw  →     55.0 °C  [充电过温恢复]  (TMPBatCOTPR)
+  reg 0x0054  off= 90     600 raw  →     60.0 °C  [放电过温保护]  (TMPBatDOT)
+  reg 0x0058  off= 94     550 raw  →     55.0 °C  [放电过温恢复]  (TMPBatDOTPR)
+  reg 0x005C  off= 98       0 raw  →      0.0 °C  [充电低温保护]  (TMPBatCUT)
+  reg 0x0060  off=102      50 raw  →      5.0 °C  [充电低温恢复]  (TMPBatCUTPR)
+  reg 0x0064  off=106     800 raw  →     80.0 °C  [MOS过温保护]  (TMPMosOTP)
+  reg 0x0068  off=110     700 raw  →     70.0 °C  [MOS过温保护恢复]  (TMPMosOTPR)
+
+======================================================================
+  4. BATTERY CAPACITY & SWITCHES (reg 0x006C-0x0080)
+======================================================================
+  reg 0x006C  off=114        16 raw  →  16 串    [单体数量]  (CellCount)
+  reg 0x0070  off=118         1 raw  →     ON    [充电开关]  (BatChargeEN)
+  reg 0x0074  off=122         1 raw  →     ON    [放电开关]  (BatDisChargeEN)
+  reg 0x0078  off=126         1 raw  →     ON    [均衡开关]  (BalanEN)
+  reg 0x007C  off=130    100000 raw  →  100000 mAh  [电池设计容量]  (CapBatCell)
+  reg 0x0080  off=134         5 raw  →  5 us  [短路保护延时]  (SCPDelay)
+
+======================================================================
+  5. BALANCE START VOLTAGE (reg 0x0084)
+======================================================================
+  reg 0x0084  off=138      3300 raw  →  3300 mV = 3.300 V  [均衡起始电压]  (VolStartBalan)
+
+======================================================================
+  6. WIRE RESISTANCE CALIBRATION (reg 0x0088-0x0104)
+======================================================================
+  ... (32 wires with 0 uΩ calibration)
+
+======================================================================
+  7. DEVICE CONFIG (reg 0x0108-0x0118)
+======================================================================
+  reg 0x0108  off=270         0 raw  →  0  [设备地址]  (DevAdd)
+  reg 0x010C  off=274         0 raw  →  0 s  [预充延时]  (TIMPrecharge)
+
+  reg 0x0114  off=282  0x0000  [功能位字段]
+    BIT0: [OFF]  加热使能  (HeatEN)
+    BIT1: [OFF]  温度传感器禁用  (DisableTempSensor)
+    BIT2: [OFF]  GPS心跳包  (GPS Heartbeat)
+    BIT3: [OFF]  通讯端口切换 (1=RS485, 0=CAN)  (Port Switch)
+    BIT4: [OFF]  显示屏常亮  (LCD Always On)
+    BIT5: [OFF]  专用充电器识别  (Special Charger)
+    BIT6: [OFF]  智能休眠  (SmartSleep)
+    BIT7: [OFF]  禁用并联限流  (DisablePCLModule)
+    BIT8: [OFF]  数据定时存储  (TimedStoredData)
+    BIT9: [OFF]  充电浮充模式  (ChargingFloatMode)
+
+  reg 0x0118  off=286         0 raw  →  0 H  [智能休眠时间]  (TIMSmartSleep)
+
+======================================================================
+  8. UNMAPPED / RESERVED (offset 280-299)
+======================================================================
+  All zero (no unmapped data)
+
+======================================================================
+  FULL 300-BYTE 55AA SETUP FRAME HEX DUMP
+======================================================================
+  0000: 55 AA EB 90 01 00 D4 0D 00 00 C4 09 00 00 54 0B   U.............T.
+  0010: 00 00 42 0E 00 00 48 0D 00 00 0A 00 00 00 75 0D   ..B...H.......u.
+  0020: 00 00 8C 0A 00 00 7A 0D 00 00 48 0D 00 00 BA 09   ......z...H.....
+  0030: 00 00 30 75 00 00 03 00 00 00 3C 00 00 00 A0 86   ..0u......<.....
+  0040: 01 00 2C 01 00 00 46 00 00 00 1E 00 00 00 E8 03   ..,...F.........
+  0050: 00 00 58 02 00 00 26 02 00 00 58 02 00 00 26 02   ..X...&...X...&.
+  0060: 00 00 00 00 00 00 32 00 00 00 20 03 00 00 BC 02   ......2... .....
+  0070: 00 00 10 00 00 00 01 00 00 00 01 00 00 00 01 00   ................
+  0080: 00 00 A0 86 01 00 05 00 00 00 E4 0C 00 00 00 00   ................
+  0090: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+  00A0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+  00B0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+  00C0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+  00D0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+  00E0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+  00F0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+  0100: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+  0110: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+  0120: 00 00 00 00 00 00 00 00 00 00 00 00               ............
+
+======================================================================
+  SUMMARY
+======================================================================
+  55AA Frame Type:               0x01 (SETUP)
+  Pack ID (in ACK):              0
+  Register base (from ACK):      0x161E
+  Battery config:                16S LFP
+  Cell OVP:                      3.65 V
+  Cell UVP:                      2.50 V
+  Battery design capacity:       100000 mAh = 100.0 Ah
+  Charge enable:                 ON
+  Discharge enable:              ON
+  Balance enable:                ON
+  Device address:                0

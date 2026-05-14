@@ -40,9 +40,9 @@ class HA_MQTT_JK:
     # Internal helpers
     # ------------------------------------------------------------------ #
 
-    def _pub_sensor(self, entity_id, value, unit, icon, devclass, stateclass):
+    def _pub_sensor(self, entity_id, value, unit, icon, devclass, stateclass, precision=None):
         """Publish discovery + state for a single sensor entity."""
-        self.mqtt.publish_sensor_discovery(entity_id, unit, icon, devclass, stateclass)
+        self.mqtt.publish_sensor_discovery(entity_id, unit, icon, devclass, stateclass, precision=precision)
         self.mqtt.publish_sensor_state(value, unit, entity_id)
 
     def _pub_binary(self, entity_id, value, icon):
@@ -126,9 +126,14 @@ class HA_MQTT_JK:
 
         for key, (unit, icon, devclass, stateclass) in total_defs.items():
             if key in totals:
+                val = totals[key]
+                prec = None
+                if key == 'voltage':
+                    val = f"{float(val):.2f}"
+                    prec = 2
                 self._pub_sensor(
-                    f'total_{key}', totals[key],
-                    unit, icon, devclass, stateclass
+                    f'total_{key}', val,
+                    unit, icon, devclass, stateclass, precision=prec
                 )
 
     # ------------------------------------------------------------------ #
@@ -137,7 +142,7 @@ class HA_MQTT_JK:
 
     def _publish_pack_analog(self, pack, pack_num):
         """Publish analog data for a single pack."""
-        prefix = f'pack_{pack_num:02}'
+        prefix = f'pack_{pack_num:02}_view'
 
         # Cell voltages
         cells = pack.get('cell_voltages', [])
@@ -150,6 +155,13 @@ class HA_MQTT_JK:
         for i, t in enumerate(temps):
             eid = f'{prefix}_temperature_{i + 1:02}'
             self._pub_sensor(eid, t, '°C', 'mdi:thermometer', 'temperature', 'measurement')
+
+        # Wire resistances
+        res = pack.get('cell_resistances', [])
+        num_cells = pack.get('num_cells', 16)
+        for i, r in enumerate(res[:num_cells]):
+            eid = f'{prefix}_wire_resistance_{i + 1:02}'
+            self._pub_sensor(eid, r, 'mΩ', 'mdi:resistor', 'null', 'measurement')
 
         # Scalar sensor definitions: key -> (unit, icon, device_class, state_class)
         analog_defs = {
@@ -173,24 +185,131 @@ class HA_MQTT_JK:
             'software_version':  ('', 'mdi:application-cog', 'null', 'null'),
             'num_temps':         ('NTCs', 'mdi:database', 'null', 'measurement'),
             'temp_mos':          ('°C', 'mdi:thermometer', 'temperature', 'measurement'),
+            'total_runtime':      ('h', 'mdi:clock-outline', 'null', 'measurement'),
+            'heat_current':      ('A', 'mdi:current-dc', 'current', 'measurement'),
+            'system_uptime':     ('', 'mdi:clock', 'null', 'null'),
+            'fault_count':       ('faults', 'mdi:alert-circle-outline', 'null', 'measurement'),
+            'time_enter_sleep_h':('h', 'mdi:sleep', 'null', 'measurement'),
+            'wire_alarm':        ('', 'mdi:alert', 'null', 'measurement'),
+            'user_alarm_1':      ('', 'mdi:alert', 'null', 'measurement'),
+            'bms_time':          ('', 'mdi:calendar-clock', 'null', 'null'),
         }
 
         for key, (unit, icon, devclass, stateclass) in analog_defs.items():
             if key in pack:
+                val = pack[key]
+                prec = None
+                if key == 'voltage':
+                    val = f"{float(val):.2f}"
+                    prec = 2
                 self._pub_sensor(
-                    f'{prefix}_{key}', pack[key],
-                    unit, icon, devclass, stateclass
+                    f'{prefix}_{key}', val,
+                    unit, icon, devclass, stateclass, precision=prec
                 )
 
-        # Binary sensors (MOS states)
+        # Binary sensors (MOS states and others)
         binary_defs = {
-            'charge_mos':    'mdi:flash',
-            'discharge_mos': 'mdi:flash',
-            'balance_mos':   'mdi:scale-balance',
+            'charge_mos':      'mdi:flash',
+            'discharge_mos':   'mdi:flash',
+            'balance_mos':     'mdi:scale-balance',
+            'precharge_state': 'mdi:battery-charging-low',
+            'heating_state':   'mdi:radiator',
+            'charger_plugged': 'mdi:power-plug',
+            'pcl_module_sta':  'mdi:connection',
+            'temp_sensor_mos_ok':  'mdi:thermometer-check',
+            'temp_sensor_bat1_ok': 'mdi:thermometer-check',
+            'temp_sensor_bat2_ok': 'mdi:thermometer-check',
+            'temp_sensor_bat3_ok': 'mdi:thermometer-check',
+            'temp_sensor_bat4_ok': 'mdi:thermometer-check',
+            'temp_sensor_bat5_ok': 'mdi:thermometer-check',
         }
         for key, icon in binary_defs.items():
             if key in pack:
                 self._pub_binary(f'{prefix}_{key}', pack[key], icon)
+
+        # Settings (from 0x161E setup frame)
+        if 'settings' in pack:
+            self._publish_pack_settings(pack['settings'], pack_num)
+
+    def _publish_pack_settings(self, settings, pack_num):
+        """Publish setup/configuration parameters with descriptive names."""
+        prefix = f'pack_{pack_num:02}_setting'
+
+        # Map internal setup keys to (HA descriptive name part, unit, icon, device_class, state_class)
+        # The final name will be "Pack XX Setting [Descriptive Name]"
+        setup_mappings = {
+            'vol_smart_sleep':   ('smart_sleep_voltage', 'V', 'mdi:sleep', 'voltage', 'measurement'),
+            'vol_cell_uvp':      ('cell_undervoltage_protection', 'V', 'mdi:shield-check', 'voltage', 'measurement'),
+            'vol_cell_uvpr':     ('cell_undervoltage_recovery', 'V', 'mdi:shield-check', 'voltage', 'measurement'),
+            'vol_cell_ovp':      ('cell_overvoltage_protection', 'V', 'mdi:shield-check', 'voltage', 'measurement'),
+            'vol_cell_ovpr':     ('cell_overvoltage_recovery', 'V', 'mdi:shield-check', 'voltage', 'measurement'),
+            'vol_balan_trig':    ('balance_trigger_voltage', 'V', 'mdi:scale-balance', 'voltage', 'measurement'),
+            'vol_soc_100':       ('soc_100_voltage', 'V', 'mdi:battery-100', 'voltage', 'measurement'),
+            'vol_soc_0':         ('soc_0_voltage', 'V', 'mdi:battery-outline', 'voltage', 'measurement'),
+            'vol_bat_uvp':       ('battery_undervoltage_protection', 'V', 'mdi:shield-check', 'voltage', 'measurement'),
+            'vol_bat_ovp':       ('battery_overvoltage_protection', 'V', 'mdi:shield-check', 'voltage', 'measurement'),
+            'vol_sys_pwr_off':   ('system_power_off_voltage', 'V', 'mdi:power-off', 'voltage', 'measurement'),
+            'cur_bat_c_oc':      ('charge_overcurrent_protection', 'A', 'mdi:current-dc', 'current', 'measurement'),
+            'tim_bat_c_ocp_dly': ('charge_overcurrent_delay', 's', 'mdi:clock-fast', 'null', 'measurement'),
+            'tim_bat_c_ocpr_dly':('charge_overcurrent_recovery_delay', 's', 'mdi:clock-end', 'null', 'measurement'),
+            'cur_bat_dc_oc':     ('discharge_overcurrent_protection', 'A', 'mdi:current-dc', 'current', 'measurement'),
+            'tim_bat_dc_ocp_dly':('discharge_overcurrent_delay', 's', 'mdi:clock-fast', 'null', 'measurement'),
+            'tim_bat_dc_ocpr_dly':('discharge_overcurrent_recovery_delay', 's', 'mdi:clock-end', 'null', 'measurement'),
+            'tim_bat_scpr_dly':  ('short_circuit_recovery_delay', 's', 'mdi:clock-alert', 'null', 'measurement'),
+            'cur_balan_max':     ('max_balance_current', 'A', 'mdi:scale-balance', 'current', 'measurement'),
+            'tmp_bat_cot':       ('charge_over_temperature_protection', '°C', 'mdi:thermometer-high', 'temperature', 'measurement'),
+            'tmp_bat_cotpr':     ('charge_over_temperature_recovery', '°C', 'mdi:thermometer-check', 'temperature', 'measurement'),
+            'tmp_bat_dot':       ('discharge_over_temperature_protection', '°C', 'mdi:thermometer-high', 'temperature', 'measurement'),
+            'tmp_bat_dotpr':     ('discharge_over_temperature_recovery', '°C', 'mdi:thermometer-check', 'temperature', 'measurement'),
+            'tmp_bat_cut':       ('charge_low_temperature_protection', '°C', 'mdi:thermometer-low', 'temperature', 'measurement'),
+            'tmp_bat_cutpr':     ('charge_low_temperature_recovery', '°C', 'mdi:thermometer-check', 'temperature', 'measurement'),
+            'tmp_mos_otp':       ('mos_over_temperature_protection', '°C', 'mdi:thermometer-high', 'temperature', 'measurement'),
+            'tmp_mos_otpr':      ('mos_over_temperature_recovery', '°C', 'mdi:thermometer-check', 'temperature', 'measurement'),
+            'cell_count':        ('cell_count_setting', 'cells', 'mdi:database', 'null', 'measurement'),
+            'bat_charge_en':     ('charge_switch_enabled', '', 'mdi:flash', 'null', 'null'),
+            'bat_discharge_en':  ('discharge_switch_enabled', '', 'mdi:flash', 'null', 'null'),
+            'balan_en':          ('balance_switch_enabled', '', 'mdi:scale-balance', 'null', 'null'),
+            'cap_bat_cell':      ('cell_design_capacity', 'Ah', 'mdi:battery-high', 'null', 'measurement'),
+            'scp_delay':         ('short_circuit_delay', 'us', 'mdi:clock-fast', 'null', 'measurement'),
+            'vol_start_balan':   ('balance_start_voltage', 'V', 'mdi:scale-balance', 'voltage', 'measurement'),
+            'dev_addr':          ('device_address', '', 'mdi:identifier', 'null', 'null'),
+            'tim_precharge':     ('precharge_delay', 's', 'mdi:clock-start', 'null', 'measurement'),
+            'tim_smart_sleep':   ('smart_sleep_time', 'h', 'mdi:sleep', 'null', 'measurement'),
+            # Decoded Function Bits
+            'func_heat_en':              ('function_heating_enabled', '', 'mdi:radiator', 'null', 'null'),
+            'func_disable_temp_sensor':  ('function_disable_temp_sensors', '', 'mdi:thermometer-off', 'null', 'null'),
+            'func_gps_heartbeat':        ('function_gps_heartbeat', '', 'mdi:heart-pulse', 'null', 'null'),
+            'func_port_switch_rs485':    ('function_port_switch_rs485', '', 'mdi:serial-port', 'null', 'null'),
+            'func_lcd_always_on':        ('function_lcd_always_on', '', 'mdi:monitor-screenshot', 'null', 'null'),
+            'func_special_charger':      ('function_special_charger_mode', '', 'mdi:battery-charging-wireless', 'null', 'null'),
+            'func_smart_sleep':          ('function_smart_sleep_enabled', '', 'mdi:sleep', 'null', 'null'),
+            'func_disable_pcl_module':   ('function_disable_pcl_module', '', 'mdi:connection-off', 'null', 'null'),
+            'func_timed_stored_data':    ('function_timed_data_storage', '', 'mdi:database-clock', 'null', 'null'),
+            'func_charging_float_mode':  ('function_charging_float_mode', '', 'mdi:battery-charging-high', 'null', 'null'),
+        }
+
+        for internal_key, (display_key, unit, icon, devclass, stateclass) in setup_mappings.items():
+            if internal_key in settings:
+                val = settings[internal_key]
+                entity_id = f'{prefix}_{display_key}'
+                prec = None
+                if unit == 'V':
+                    val = f"{float(val):.3f}"
+                    prec = 3
+                
+                # Binary settings (Original ones + Decoded Function Bits)
+                binary_keys = [
+                    'bat_charge_en', 'bat_discharge_en', 'balan_en',
+                    'func_heat_en', 'func_disable_temp_sensor', 'func_gps_heartbeat',
+                    'func_port_switch_rs485', 'func_lcd_always_on', 'func_special_charger',
+                    'func_smart_sleep', 'func_disable_pcl_module', 'func_timed_stored_data',
+                    'func_charging_float_mode'
+                ]
+                
+                if internal_key in binary_keys:
+                    self._pub_binary(entity_id, bool(val), icon)
+                else:
+                    self._pub_sensor(entity_id, val, unit, icon, devclass, stateclass, precision=prec)
 
     # ------------------------------------------------------------------ #
     # Warning / alarm data
@@ -214,7 +333,7 @@ class HA_MQTT_JK:
 
     def _publish_pack_warnings(self, pack, pack_num):
         """Publish warning data for a single pack."""
-        prefix = f'pack_{pack_num:02}'
+        prefix = f'pack_{pack_num:02}_protect'
 
         for key, value in pack.items():
 
