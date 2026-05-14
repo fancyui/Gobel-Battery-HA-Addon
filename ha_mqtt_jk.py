@@ -227,6 +227,65 @@ class HA_MQTT_JK:
             if key in pack:
                 self._pub_binary(f'{prefix}_{key}', pack[key], icon)
 
+        # Settings (from 0x161E setup frame)
+        if 'settings' in pack:
+            self._publish_pack_settings(pack['settings'], pack_num)
+
+    def _publish_pack_settings(self, settings, pack_num):
+        """Publish setup/configuration parameters with 'Setting' naming."""
+        prefix = f'pack_{pack_num:02}_setting'
+
+        # Map setup keys to (unit, icon, device_class, state_class)
+        setup_defs = {
+            'vol_smart_sleep':   ('V', 'mdi:sleep', 'voltage', 'measurement'),
+            'vol_cell_uvp':      ('V', 'mdi:shield-check', 'voltage', 'measurement'),
+            'vol_cell_uvpr':     ('V', 'mdi:shield-check', 'voltage', 'measurement'),
+            'vol_cell_ovp':      ('V', 'mdi:shield-check', 'voltage', 'measurement'),
+            'vol_cell_ovpr':     ('V', 'mdi:shield-check', 'voltage', 'measurement'),
+            'vol_balan_trig':    ('V', 'mdi:scale-balance', 'voltage', 'measurement'),
+            'vol_soc_100':       ('V', 'mdi:battery-100', 'voltage', 'measurement'),
+            'vol_soc_0':         ('V', 'mdi:battery-outline', 'voltage', 'measurement'),
+            'vol_bat_uvp':       ('V', 'mdi:shield-check', 'voltage', 'measurement'),
+            'vol_bat_ovp':       ('V', 'mdi:shield-check', 'voltage', 'measurement'),
+            'vol_sys_pwr_off':   ('V', 'mdi:power-off', 'voltage', 'measurement'),
+            'cur_bat_c_oc':      ('A', 'mdi:current-dc', 'current', 'measurement'),
+            'tim_bat_c_ocp_dly': ('s', 'mdi:clock-fast', 'null', 'measurement'),
+            'tim_bat_c_ocpr_dly':('s', 'mdi:clock-end', 'null', 'measurement'),
+            'cur_bat_dc_oc':     ('A', 'mdi:current-dc', 'current', 'measurement'),
+            'tim_bat_dc_ocp_dly':('s', 'mdi:clock-fast', 'null', 'measurement'),
+            'tim_bat_dc_ocpr_dly':('s', 'mdi:clock-end', 'null', 'measurement'),
+            'tim_bat_scpr_dly':  ('s', 'mdi:clock-alert', 'null', 'measurement'),
+            'cur_balan_max':     ('A', 'mdi:scale-balance', 'current', 'measurement'),
+            'tmp_bat_cot':       ('°C', 'mdi:thermometer-high', 'temperature', 'measurement'),
+            'tmp_bat_cotpr':     ('°C', 'mdi:thermometer-check', 'temperature', 'measurement'),
+            'tmp_bat_dot':       ('°C', 'mdi:thermometer-high', 'temperature', 'measurement'),
+            'tmp_bat_dotpr':     ('°C', 'mdi:thermometer-check', 'temperature', 'measurement'),
+            'tmp_bat_cut':       ('°C', 'mdi:thermometer-low', 'temperature', 'measurement'),
+            'tmp_bat_cutpr':     ('°C', 'mdi:thermometer-check', 'temperature', 'measurement'),
+            'tmp_mos_otp':       ('°C', 'mdi:thermometer-high', 'temperature', 'measurement'),
+            'tmp_mos_otpr':      ('°C', 'mdi:thermometer-check', 'temperature', 'measurement'),
+            'cell_count':        ('cells', 'mdi:database', 'null', 'measurement'),
+            'bat_charge_en':     ('', 'mdi:flash', 'null', 'null'),
+            'bat_discharge_en':  ('', 'mdi:flash', 'null', 'null'),
+            'balan_en':          ('', 'mdi:scale-balance', 'null', 'null'),
+            'cap_bat_cell':      ('Ah', 'mdi:battery-high', 'null', 'measurement'),
+            'scp_delay':         ('us', 'mdi:clock-fast', 'null', 'measurement'),
+            'vol_start_balan':   ('V', 'mdi:scale-balance', 'voltage', 'measurement'),
+            'dev_addr':          ('', 'mdi:identifier', 'null', 'null'),
+            'tim_precharge':     ('s', 'mdi:clock-start', 'null', 'measurement'),
+            'func_bit_field':    ('', 'mdi:cog', 'null', 'null'),
+            'tim_smart_sleep':   ('h', 'mdi:sleep', 'null', 'measurement'),
+        }
+
+        for key, (unit, icon, devclass, stateclass) in setup_defs.items():
+            if key in settings:
+                val = settings[key]
+                # Binary settings
+                if key in ['bat_charge_en', 'bat_discharge_en', 'balan_en']:
+                    self._pub_binary(f'{prefix}_{key}', bool(val), icon)
+                else:
+                    self._pub_sensor(f'{prefix}_{key}', val, unit, icon, devclass, stateclass)
+
     # ------------------------------------------------------------------ #
     # Warning / alarm data
     # ------------------------------------------------------------------ #

@@ -1101,6 +1101,7 @@ class JKBMS485:
 
         for pack_id, dynamic in dynamic_results.items():
             static = static_results.get(pack_id) if static_results else None
+            setup = setup_results.get(pack_id) if setup_results else None
             data = {}
             data['pack_id'] = pack_id
 
@@ -1197,6 +1198,10 @@ class JKBMS485:
                 data['time_enter_sleep_h'] = round(dynamic['time_enter_sleep'] / 3600.0, 2)
             data['pcl_module_sta'] = bool(dynamic.get('pcl_module_sta', 0))
 
+            # Setup / Config info
+            if setup:
+                data['settings'] = setup
+
             # Version info
             if static:
                 data['hardware_version'] = static.get('hardware_version', '')
@@ -1209,58 +1214,6 @@ class JKBMS485:
 
         self.logger.debug(f"Finished getting JK BMS native data: {pack_list}")
         return pack_list
-
-    def parse_jkbms_setup_frame(self, data):
-        """
-        Parse JK BMS setup/config 55AA frame (register 0x161E).
-
-        The setup frame contains voltage thresholds, current limits,
-        and other configuration parameters stored as uint32le at
-        4-byte-aligned offsets (high 16 bits are typically 0x0000).
-
-        Offset mapping is firmware-version-dependent and **tentative**
-        for firmware 9.04 (16S LFP). Labels should be confirmed with
-        manufacturer documentation.
-
-        Args:
-            data: Raw 300-byte 55AA frame
-
-        Returns:
-            Dict with setup parameter keys, or empty dict on failure.
-        """
-        result = {}
-        if not data or len(data) < 6 or data[0] != 0x55 or data[1] != 0xAA:
-            return result
-
-        pack_id = data[4]
-        result['pack_id'] = pack_id
-
-        # Field map: offset -> (key, description)
-        # Values stored as uint32le; high 16 bits are padding (0x0000).
-        # These labels are best guesses for FW 9.04 (16S LFP).
-        fields = {
-            6:   ('cell_ovp_protect',       'Cell overvoltage protection'),
-            10:  ('cell_uvp_protect',       'Cell undervoltage protection'),
-            14:  ('cell_ovp_recover',       'Cell OVP recovery threshold'),
-            18:  ('cell_uvp_recover',       'Cell UVP recovery threshold'),
-            22:  ('battery_ovp_protect',    'Battery overvoltage protection'),
-            26:  ('balancer_start_delta',   'Balancer start voltage delta'),
-            30:  ('battery_uvp_protect',    'Battery undervoltage protection'),
-            34:  ('discharge_ocp_threshold','Discharge OCP threshold (mA)'),
-            38:  ('charge_ocp_threshold',   'Charge OCP threshold (mA)'),
-            42:  ('cell_balance_start',     'Cell balance start voltage'),
-            46:  ('cell_balance_stop',      'Cell balance stop voltage'),
-        }
-
-        for offset, (key, desc) in fields.items():
-            if offset + 4 <= len(data):
-                raw = struct.unpack_from('<I', data, offset)[0]
-                if 0 < raw < 50000:     # plausibility check
-                    result[key] = raw
-                    self.logger.debug(f"  setup[{offset:3d}] {key}: {raw} ({desc})")
-
-        self.logger.debug(f"Parsed setup frame (pack {pack_id}): {result}")
-        return result
 
     def get_setup_data(self):
         """
