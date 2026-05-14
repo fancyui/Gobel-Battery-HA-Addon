@@ -677,6 +677,7 @@ class PACEBMS232:
     
             instruction_state = warnstate_bytes[index]
             pack_info['instruction_state'] = {
+                'status_heating': bool(instruction_state & 0b10000000),
                 'status_charger_avaliable': bool(instruction_state & 0b00100000),
                 'status_reverse_connected': bool(instruction_state & 0b00010000),
                 'status_discharge_enabled': bool(instruction_state & 0b00000100),
@@ -822,6 +823,7 @@ class PACEBMS232:
     
             instruction_state = warnstate_bytes[index]
             pack_info['instruction_state'] = {
+                'status_heating': bool(instruction_state & 0b10000000),
                 'status_charger_avaliable': bool(instruction_state & 0b00100000),
                 'status_reverse_connected': bool(instruction_state & 0b00010000),
                 'status_discharge_enabled': bool(instruction_state & 0b00000100),
