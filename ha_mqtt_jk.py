@@ -142,7 +142,7 @@ class HA_MQTT_JK:
 
     def _publish_pack_analog(self, pack, pack_num):
         """Publish analog data for a single pack."""
-        prefix = f'pack_{pack_num:02}'
+        prefix = f'pack_{pack_num:02}_view'
 
         # Cell voltages
         cells = pack.get('cell_voltages', [])
@@ -333,7 +333,7 @@ class HA_MQTT_JK:
 
     def _publish_pack_warnings(self, pack, pack_num):
         """Publish warning data for a single pack."""
-        prefix = f'pack_{pack_num:02}'
+        prefix = f'pack_{pack_num:02}_protect'
 
         for key, value in pack.items():
 
