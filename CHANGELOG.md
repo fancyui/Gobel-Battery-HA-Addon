@@ -4,6 +4,13 @@
 ---------------
 
 
+## 1.9.46
+
+-   [JKBMS] Changed verbose frame-parsing log messages from WARNING to DEBUG to reduce log noise.
+
+---------------
+
+
 ## 1.9.45
 
 -   [JKBMS] Refined multi-pack integration and setup configuration parameters (Reg=0x161E).

@@ -185,7 +185,7 @@ class JKBMS485:
                     ' '.join(f'{b:02X}' for b in frame[i:i+32])
                     for i in range(0, len(frame), 32)
                 )
-                self.logger.warning(
+                self.logger.debug(
                     f"receive_55aa_frames: block at offset {start}, "
                     f"pack_id={pack_id}, reg=0x{reg_addr:04X} "
                     f"({'DYNAMIC' if reg_addr == 0x1620 else 'SETUP' if reg_addr == 0x161E else 'STATIC' if reg_addr == 0x161C else 'UNKNOWN'})"
@@ -195,16 +195,16 @@ class JKBMS485:
                 search_start = start + BLOCK_SIZE
             else:
                 remaining = len(raw_data) - start
-                self.logger.warning(
+                self.logger.debug(
                     f"receive_55aa_frames: 55AA marker at offset {start}, "
                     f"only {remaining} bytes remain (need {BLOCK_SIZE}) — incomplete block"
                 )
                 break
 
         if frames:
-            self.logger.warning(f"receive_55aa_frames: extracted {len(frames)} 55AA block(s) from {len(raw_data)} bytes")
+            self.logger.debug(f"receive_55aa_frames: extracted {len(frames)} 55AA block(s) from {len(raw_data)} bytes")
         else:
-            self.logger.warning(f"receive_55aa_frames: NO 55AA block found in {len(raw_data)} bytes")
+            self.logger.debug(f"receive_55aa_frames: NO 55AA block found in {len(raw_data)} bytes")
 
         return frames
 
