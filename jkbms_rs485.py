@@ -34,15 +34,10 @@ class JKBMS485:
                             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         self.logger = logging.getLogger(__name__)
 
-        # JK BMS registers for data queries (Modbus FC 0x10 write with 0x0000)
+        # JK BMS register addresses used for frame identification in passive listening
         self.REG_STATIC = 0x161C    # Trame 1 - Static data (version, serial, etc.)
         self.REG_SETUP  = 0x161E    # Trame 2 - Setup/Config data
         self.REG_DYNAMIC = 0x1620   # Trame 3 - Dynamic data (cells, current, SOC, etc.)
-        self.REG_ALARM  = 0x12A0    # Alarm register (FC 0x03 read, count 2)
-
-        # Slave address: default 0x01 as used by reference implementation
-        self.slave_address = 0x01
-        
         # Cumulative energy tracking
         self.pack_energy = {}  # dict of pack_id -> {'charged': 0.0, 'discharged': 0.0, 'last_time': float}
 
@@ -99,44 +94,6 @@ class JKBMS485:
                     crc >>= 1
         return crc
 
-
-    # ---------------------------------------------------------------------------
-    # Command builders
-    # ---------------------------------------------------------------------------
-    def build_read_command(self, register_address, register_count=1):
-        """
-        Build Modbus FC 0x03 (Read Holding Registers) command.
-        Used for alarm reads (0x12A0).
-        """
-        command_frame = struct.pack('>BBHH',
-                                    self.slave_address,
-                                    0x03,               # Function code: Read Holding Registers
-                                    register_address,
-                                    register_count)
-        crc = self.calculate_crc16_modbus(command_frame)
-        command = command_frame + struct.pack('<H', crc)
-        self.logger.debug(f"Read command: {command.hex().upper()}")
-        return command
-
-    def build_write_command(self, register_address):
-        """
-        Build Modbus FC 0x10 (Write Multiple Registers) command with value 0x0000.
-        Used to query JK BMS data frames (0x161C, 0x161E, 0x1620).
-        """
-        command_frame = struct.pack('>BBHHBB',
-                                    self.slave_address,
-                                    0x10,               # Function code: Write Multiple Registers
-                                    register_address,
-                                    0x0001,             # Quantity: 1 register
-                                    0x02,               # Byte count: 2 bytes
-                                    0x00)               # Data high byte
-        # Append data low byte separately for clarity
-        command_frame += struct.pack('B', 0x00)          # Data low byte
-        crc = self.calculate_crc16_modbus(command_frame)
-        command = command_frame + struct.pack('<H', crc)
-        self.logger.debug(f"Write query command for 0x{register_address:04X}: {command.hex().upper()}")
-        return command
-
     # ---------------------------------------------------------------------------
     # Passive data reception (BMS broadcasts 55AA frames automatically)
     # ---------------------------------------------------------------------------
@@ -145,61 +102,93 @@ class JKBMS485:
         """
         Passively receive 55AA frames from the JK BMS broadcast stream.
 
-        Protocol structure (from JK-BMS-RS485-Protocol.md):
-          Each received block = 300-byte 55AA frame + 8-byte Modbus ACK = 308 bytes total
-          byte[4] = Pack ID (NOT frame type)
-          The trailing 8-byte Modbus ACK contains the register address that triggered this frame:
-            bytes[292-293] of the 300-byte frame = offset 292 within the 55AA block
-            In the 308-byte block: bytes[300+2..300+3] = register address
-              0x1620 → Dynamic data frame  (Trame 3)
-              0x161E → Setup/Config frame  (Trame 2)
-              0x161C → Static data frame   (Trame 1)
+        Protocol structure (from JK-BMS-55AA-Protocol.md):
+          - DYNAMIC (0x1620) / STATIC (0x161C): 300-byte 55AA frame + 8-byte ACK = 308 bytes
+            ACK at offset 300: [pack_id][0x10][reg_hi][reg_lo][0x00][0x01][crc16]
+          - SETUP (0x161E): 300-byte 55AA frame + 24-byte extra + 8-byte ACK = 332 bytes
+            ACK at offset 324: [pack_id][0x10][reg_hi][reg_lo][0x00][0x01][crc16]
+          - pack_id is 0-based: 0 = pack 1, 1 = pack 2, etc.
 
         Returns:
-            list of tuples (frame_300bytes, reg_addr) for each complete 55AA block found
+            list of tuples (frame_300bytes, reg_addr, pack_id)
         """
         raw_data = self.bms_comm.receive_jkbms_passive(timeout)
         if not raw_data:
             self.logger.warning("receive_55aa_frames: no data received from BMS (raw_data is None/empty)")
             return []
 
-        BLOCK_SIZE = 308   # 300-byte 55AA frame + 8-byte Modbus ACK
-        FRAME_SIZE = 300   # Pure 55AA frame data
+        FRAME_SIZE = 300
+        DYNAMIC_BLOCK = 308   # 300 + 8-byte ACK
+        SETUP_BLOCK = 332     # 300 + 24-byte extra + 8-byte ACK
+        VALID_DYNAMIC_REGS = {0x161C, 0x1620}
+        VALID_SETUP_REGS = {0x161E}
 
-        frames = []  # list of (frame_300, reg_addr)
+        def _validate_ack_at(offset):
+            """Check if a valid Modbus ACK exists at the given offset.
+            ACK format: [pack_id][0x10][reg_hi][reg_lo][0x00][0x01][crc16_le]
+            Returns (True, reg_addr, pack_id) or (False, 0, 0)."""
+            if start + offset + 8 > len(raw_data):
+                return False, 0, 0
+            ack = raw_data[start + offset:start + offset + 8]
+            if ack[1] != 0x10:
+                return False, 0, 0
+            if ack[4] != 0x00 or ack[5] != 0x01:
+                return False, 0, 0
+            crc_expected = self.calculate_crc16_modbus(ack[0:6])
+            crc_received = struct.unpack('<H', ack[6:8])[0]
+            if crc_expected != crc_received:
+                return False, 0, 0
+            reg_addr = (ack[2] << 8) | ack[3]
+            pack_id = ack[0]
+            return True, reg_addr, pack_id
+
+        frames = []  # list of (frame_300, reg_addr, pack_id)
         search_start = 0
         while search_start < len(raw_data):
             start = raw_data.find(b'\x55\xAA', search_start)
             if start < 0:
                 break
 
-            if start + BLOCK_SIZE <= len(raw_data):
-                block = raw_data[start:start + BLOCK_SIZE]
-                frame = block[:FRAME_SIZE]          # 300-byte 55AA data
-                # Modbus ACK starts at offset 300: [slave][0x10][reg_hi][reg_lo]...
-                reg_hi = block[302]
-                reg_lo = block[303]
-                reg_addr = (reg_hi << 8) | reg_lo
-                pack_id = block[300]
-                frame_hex = '\n'.join(
-                    ' '.join(f'{b:02X}' for b in frame[i:i+32])
-                    for i in range(0, len(frame), 32)
+            matched = False
+
+            # Try DYNAMIC/STATIC first (ACK at offset 300, block=308)
+            if start + DYNAMIC_BLOCK <= len(raw_data):
+                valid, reg_addr, pack_id = _validate_ack_at(300)
+                if valid and reg_addr in VALID_DYNAMIC_REGS:
+                    frame = raw_data[start:start + FRAME_SIZE]
+                    frames.append((frame, reg_addr, pack_id))
+                    search_start = start + DYNAMIC_BLOCK
+                    matched = True
+
+            # Try SETUP (ACK at offset 324, block=332)
+            if not matched and start + SETUP_BLOCK <= len(raw_data):
+                valid, reg_addr, pack_id = _validate_ack_at(324)
+                if valid and reg_addr in VALID_SETUP_REGS:
+                    frame = raw_data[start:start + FRAME_SIZE]
+                    frames.append((frame, reg_addr, pack_id))
+                    search_start = start + SETUP_BLOCK
+                    matched = True
+
+            if not matched:
+                # 55AA found but no valid ACK at either offset — skip this marker
+                self.logger.debug(
+                    f"receive_55aa_frames: 55AA at offset {start} but no valid ACK, "
+                    f"skipping 1 byte to search again"
                 )
+                search_start = start + 1
+                continue
+
+            if frames:
+                last_frame, last_reg, last_pack = frames[-1]
+                reg_label = (
+                    'DYNAMIC' if last_reg == 0x1620
+                    else 'SETUP' if last_reg == 0x161E
+                    else 'STATIC' if last_reg == 0x161C
+                    else 'UNKNOWN')
                 self.logger.debug(
                     f"receive_55aa_frames: block at offset {start}, "
-                    f"pack_id={pack_id}, reg=0x{reg_addr:04X} "
-                    f"({'DYNAMIC' if reg_addr == 0x1620 else 'SETUP' if reg_addr == 0x161E else 'STATIC' if reg_addr == 0x161C else 'UNKNOWN'})"
-                    f"\n{frame_hex}"
+                    f"pack_id={last_pack}, reg=0x{last_reg:04X} ({reg_label})"
                 )
-                frames.append((frame, reg_addr, pack_id))
-                search_start = start + BLOCK_SIZE
-            else:
-                remaining = len(raw_data) - start
-                self.logger.debug(
-                    f"receive_55aa_frames: 55AA marker at offset {start}, "
-                    f"only {remaining} bytes remain (need {BLOCK_SIZE}) — incomplete block"
-                )
-                break
 
         if frames:
             self.logger.debug(f"receive_55aa_frames: extracted {len(frames)} 55AA block(s) from {len(raw_data)} bytes")
@@ -207,18 +196,6 @@ class JKBMS485:
             self.logger.debug(f"receive_55aa_frames: NO 55AA block found in {len(raw_data)} bytes")
 
         return frames
-
-    def send_and_receive(self, command):
-        """
-        Legacy method: send a command and receive response.
-        Kept for backward compatibility. Prefer passive receive_55aa_frames().
-        """
-        self.bms_comm.flush_jkbms_buffer()
-        if not self.bms_comm.send_data(command):
-            self.logger.error("Failed to send command")
-            return None
-        response = self.bms_comm.receive_jkbms_raw()
-        return response
 
     # ---------------------------------------------------------------------------
     # 55AA JK BMS Frame Parser
@@ -749,32 +726,6 @@ class JKBMS485:
         self.logger.debug(f"Parsed setup frame: {result}")
         return result
 
-    def parse_alarm_response(self, response):
-        """
-        Parse alarm response from Modbus FC 0x03 read of 0x12A0.
-
-        Standard Modbus RTU response format:
-        [0]: Slave ID
-        [1]: 0x03 (FC)
-        [2]: 0x04 (byte count)
-        [3-6]: 32-bit alarm value (big-endian)
-        [7-8]: CRC
-        """
-        if not response or len(response) < 9:
-            self.logger.warning("Alarm response too short")
-            return None
-
-        # Validate CRC
-        data_no_crc = response[:-2]
-        received_crc = struct.unpack('<H', response[-2:])[0]
-        calc_crc = self.calculate_crc16_modbus(data_no_crc)
-        if received_crc != calc_crc:
-            self.logger.error(f"Alarm CRC failed: received={received_crc:04X}, calculated={calc_crc:04X}")
-            # Try parsing anyway for resilience
-
-        alarm_value = struct.unpack('>I', response[3:7])[0]
-        return self._decode_alarms(alarm_value)
-
     def _decode_alarms(self, alarm_value):
         """Decode 32-bit alarm bitfield into structured dict."""
         alarm_bits = {
@@ -844,34 +795,6 @@ class JKBMS485:
 
         return dynamic_results, setup_results, static_results
 
-    def get_alarm_data(self):
-        """
-        Read alarm/status information from passively received broadcast data.
-        Additionally checks if alarm Modbus responses happen to be in the stream.
-        Returns parsed alarm dict or None.
-        """
-        # Try to find alarm data in the passive broadcast
-        raw = self.bms_comm.receive_jkbms_passive(read_timeout=1.0)
-        if not raw:
-            return None
-
-        # Look for Modbus RTU response in the raw data
-        # Alarm FC 0x03 response format: [slave] [0x03] [byte_cnt=4] [data...4] [CRC...2]
-        alarm_response = None
-        for candidate_addr in [self.slave_address, 0x0A, 0x01, 0x00]:
-            pattern = bytes([candidate_addr, 0x03, 0x04])
-            idx = raw.find(pattern)
-            if idx >= 0 and idx + 9 <= len(raw):
-                alarm_response = raw[idx:idx+9]
-                self.logger.debug(f"Found alarm response at offset {idx} with addr 0x{candidate_addr:02X}")
-                break
-
-        if not alarm_response:
-            self.logger.debug("No alarm data in passive broadcast stream")
-            return None
-
-        return self.parse_alarm_response(alarm_response)
-
     # ---------------------------------------------------------------------------
     # Main data gathering (compatible interface with original code)
     # ---------------------------------------------------------------------------
@@ -894,16 +817,6 @@ class JKBMS485:
             if not dynamic_results:
                 self.logger.error("Failed to get dynamic data after retry")
                 return []
-
-        # Request setup frame if not captured passively
-        if not setup_results:
-            self.logger.debug("Setup frame not captured passively, sending active request...")
-            cmd = self.build_write_command(self.REG_SETUP)
-            self.bms_comm.send_data(cmd)
-            import time
-            time.sleep(0.5)
-            _, set2, _ = self.get_all_frames_data()
-            setup_results.update(set2)
 
         pack_list = []
         for pack_id, dynamic in dynamic_results.items():
@@ -1228,24 +1141,6 @@ class JKBMS485:
         self.logger.debug(f"Finished getting JK BMS native data: {pack_list}")
         return pack_list
 
-    def get_setup_data(self):
-        """
-        Read JK BMS setup/config data from passively received broadcast.
-        Setup frames are identified by trailing ACK register 0x161E.
-
-        Returns parsed dict (from parse_jkbms_setup_frame) or None.
-        """
-        frame_list = self.receive_55aa_frames(timeout=1.0)
-        for frame, reg_addr in frame_list:
-            if reg_addr != 0x161E:
-                continue
-            result = self.parse_jkbms_setup_frame(frame)
-            if result:
-                return result
-
-        self.logger.debug("No setup 55AA frame (reg=0x161E) in buffer")
-        return None
-
     def get_warning_data(self, pack_number=None):
         """
         Get warning/alarm data from JK BMS.
@@ -1254,7 +1149,12 @@ class JKBMS485:
         self.logger.debug("Starting to get JK BMS warning data")
 
         dynamic_results, _, _ = self.get_all_frames_data()
-        
+        if not dynamic_results:
+            self.logger.warning("Failed to get warning data, retrying once...")
+            import time
+            time.sleep(0.5)
+            dynamic_results, _, _ = self.get_all_frames_data()
+
         warning_data = []
         for pack_id, dynamic in dynamic_results.items():
             raw_alarm = dynamic.get('alarm_bits', 0)
@@ -1303,16 +1203,16 @@ class JKBMS485:
         # ----- JK-native pipeline -----
         if self.ha_comm_jk:
             retry_count = 0
-            data = None
+            data = []
             while retry_count < 3:
                 data = self.get_jk_native_data()
-                if data is not None:
+                if data:
                     break
                 retry_count += 1
                 import time
                 time.sleep(0.5)
 
-            if data is None:
+            if not data:
                 self.logger.error("Failed to get JK native data after retries")
                 return
 
@@ -1467,7 +1367,7 @@ class JKBMS485:
 
         while True:
             analog_data = self.get_analog_data(pack_number)
-            if analog_data is not None:
+            if analog_data:
                 break
 
         total_packs_num = len(analog_data)
@@ -1541,11 +1441,7 @@ class JKBMS485:
 
         # ----- JK-native pipeline -----
         if self.ha_comm_jk:
-            warn_data = None
-            while True:
-                warn_data = self.get_warning_data(pack_number)
-                if warn_data is not None:
-                    break
+            warn_data = self.get_warning_data(pack_number)
 
             if not warn_data:
                 self.logger.error("No warning data to publish")
@@ -1555,10 +1451,7 @@ class JKBMS485:
             return
 
         # ----- Legacy PACE-compatible pipeline (unchanged) -----
-        while True:
-            warn_data = self.get_warning_data(pack_number)
-            if warn_data is not None:
-                break
+        warn_data = self.get_warning_data(pack_number)
 
         total_packs_num = len(warn_data)
         if total_packs_num < 1:
