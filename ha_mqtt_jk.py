@@ -36,6 +36,22 @@ class HA_MQTT_JK:
         self.mqtt = ha_comm
         self.logger = logging.getLogger(__name__)
 
+    def _get_pack_device_info(self, pack_num):
+        orig_id = self.mqtt.device_info.get('identifiers', self.mqtt.device_name)
+        orig_name = self.mqtt.device_info.get('name', self.mqtt.device_name)
+        orig_mfr = self.mqtt.device_info.get('manufacturer', '')
+        orig_model = self.mqtt.device_info.get('model', '')
+        orig_ver = self.mqtt.device_info.get('sw_version', '1.0')
+        
+        return {
+            "identifiers": f"{orig_id}_{pack_num:02}",
+            "name": f"{orig_name} Pack {pack_num:02}",
+            "manufacturer": orig_mfr,
+            "model": f"{orig_model} Pack {pack_num:02}",
+            "sw_version": orig_ver,
+            "via_device": orig_id
+        }
+
     # ------------------------------------------------------------------ #
     # Internal helpers
     # ------------------------------------------------------------------ #
@@ -150,6 +166,16 @@ class HA_MQTT_JK:
     # ------------------------------------------------------------------ #
 
     def _publish_pack_analog(self, pack, pack_num):
+        """Publish analog data for a single pack."""
+        pack_device = self._get_pack_device_info(pack_num)
+        orig_device = self.mqtt.device_info
+        self.mqtt.device_info = pack_device
+        try:
+            self._publish_pack_analog_internal(pack, pack_num)
+        finally:
+            self.mqtt.device_info = orig_device
+
+    def _publish_pack_analog_internal(self, pack, pack_num):
         """Publish analog data for a single pack."""
         prefix = f'pack_{pack_num:02}_view'
 
@@ -349,6 +375,16 @@ class HA_MQTT_JK:
             self._publish_pack_warnings(pack, pack_num)
 
     def _publish_pack_warnings(self, pack, pack_num):
+        """Publish warning data for a single pack."""
+        pack_device = self._get_pack_device_info(pack_num)
+        orig_device = self.mqtt.device_info
+        self.mqtt.device_info = pack_device
+        try:
+            self._publish_pack_warnings_internal(pack, pack_num)
+        finally:
+            self.mqtt.device_info = orig_device
+
+    def _publish_pack_warnings_internal(self, pack, pack_num):
         """Publish warning data for a single pack."""
         prefix = f'pack_{pack_num:02}_protect'
 
