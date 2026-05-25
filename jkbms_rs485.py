@@ -40,6 +40,9 @@ class JKBMS485:
         self.REG_DYNAMIC = 0x1620   # Trame 3 - Dynamic data (cells, current, SOC, etc.)
         # Cumulative energy tracking
         self.pack_energy = {}  # dict of pack_id -> {'charged': 0.0, 'discharged': 0.0, 'last_time': float}
+        # Setup and Static data caching (infrequently broadcasted frames)
+        self.setup_cache = {}   # dict of pack_id -> setup_dict
+        self.static_cache = {}  # dict of pack_id -> static_dict
 
     # ---------------------------------------------------------------------------
     # Cumulative Energy
@@ -788,10 +791,19 @@ class JKBMS485:
                 res = self.parse_jkbms_setup_frame(frame)
                 if res:
                     setup_results[pack_id] = res
+                    self.setup_cache[pack_id] = res  # update cache
             elif reg_addr == 0x161C:
                 res = self.parse_jkbms_static_frame(frame)
                 if res:
                     static_results[pack_id] = res
+                    self.static_cache[pack_id] = res  # update cache
+
+        # Merge cached values for any packs that were detected but didn't receive setup/static frames in this iteration
+        for pack_id in dynamic_results:
+            if pack_id not in setup_results and pack_id in self.setup_cache:
+                setup_results[pack_id] = self.setup_cache[pack_id]
+            if pack_id not in static_results and pack_id in self.static_cache:
+                static_results[pack_id] = self.static_cache[pack_id]
 
         return dynamic_results, setup_results, static_results
 
