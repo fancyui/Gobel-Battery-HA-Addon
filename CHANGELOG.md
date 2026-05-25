@@ -8,6 +8,13 @@ description:
 ---------------
 
 
+## 1.9.50
+
+-   [JKBMS] Dynamically parse Modbus ACK at the end of frames, making data parsing independent of specific packet lengths.
+
+---------------
+
+
 ## 1.9.48
 
 -   [JKBMS] Fixed pack identification logic to prevent data collision between different packs.
@@ -86,4 +93,3 @@ description:
 -   add TDT BMS support.
 
 ---------------
-
