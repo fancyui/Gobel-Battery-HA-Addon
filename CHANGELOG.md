@@ -8,6 +8,13 @@ description:
 ---------------
 
 
+## 1.9.52
+
+-   [PACEWIFI] Add support for PACE_LV_WIFI bms_type to passively parse telemetry data actively broadcasted over WiFi.
+
+---------------
+
+
 ## 1.9.50
 
 -   [JKBMS] Dynamically parse Modbus ACK at the end of frames, making data parsing independent of specific packet lengths.

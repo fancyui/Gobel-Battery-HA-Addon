@@ -8,6 +8,7 @@ import threading
 from bms_comm import BMSCommunication
 from pacebms_rs232 import PACEBMS232
 from pacebms_rs485 import PACEBMS485
+from pacebms_wifi import PACEBMSWIFI
 from tdtbms_rs232 import TDTBMS232
 from jkbms_rs485 import JKBMS485
 from ha_rest_api import HA_REST_API
@@ -179,6 +180,27 @@ def run():
                 
                 finally:
                     mqtt_client.loop_stop()
+
+    elif bms_type == 'PACE_LV_WIFI':
+
+        bms = PACEBMSWIFI(bms_comm, ha_comm, bms_type, data_refresh_interval, debug, if_random)
+
+        logger.info("PACE_LV_WIFI BMS Monitor Working...")
+
+        try:
+            while True:  # Run continuously
+                
+                bms.publish_analog_data_mqtt()
+                time.sleep(1)
+                bms.publish_warning_data_mqtt()
+
+                time.sleep(data_refresh_interval)
+
+        except KeyboardInterrupt:
+            logger.info("Stopping the program...")
+        
+        finally:
+            mqtt_client.loop_stop()
 
     elif bms_type == 'JK_PB':
 

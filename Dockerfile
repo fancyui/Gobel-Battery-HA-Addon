@@ -28,6 +28,7 @@ COPY bms_comm.py /
 COPY ha_rest_api.py /
 COPY ha_mqtt.py /
 COPY ha_mqtt_jk.py /
+COPY pacebms_wifi.py /
 COPY config.yaml /
 RUN chmod +x /run.sh
 
