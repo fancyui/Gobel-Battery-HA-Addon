@@ -121,10 +121,7 @@ class JKBMS485:
             return []
 
         FRAME_SIZE = 300
-        DYNAMIC_BLOCK = 308   # 300 + 8-byte ACK
-        SETUP_BLOCK = 332     # 300 + 24-byte extra + 8-byte ACK
-        VALID_DYNAMIC_REGS = {0x161C, 0x1620}
-        VALID_SETUP_REGS = {0x161E}
+        VALID_REGS = {0x161C, 0x161E, 0x1620}
 
         def _validate_ack_at(offset):
             """Check if a valid Modbus ACK exists at the given offset.
@@ -154,28 +151,22 @@ class JKBMS485:
 
             matched = False
 
-            # Try DYNAMIC/STATIC first (ACK at offset 300, block=308)
-            if start + DYNAMIC_BLOCK <= len(raw_data):
-                valid, reg_addr, pack_id = _validate_ack_at(300)
-                if valid and reg_addr in VALID_DYNAMIC_REGS:
+            # Scan offsets 280 to 340 for a valid Modbus ACK to determine frame block size dynamically
+            for offset in range(280, 341):
+                if start + offset + 8 > len(raw_data):
+                    break
+                valid, reg_addr, pack_id = _validate_ack_at(offset)
+                if valid and reg_addr in VALID_REGS:
                     frame = raw_data[start:start + FRAME_SIZE]
                     frames.append((frame, reg_addr, pack_id))
-                    search_start = start + DYNAMIC_BLOCK
+                    search_start = start + offset + 8
                     matched = True
-
-            # Try SETUP (ACK at offset 324, block=332)
-            if not matched and start + SETUP_BLOCK <= len(raw_data):
-                valid, reg_addr, pack_id = _validate_ack_at(324)
-                if valid and reg_addr in VALID_SETUP_REGS:
-                    frame = raw_data[start:start + FRAME_SIZE]
-                    frames.append((frame, reg_addr, pack_id))
-                    search_start = start + SETUP_BLOCK
-                    matched = True
+                    break
 
             if not matched:
-                # 55AA found but no valid ACK at either offset — skip this marker
+                # 55AA found but no valid ACK found in range — skip this marker
                 self.logger.debug(
-                    f"receive_55aa_frames: 55AA at offset {start} but no valid ACK, "
+                    f"receive_55aa_frames: 55AA at offset {start} but no valid ACK found, "
                     f"skipping 1 byte to search again"
                 )
                 search_start = start + 1
