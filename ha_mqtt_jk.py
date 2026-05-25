@@ -36,6 +36,22 @@ class HA_MQTT_JK:
         self.mqtt = ha_comm
         self.logger = logging.getLogger(__name__)
 
+    def _get_pack_device_info(self, pack_num):
+        orig_id = self.mqtt.device_info.get('identifiers', self.mqtt.device_name)
+        orig_name = self.mqtt.device_info.get('name', self.mqtt.device_name)
+        orig_mfr = self.mqtt.device_info.get('manufacturer', '')
+        orig_model = self.mqtt.device_info.get('model', '')
+        orig_ver = self.mqtt.device_info.get('sw_version', '1.0')
+        
+        return {
+            "identifiers": f"{orig_id}_{pack_num:02}",
+            "name": f"{orig_name} Pack {pack_num:02}",
+            "manufacturer": orig_mfr,
+            "model": f"{orig_model} Pack {pack_num:02}",
+            "sw_version": orig_ver,
+            "via_device": orig_id
+        }
+
     # ------------------------------------------------------------------ #
     # Internal helpers
     # ------------------------------------------------------------------ #
@@ -74,8 +90,17 @@ class HA_MQTT_JK:
 
         self._publish_totals(packs)
 
-        for idx, pack_data in enumerate(packs):
-            self._publish_pack_analog(pack_data, idx + 1)
+        # Sort packs by pack_id so MQTT topic numbering is deterministic
+        # regardless of which pack's 55AA frame arrives first in the TCP stream.
+        packs_sorted = sorted(packs, key=lambda p: p.get('pack_id', 0))
+
+        for pack_data in packs_sorted:
+            pack_id_val = pack_data.get('pack_id')
+            if pack_id_val is not None:
+                pack_num = pack_id_val + 1  # 0-based protocol → 1-based MQTT
+            else:
+                pack_num = packs_sorted.index(pack_data) + 1
+            self._publish_pack_analog(pack_data, pack_num)
 
     # ------------------------------------------------------------------ #
     # Totals (aggregated across all packs)
@@ -141,6 +166,16 @@ class HA_MQTT_JK:
     # ------------------------------------------------------------------ #
 
     def _publish_pack_analog(self, pack, pack_num):
+        """Publish analog data for a single pack."""
+        pack_device = self._get_pack_device_info(pack_num)
+        orig_device = self.mqtt.device_info
+        self.mqtt.device_info = pack_device
+        try:
+            self._publish_pack_analog_internal(pack, pack_num)
+        finally:
+            self.mqtt.device_info = orig_device
+
+    def _publish_pack_analog_internal(self, pack, pack_num):
         """Publish analog data for a single pack."""
         prefix = f'pack_{pack_num:02}_view'
 
@@ -328,10 +363,28 @@ class HA_MQTT_JK:
 
         packs = [warn_data] if isinstance(warn_data, dict) else warn_data
 
-        for idx, pack in enumerate(packs):
-            self._publish_pack_warnings(pack, idx + 1)
+        # Sort by pack_id for deterministic MQTT topic numbering
+        packs_sorted = sorted(packs, key=lambda p: p.get('pack_id', 0))
+
+        for pack in packs_sorted:
+            pack_id_val = pack.get('pack_id')
+            if pack_id_val is not None:
+                pack_num = pack_id_val + 1  # 0-based protocol → 1-based MQTT
+            else:
+                pack_num = packs_sorted.index(pack) + 1
+            self._publish_pack_warnings(pack, pack_num)
 
     def _publish_pack_warnings(self, pack, pack_num):
+        """Publish warning data for a single pack."""
+        pack_device = self._get_pack_device_info(pack_num)
+        orig_device = self.mqtt.device_info
+        self.mqtt.device_info = pack_device
+        try:
+            self._publish_pack_warnings_internal(pack, pack_num)
+        finally:
+            self.mqtt.device_info = orig_device
+
+    def _publish_pack_warnings_internal(self, pack, pack_num):
         """Publish warning data for a single pack."""
         prefix = f'pack_{pack_num:02}_protect'
 
@@ -386,38 +439,5 @@ class HA_MQTT_JK:
                 icon = 'mdi:battery-heart-variant'
                 self._pub_warn(f'{prefix}_{key}', value, icon)
 
-    # ------------------------------------------------------------------ #
-    # Setup / config data (0x161E frame)
-    # ------------------------------------------------------------------ #
-
-    def publish_setup_data(self, setup_data):
-        """
-        Publish JK setup/config (0x161E) parameters.
-
-        Args:
-            setup_data: Dict with setup parameter keys, as returned by
-                        JKBMS485.parse_jkbms_setup_frame().
-        """
-        if not setup_data:
-            return
-
-        setup_defs = {
-            'cell_ovp_protect':       ('mV', 'mdi:shield-check', 'voltage', 'measurement'),
-            'cell_uvp_protect':       ('mV', 'mdi:shield-check', 'voltage', 'measurement'),
-            'cell_ovp_recover':       ('mV', 'mdi:shield-check', 'voltage', 'measurement'),
-            'cell_uvp_recover':       ('mV', 'mdi:shield-check', 'voltage', 'measurement'),
-            'battery_ovp_protect':    ('mV', 'mdi:shield-check', 'voltage', 'measurement'),
-            'balancer_start_delta':   ('mV', 'mdi:scale-balance', 'voltage', 'measurement'),
-            'battery_uvp_protect':    ('mV', 'mdi:shield-check', 'voltage', 'measurement'),
-            'discharge_ocp_threshold': ('mA', 'mdi:current-ac', 'current', 'measurement'),
-            'charge_ocp_threshold':   ('mA', 'mdi:current-ac', 'current', 'measurement'),
-            'cell_balance_start':     ('mV', 'mdi:scale-balance', 'voltage', 'measurement'),
-            'cell_balance_stop':      ('mV', 'mdi:scale-balance', 'voltage', 'measurement'),
-        }
-
-        for key, (unit, icon, devclass, stateclass) in setup_defs.items():
-            if key in setup_data:
-                self._pub_sensor(
-                    f'setup_{key}', setup_data[key],
-                    unit, icon, devclass, stateclass
-                )
+    # Setup / config data is published via _publish_pack_settings() from the
+    # active data pipeline (get_jk_native_data → publish_analog_data → _publish_pack_settings).
