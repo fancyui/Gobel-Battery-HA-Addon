@@ -1,19 +1,19 @@
+---
+description: 
+---
+
 # Changelog
 
 
 ---------------
 
-  存在的一个隐患
 
-  ACK 的 CRC 未校验（jkbms_rs485.py:169-179）。_validate_ack_at() 只检查了功能码是否为 0x10
-  和寄存器地址是否合法，没有验证 ACK 的 CRC16。如果 RS485 总线上发生 bit 翻转导致 ack[0] 的 pack_id
-  字节损坏，理论上可能把 pack2 的帧错误归属到 pack1。但差分信号的 RS485 抗噪能力很强，且帧体 300
-  字节也要同时有效，实际发生概率极低。
+## 1.9.48
 
-  另一个小问题
+-   [JKBMS] Fixed pack identification logic to prevent data collision between different packs.
+-   [JKBMS] Send each pack's sensor data to its own separate Home Assistant device.
 
-  主动查询备选路径（jkbms_rs485.py:926）中 slave_address 硬编码为 0x01，如果 setup 帧没被被动捕获到，主动查询只会请求
-  pack1，pack2 的 setup 数据会缺失。但这不会导致数据错乱，只是 pack2 缺少配置参数。
+---------------
 
 
 ## 1.9.46
