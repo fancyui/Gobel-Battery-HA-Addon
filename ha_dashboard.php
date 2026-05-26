@@ -210,6 +210,90 @@ function total_entities($device_name, $bms_type) {
   return $output;
 }
 
+function pack_settings_entities($device_name, $total_packs_num, $bms_type) {
+  $output = "";
+  if ($bms_type != 'jkbms') {
+    return $output;
+  }
+  for ($i = 0; $i < $total_packs_num; $i++) {
+    $pack_str = "pack_" . sprintf("%02d", $i+1);
+    $sensor_prefix = "sensor." . $device_name . "_" . $pack_str . "_" . $pack_str . "_setting_";
+    $binary_prefix = "binary_sensor." . $device_name . "_" . $pack_str . "_" . $pack_str . "_setting_";
+    
+    $output .= "      - type: entities\n";
+    $output .= "        title: Pack " . sprintf("%02d", $i+1) . " Settings\n";
+    $output .= "        state_color: true\n";
+    $output .= "        view_layout:\n";
+    $output .= "          position: sidebar\n";
+    $output .= "        entities:\n";
+    
+    // Group 1: Switch Settings
+    $output .= "          - type: section\n";
+    $output .= "            label: Function Switches\n";
+    $output .= "          - entity: " . $binary_prefix . "charge_switch_enabled\n";
+    $output .= "            name: Charge Switch\n";
+    $output .= "          - entity: " . $binary_prefix . "discharge_switch_enabled\n";
+    $output .= "            name: Discharge Switch\n";
+    $output .= "          - entity: " . $binary_prefix . "balance_switch_enabled\n";
+    $output .= "            name: Balance Switch\n";
+    $output .= "          - entity: " . $binary_prefix . "function_heating_enabled\n";
+    $output .= "            name: Heating Function\n";
+    $output .= "          - entity: " . $binary_prefix . "function_smart_sleep_enabled\n";
+    $output .= "            name: Smart Sleep Function\n";
+    
+    // Group 2: Voltages Settings
+    $output .= "          - type: section\n";
+    $output .= "            label: Voltage Parameters\n";
+    $output .= "          - entity: " . $sensor_prefix . "cell_overvoltage_protection\n";
+    $output .= "            name: Cell Overvoltage Protection\n";
+    $output .= "          - entity: " . $sensor_prefix . "cell_overvoltage_recovery\n";
+    $output .= "            name: Cell Overvoltage Recovery\n";
+    $output .= "          - entity: " . $sensor_prefix . "cell_undervoltage_protection\n";
+    $output .= "            name: Cell Undervoltage Protection\n";
+    $output .= "          - entity: " . $sensor_prefix . "cell_undervoltage_recovery\n";
+    $output .= "            name: Cell Undervoltage Recovery\n";
+    $output .= "          - entity: " . $sensor_prefix . "balance_start_voltage\n";
+    $output .= "            name: Balance Start Voltage\n";
+    $output .= "          - entity: " . $sensor_prefix . "balance_trigger_voltage\n";
+    $output .= "            name: Balance Trigger Voltage\n";
+    
+    // Group 3: Current Settings
+    $output .= "          - type: section\n";
+    $output .= "            label: Current & Delay Parameters\n";
+    $output .= "          - entity: " . $sensor_prefix . "charge_overcurrent_protection\n";
+    $output .= "            name: Charge Overcurrent Protection\n";
+    $output .= "          - entity: " . $sensor_prefix . "discharge_overcurrent_protection\n";
+    $output .= "            name: Discharge Overcurrent Protection\n";
+    $output .= "          - entity: " . $sensor_prefix . "max_balance_current\n";
+    $output .= "            name: Max Balance Current\n";
+    $output .= "          - entity: " . $sensor_prefix . "short_circuit_delay\n";
+    $output .= "            name: Short Circuit Delay\n";
+    
+    // Group 4: Temperature Settings
+    $output .= "          - type: section\n";
+    $output .= "            label: Temperature Parameters\n";
+    $output .= "          - entity: " . $sensor_prefix . "charge_over_temperature_protection\n";
+    $output .= "            name: Charge Over Temp Protection\n";
+    $output .= "          - entity: " . $sensor_prefix . "charge_low_temperature_protection\n";
+    $output .= "            name: Charge Low Temp Protection\n";
+    $output .= "          - entity: " . $sensor_prefix . "discharge_over_temperature_protection\n";
+    $output .= "            name: Discharge Over Temp Protection\n";
+    $output .= "          - entity: " . $sensor_prefix . "mos_over_temperature_protection\n";
+    $output .= "            name: MOS Over Temp Protection\n";
+    
+    // Group 5: Other Settings
+    $output .= "          - type: section\n";
+    $output .= "            label: Hardware Settings\n";
+    $output .= "          - entity: " . $sensor_prefix . "cell_count_setting\n";
+    $output .= "            name: Cell Count Setting\n";
+    $output .= "          - entity: " . $sensor_prefix . "cell_design_capacity\n";
+    $output .= "            name: Cell Design Capacity\n";
+    $output .= "          - entity: " . $sensor_prefix . "device_address\n";
+    $output .= "            name: Device Address\n";
+  }
+  return $output;
+}
+
 function pack_entities($device_name, $total_packs_num, $bms_type) {
   $output = "";
   for ($i = 0; $i < $total_packs_num; $i++) {
@@ -413,6 +497,7 @@ function generate_dashboard_template($device_name, $total_packs_num, $num_cells,
     $output .= pack_warn_entity_filter($device_name, $total_packs_num, $bms_type);
     $output .= cell_warn_entity_filter($device_name, $total_packs_num, $num_cells, $bms_type);
     $output .= total_entities($device_name, $bms_type);
+    $output .= pack_settings_entities($device_name, $total_packs_num, $bms_type);
     $output .= pack_entities($device_name, $total_packs_num, $bms_type);
     $output .= pack_cell_history($device_name, $total_packs_num, $num_cells, $bms_type);
     $output .= pack_temp_history($device_name, $total_packs_num, $num_temps, $bms_type);
