@@ -1,7 +1,8 @@
 ## Gobel Power Battery Home Assistant Addon
 
-### Documents
-<a href="https://www.gobelpower.com/introduction_f61.html">Gobel Power Battery Home Assistant Addon Manual</a>
+### Documents & Tools
+<a href="https://www.gobelpower.com/introduction_f61.html">Gobel Power Battery Home Assistant Addon Manual</a>  
+<a href="https://www.gobelpower.com/ha_dashboard_ap46.html">Online Home Assistant Dashboard Generator</a>
 
 ### Dashboard Example:
 
