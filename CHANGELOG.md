@@ -8,6 +8,13 @@ description:
 ---------------
 
 
+## 1.9.53
+
+-   [JKBMS] Map 1-based Modbus Slave ID in trailing ACK to 0-based pack ID to fix missing Pack 01 and prevent duplicate/misaligned pack devices in HA.
+
+---------------
+
+
 ## 1.9.52
 
 -   [PACEWIFI] Add support for PACE_LV_WIFI bms_type to passively parse telemetry data actively broadcasted over WiFi.
