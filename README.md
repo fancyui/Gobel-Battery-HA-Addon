@@ -17,7 +17,7 @@ Seamlessly bridge your solar energy storage system (ESS) with your home automati
 
 ## Documents & Tools
 <a href="https://www.gobelpower.com/introduction_f61.html">Gobel Power Battery Home Assistant Addon Manual</a>  
-<a href="https://www.gobelpower.com/ha_dashboard_ap46.html">Online Home Assistant Dashboard Generator</a>
+<a href="https://www.gobelpower.com/generate-dashboard_f60.html">Online Home Assistant Dashboard Generator</a>
 
 ## Dashboard Example:
 
