@@ -557,6 +557,14 @@ if (isset($_GET['device_name'])) {
     width: 100%;
     box-sizing: border-box;
   }
+  .form_ctn small {
+    display: block;
+    color: #888;
+    font-size: 11px;
+    margin-top: 2px;
+    margin-bottom: 5px;
+    line-height: 1.2;
+  }
   .cssButton {
     margin-top: 20px!important;
   }
@@ -568,9 +576,17 @@ if (isset($_GET['device_name'])) {
 <div class="form_ctn">
   <form action="/ha_dashboard_ap46.html">
     <input type="text" name="device_name" placeholder="Device Name" class="input_box" value="<?php echo isset($_GET['device_name']) ? htmlspecialchars($_GET['device_name']) : ''; ?>">
+    <small>Device Name: device_name in Config</small>
+    
     <input type="number" name="total_packs_num" placeholder="Total Packs Num" class="input_box" value="<?php echo isset($_GET['total_packs_num']) ? htmlspecialchars($_GET['total_packs_num']) : ''; ?>">
+    <small>Total Packs Num: Total Packs Num in Home Assistant -> Settings -> Devices & services -> Integrations -> MQTT -> device -> Sensors</small>
+    
     <input type="number" name="num_cells" placeholder="View Num Cells" class="input_box" value="<?php echo isset($_GET['num_cells']) ? htmlspecialchars($_GET['num_cells']) : ''; ?>">
+    <small>View Num Cells: Pack 01 View Num Cells in Home Assistant -> Settings -> Devices & services -> Integrations -> MQTT -> device -> Sensors</small>
+    
     <input type="number" name="num_temps" placeholder="View Num Temps" class="input_box" value="<?php echo isset($_GET['num_temps']) ? htmlspecialchars($_GET['num_temps']) : ''; ?>">
+    <small>View Num Temps: Pack 01 View Num Temps in Home Assistant -> Settings -> Devices & services -> Integrations -> MQTT -> device -> Sensors</small>
+    
     <select name="bms_type" class="input_box" style="margin-top: 10px; height: 35px; background: #fff; border: 1px solid #ccc; padding: 5px;">
       <option value="pacebms" <?php if (isset($_GET['bms_type']) && $_GET['bms_type'] == 'pacebms') echo 'selected'; ?>>PACE BMS</option>
       <option value="jkbms" <?php if (isset($_GET['bms_type']) && $_GET['bms_type'] == 'jkbms') echo 'selected'; ?>>JK BMS</option>
