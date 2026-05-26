@@ -2,7 +2,18 @@
 description: 
 ---
 
-# Gobel Power Battery Home Assistant Addon for JK BMS, Pace BMS, TDT BMS
+# Gobel Power Battery Home Assistant Add-on (JK BMS, Pace BMS, TDT BMS)
+
+The ultimate Home Assistant integration for smart energy storage monitoring. This add-on provides robust, real-time data logging and diagnostics for your LiFePO4 battery banks running Pace BMS, JK BMS, or TDT BMS hardware. 
+
+Seamlessly bridge your solar energy storage system (ESS) with your home automation network using standard protocols like MQTT to monitor battery health, individual cell voltages, state of charge (SoC), and system protections.
+
+## Key Features & Capabilities:
+* **Multi-BMS Compatibility:** Native support for Pace BMS, JK BMS (55AA protocol), and TDT BMS.
+* **Versatile Connectivity Options:** Connect your hardware via RS232-USB, RS232-to-Ethernet, RS232-to-WiFi, RS485-to-Ethernet, or RS485-to-WiFi.
+* **Comprehensive Telemetry:** Tracks state of charge (SoC), state of health (SoH), total voltage, current, individual cell balancing, temperatures, warnings, and fault protections.
+* **One Connection for All (Master-Slave):** Simplify your wiring. Connect directly to the Master BMS to automatically discover and aggregate data from all parallel-connected slave battery packs.
+* **Plug-and-Play Home Assistant Setup:** Quickly deploy and generate automated dashboards for real-time energy tracking.
 
 ## Documents & Tools
 <a href="https://www.gobelpower.com/introduction_f61.html">Gobel Power Battery Home Assistant Addon Manual</a>  
