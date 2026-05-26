@@ -23,6 +23,11 @@ Seamlessly bridge your solar energy storage system (ESS) with your home automati
 
 ![image](https://www.gobelpower.com/images/github/dashboard-gobel-power-home-assistant-addon-1.webp)
 
+## Pace BMS Connection Instructions:
+- **Connection Port**: Connect Home Assistant to the **RS232** or WIFI interface of the Pace BMS.
+- **Master BMS**: The connection must be made to the **Master BMS**.
+- **DIP Switch Settings**: Ensure the DIP switches (Dial) are set to **1000**.
+
 ## JK BMS Connection Instructions:
 - **Connection Port**: Connect Home Assistant to the **RS485B** or **RS485C** interface of the JK BMS.
 - **Master BMS**: The connection must be made to the **Master BMS**.
