@@ -25,7 +25,7 @@ Seamlessly bridge your solar energy storage system (ESS) with your home automati
 
 ## Pace BMS Connection Instructions:
 - **RS232-WIFI/Ethernet modual or RS232-USB cable needed**
-- **Connection Port**: Connect Home Assistant to the **RS232** or WIFI interface of the Pace BMS.
+- **Connection Port**: Connect Home Assistant to the **RS232** or **WIFI** interface of the Pace BMS.
 - **Master BMS**: The connection must be made to the **Master BMS**.
 - **DIP Switch Settings**: Ensure the DIP switch (Dial) of master BMS is set to **1000**.
 
