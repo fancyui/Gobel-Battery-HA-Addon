@@ -27,13 +27,13 @@ Seamlessly bridge your solar energy storage system (ESS) with your home automati
 - **RS232-WIFI/Ethernet modual or RS232-USB cable needed**
 - **Connection Port**: Connect Home Assistant to the **RS232** or WIFI interface of the Pace BMS.
 - **Master BMS**: The connection must be made to the **Master BMS**.
-- **DIP Switch Settings**: Ensure the DIP switches (Dial) are set to **1000**.
+- **DIP Switch Settings**: Ensure the DIP switch (Dial) of master BMS is set to **1000**.
 
 ## JK BMS Connection Instructions:
 - **RS485-WIFI/Ethernet modual or RS485-USB cable needed**
 - **Connection Port**: Connect Home Assistant to the **RS485B** or **RS485C** interface of the JK BMS.
 - **Master BMS**: The connection must be made to the **Master BMS**.
-- **DIP Switch Settings**: Ensure the DIP switches (Dial) are set to **0000**.
+- **DIP Switch Settings**: Ensure the DIP switch (Dial) of master BMS is set to **0000**.
 
 ## Installation:
 Click the button to add the addon to Home Assistant
