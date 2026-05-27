@@ -8,6 +8,13 @@ description:
 ---------------
 
 
+## 1.9.54
+
+-   [PACE485] Fix cell temperature sensors becoming unavailable in Home Assistant. The unit was the single CJK character '℃' (U+2103), which HA rejects as an invalid unit for the `temperature` device class, so the MQTT discovery config was discarded and the entities stayed `unavailable`/restored. Use the standard '°C' (U+00B0 + 'C') instead, matching pacebms_wifi.py.
+
+---------------
+
+
 ## 1.9.53
 
 -   [JKBMS] Map 1-based Modbus Slave ID in trailing ACK to 0-based pack ID to fix missing Pack 01 and prevent duplicate/misaligned pack devices in HA.
