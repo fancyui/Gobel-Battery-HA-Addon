@@ -232,6 +232,8 @@ def run():
                 logger.info("Stopping the program...")
             
             finally:
+                if hasattr(bms, 'stop'):
+                    bms.stop()
                 mqtt_client.loop_stop()
         
         else:

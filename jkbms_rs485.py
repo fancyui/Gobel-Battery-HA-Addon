@@ -3,6 +3,8 @@
 
 import struct
 import logging
+import threading
+import time
 
 class JKBMS485:
     """
@@ -45,9 +47,12 @@ class JKBMS485:
         self.static_cache = {}  # dict of pack_id -> static_dict
         # Cache of dynamic frames to avoid pack count/data fluctuations
         self.dynamic_cache = {} # dict of pack_id -> (dynamic_dict, timestamp)
-        # Store the last read results to avoid double reading
-        self.last_dynamic_results = {}
-        self.last_read_time = 0.0
+        
+        # Thread safety lock and background listener thread
+        self.cache_lock = threading.Lock()
+        self.running = True
+        self.thread = threading.Thread(target=self._read_loop, name="jkbms_listener", daemon=True)
+        self.thread.start()
 
     # ---------------------------------------------------------------------------
     # Cumulative Energy
@@ -106,95 +111,117 @@ class JKBMS485:
     # Passive data reception (BMS broadcasts 55AA frames automatically)
     # ---------------------------------------------------------------------------
 
-    def receive_55aa_frames(self, timeout=2.0):
+    def stop(self):
+        """Stop the background listener thread."""
+        self.running = False
+
+    def _validate_ack_at(self, buffer, offset):
+        """Check if a valid Modbus ACK exists at the given offset.
+        ACK format: [pack_id][0x10][reg_hi][reg_lo][0x00][0x01][crc16_le]
+        Returns (True, reg_addr, pack_id) or (False, 0, 0)."""
+        if offset + 8 > len(buffer):
+            return False, 0, 0
+        ack = buffer[offset:offset + 8]
+        if ack[1] != 0x10:
+            return False, 0, 0
+        if ack[4] != 0x00 or ack[5] != 0x01:
+            return False, 0, 0
+        crc_expected = self.calculate_crc16_modbus(ack[0:6])
+        crc_received = struct.unpack('<H', ack[6:8])[0]
+        if crc_expected != crc_received:
+            return False, 0, 0
+        reg_addr = (ack[2] << 8) | ack[3]
+        pack_id = ack[0]
+        return True, reg_addr, pack_id
+
+    def _handle_valid_frame(self, frame, reg_addr, pack_id):
+        """Thread-safely parse and update cache dicts."""
+        current_time = time.time()
+        reg_label = (
+            'DYNAMIC' if reg_addr == 0x1620
+            else 'SETUP' if reg_addr == 0x161E
+            else 'STATIC' if reg_addr == 0x161C
+            else 'UNKNOWN')
+            
+        self.logger.debug(
+            f"Background parsed valid frame: pack_id={pack_id}, reg=0x{reg_addr:04X} ({reg_label})"
+        )
+        
+        with self.cache_lock:
+            if reg_addr == 0x1620:
+                res = self.parse_jkbms_55aa_frame(frame)
+                if res.get('cell_voltages'):
+                    self.dynamic_cache[pack_id] = (res, current_time)
+            elif reg_addr == 0x161E:
+                res = self.parse_jkbms_setup_frame(frame)
+                if res:
+                    self.setup_cache[pack_id] = res
+            elif reg_addr == 0x161C:
+                res = self.parse_jkbms_static_frame(frame)
+                if res:
+                    self.static_cache[pack_id] = res
+
+    def _read_loop(self):
         """
-        Passively receive 55AA frames from the JK BMS broadcast stream.
-
-        Protocol structure (from JK-BMS-55AA-Protocol.md):
-          - DYNAMIC (0x1620) / STATIC (0x161C): 300-byte 55AA frame + 8-byte ACK = 308 bytes
-            ACK at offset 300: [pack_id][0x10][reg_hi][reg_lo][0x00][0x01][crc16]
-          - SETUP (0x161E): 300-byte 55AA frame + 24-byte extra + 8-byte ACK = 332 bytes
-            ACK at offset 324: [pack_id][0x10][reg_hi][reg_lo][0x00][0x01][crc16]
-          - pack_id is 0-based: 0 = pack 1, 1 = pack 2, etc.
-
-        Returns:
-            list of tuples (frame_300bytes, reg_addr, pack_id)
+        Background listener thread loop.
+        Passively reads from the BMS connection,
+        accumulates bytes, parses 55AA frames, and updates caches.
         """
-        raw_data = self.bms_comm.receive_jkbms_passive(timeout)
-        if not raw_data:
-            self.logger.warning("receive_55aa_frames: no data received from BMS (raw_data is None/empty)")
-            return []
-
-        FRAME_SIZE = 300
-        VALID_REGS = {0x161C, 0x161E, 0x1620}
-
-        def _validate_ack_at(offset):
-            """Check if a valid Modbus ACK exists at the given offset.
-            ACK format: [pack_id][0x10][reg_hi][reg_lo][0x00][0x01][crc16_le]
-            Returns (True, reg_addr, pack_id) or (False, 0, 0)."""
-            if start + offset + 8 > len(raw_data):
-                return False, 0, 0
-            ack = raw_data[start + offset:start + offset + 8]
-            if ack[1] != 0x10:
-                return False, 0, 0
-            if ack[4] != 0x00 or ack[5] != 0x01:
-                return False, 0, 0
-            crc_expected = self.calculate_crc16_modbus(ack[0:6])
-            crc_received = struct.unpack('<H', ack[6:8])[0]
-            if crc_expected != crc_received:
-                return False, 0, 0
-            reg_addr = (ack[2] << 8) | ack[3]
-            pack_id = ack[0]
-            return True, reg_addr, pack_id
-
-        frames = []  # list of (frame_300, reg_addr, pack_id)
-        search_start = 0
-        while search_start < len(raw_data):
-            start = raw_data.find(b'\x55\xAA', search_start)
-            if start < 0:
-                break
-
-            matched = False
-
-            # Scan offsets 280 to 340 for a valid Modbus ACK to determine frame block size dynamically
-            for offset in range(280, 341):
-                if start + offset + 8 > len(raw_data):
-                    break
-                valid, reg_addr, pack_id = _validate_ack_at(offset)
-                if valid and reg_addr in VALID_REGS:
-                    frame = raw_data[start:start + FRAME_SIZE]
-                    frames.append((frame, reg_addr, pack_id))
-                    search_start = start + offset + 8
-                    matched = True
-                    break
-
-            if not matched:
-                # 55AA found but no valid ACK found in range — skip this marker
-                self.logger.debug(
-                    f"receive_55aa_frames: 55AA at offset {start} but no valid ACK found, "
-                    f"skipping 1 byte to search again"
-                )
-                search_start = start + 1
-                continue
-
-            if frames:
-                last_frame, last_reg, last_pack = frames[-1]
-                reg_label = (
-                    'DYNAMIC' if last_reg == 0x1620
-                    else 'SETUP' if last_reg == 0x161E
-                    else 'STATIC' if last_reg == 0x161C
-                    else 'UNKNOWN')
-                self.logger.debug(
-                    f"receive_55aa_frames: block at offset {start}, "
-                    f"pack_id={last_pack}, reg=0x{last_reg:04X} ({reg_label})"
-                )
-
-        if frames:
-            self.logger.debug(f"receive_55aa_frames: extracted {len(frames)} 55AA block(s) from {len(raw_data)} bytes")
-        else:
-            self.logger.debug(f"receive_55aa_frames: NO 55AA block found in {len(raw_data)} bytes")
-
-        return frames
+        self.logger.info("JK BMS background listener thread started")
+        buffer = b''
+        while self.running:
+            try:
+                # Read raw passive data
+                raw_data = self.bms_comm.receive_jkbms_passive(read_timeout=1.0)
+                if raw_data:
+                    # Append new data to sliding buffer
+                    buffer += raw_data
+                    
+                    # Process buffer
+                    while len(buffer) >= 8:
+                        # 1. Find the first occurrence of 55 AA
+                        idx = buffer.find(b'\x55\xAA')
+                        if idx < 0:
+                            # 55 AA not found, discard everything except the last 1 byte (in case it is 0x55)
+                            if buffer.endswith(b'\x55'):
+                                buffer = b'\x55'
+                            else:
+                                buffer = b''
+                            break
+                        
+                        if idx > 0:
+                            # Discard non-55AA data preceding the match
+                            buffer = buffer[idx:]
+                        
+                        # 2. Check if we have enough bytes to scan for ACK
+                        # Max possible offset to check is 340, ACK size is 8.
+                        # We need at least 348 bytes to do a full scan.
+                        if len(buffer) < 348:
+                            # Wait for more data to complete the frame
+                            break
+                            
+                        matched = False
+                        for offset in range(280, 341):
+                            valid, reg_addr, pack_id = self._validate_ack_at(buffer, offset)
+                            if valid and reg_addr in {0x161C, 0x161E, 0x1620}:
+                                frame = buffer[:300]
+                                self._handle_valid_frame(frame, reg_addr, pack_id)
+                                buffer = buffer[offset + 8:]
+                                matched = True
+                                break
+                                
+                        if not matched:
+                            # Checked 280 to 340 and found no valid ACK. Invalid header!
+                            # Discard first 2 bytes (55 AA) to search for the next 55 AA.
+                            buffer = buffer[2:]
+                else:
+                    # No data received, sleep a bit to prevent high CPU usage
+                    time.sleep(0.05)
+            except Exception as e:
+                self.logger.error(f"Error in background listener thread: {e}", exc_info=True)
+                time.sleep(1.0)
+                
+        self.logger.info("JK BMS background listener thread stopped")
 
     # ---------------------------------------------------------------------------
     # 55AA JK BMS Frame Parser
@@ -776,41 +803,22 @@ class JKBMS485:
         import time
         current_time = time.time()
 
-        # If we read very recently (within 5 seconds), and force_refresh is False,
-        # reuse the cached results to avoid blocking the loop again.
-        if not force_refresh and current_time - self.last_read_time <= 5.0:
-            self.logger.debug("Reusing recently fetched frames data")
-            return self.last_dynamic_results, self.setup_cache, self.static_cache
+        # Wait up to 10 seconds at startup (if caches are empty) to let background thread populate data
+        start_wait = current_time
+        while not self.dynamic_cache and (time.time() - start_wait < 10.0):
+            time.sleep(0.2)
 
         dynamic_results = {}
         setup_results = {}
         static_results = {}
 
-        frames = self.receive_55aa_frames(timeout=8.0)
-        for frame, reg_addr, pack_id in frames:
-            if reg_addr == 0x1620:
-                res = self.parse_jkbms_55aa_frame(frame)
-                if res.get('cell_voltages'):
-                    dynamic_results[pack_id] = res
-                    self.dynamic_cache[pack_id] = (res, current_time) # Update cache with timestamp
-            elif reg_addr == 0x161E:
-                res = self.parse_jkbms_setup_frame(frame)
-                if res:
-                    setup_results[pack_id] = res
-                    self.setup_cache[pack_id] = res  # update cache
-            elif reg_addr == 0x161C:
-                res = self.parse_jkbms_static_frame(frame)
-                if res:
-                    static_results[pack_id] = res
-                    self.static_cache[pack_id] = res  # update cache
-
-        # Merge cached dynamic values for packs that were NOT received in this iteration,
-        # but have been seen recently (adaptively scaled based on refresh interval).
-        max_age = max(30.0, self.data_refresh_interval * 3.0)
-        for p_id, (cached_res, last_seen) in list(self.dynamic_cache.items()):
-            if p_id not in dynamic_results:
+        # Acquire lock and copy/update from cache
+        with self.cache_lock:
+            # Merge cached dynamic values for packs that have been seen recently
+            max_age = max(30.0, self.data_refresh_interval * 3.0)
+            for p_id, (cached_res, last_seen) in list(self.dynamic_cache.items()):
                 if current_time - last_seen <= max_age:
-                    dynamic_results[p_id] = cached_res
+                    dynamic_results[p_id] = cached_res.copy()
                 else:
                     # Clean up expired cache
                     self.logger.warning(f"Pack {p_id} went offline (no data for {max_age}s), removing from cache")
@@ -818,16 +826,13 @@ class JKBMS485:
                     self.setup_cache.pop(p_id, None)
                     self.static_cache.pop(p_id, None)
 
-        # Merge cached values for any packs that were detected but didn't receive setup/static frames in this iteration
-        for pack_id in dynamic_results:
-            if pack_id not in setup_results and pack_id in self.setup_cache:
-                setup_results[pack_id] = self.setup_cache[pack_id]
-            if pack_id not in static_results and pack_id in self.static_cache:
-                static_results[pack_id] = self.static_cache[pack_id]
-
-        # Update last read results
-        self.last_dynamic_results = dynamic_results
-        self.last_read_time = current_time
+            # Copy setup and static caches
+            for p_id, setup_data in self.setup_cache.items():
+                if p_id in dynamic_results:
+                    setup_results[p_id] = setup_data.copy()
+            for p_id, static_data in self.static_cache.items():
+                if p_id in dynamic_results:
+                    static_results[p_id] = static_data.copy()
 
         return dynamic_results, setup_results, static_results
 

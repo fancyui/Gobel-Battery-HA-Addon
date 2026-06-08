@@ -5,6 +5,13 @@ description:
 # Changelog
 
 
+## 1.9.60
+
+-   [JKBMS] Refactor JK BMS serial reader into an asynchronous background listener thread to completely prevent serial port blocking in the main loop. Non-55AA frames (like Modbus master queries) are automatically filtered and discarded. Main publishing logic fetches telemetry from thread-safe caches with 0.0s latency, resolving HA entity and pack count fluctuations.
+
+---------------
+
+
 ## 1.9.59
 
 -   [JKBMS] Make dynamic telemetry cache expiration adaptive based on the refresh interval (`max(30s, refresh_interval * 3)`) to support larger refresh interval settings (e.g. 20s) without false-offline reports.
