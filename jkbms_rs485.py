@@ -139,7 +139,7 @@ class JKBMS485:
             if crc_expected != crc_received:
                 return False, 0, 0
             reg_addr = (ack[2] << 8) | ack[3]
-            pack_id = ack[0] - 1 if ack[0] > 0 else 0
+            pack_id = ack[0]
             return True, reg_addr, pack_id
 
         frames = []  # list of (frame_300, reg_addr, pack_id)
