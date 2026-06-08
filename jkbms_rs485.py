@@ -43,6 +43,11 @@ class JKBMS485:
         # Setup and Static data caching (infrequently broadcasted frames)
         self.setup_cache = {}   # dict of pack_id -> setup_dict
         self.static_cache = {}  # dict of pack_id -> static_dict
+        # Cache of dynamic frames to avoid pack count/data fluctuations
+        self.dynamic_cache = {} # dict of pack_id -> (dynamic_dict, timestamp)
+        # Store the last read results to avoid double reading
+        self.last_dynamic_results = {}
+        self.last_read_time = 0.0
 
     # ---------------------------------------------------------------------------
     # Cumulative Energy
@@ -763,21 +768,31 @@ class JKBMS485:
     # ---------------------------------------------------------------------------
     # Data retrieval methods
     # ---------------------------------------------------------------------------
-    def get_all_frames_data(self):
+    def get_all_frames_data(self, force_refresh=False):
         """
         Fetch all available 55AA frames (Dynamic, Setup, Static) from passively received broadcast.
         Returns three dictionaries: dynamic_results, setup_results, static_results.
         """
+        import time
+        current_time = time.time()
+
+        # If we read very recently (within 5 seconds), and force_refresh is False,
+        # reuse the cached results to avoid blocking the loop again.
+        if not force_refresh and current_time - self.last_read_time <= 5.0:
+            self.logger.debug("Reusing recently fetched frames data")
+            return self.last_dynamic_results, self.setup_cache, self.static_cache
+
         dynamic_results = {}
         setup_results = {}
         static_results = {}
 
-        frames = self.receive_55aa_frames(timeout=1.0)
+        frames = self.receive_55aa_frames(timeout=8.0)
         for frame, reg_addr, pack_id in frames:
             if reg_addr == 0x1620:
                 res = self.parse_jkbms_55aa_frame(frame)
                 if res.get('cell_voltages'):
                     dynamic_results[pack_id] = res
+                    self.dynamic_cache[pack_id] = (res, current_time) # Update cache with timestamp
             elif reg_addr == 0x161E:
                 res = self.parse_jkbms_setup_frame(frame)
                 if res:
@@ -789,12 +804,30 @@ class JKBMS485:
                     static_results[pack_id] = res
                     self.static_cache[pack_id] = res  # update cache
 
+        # Merge cached dynamic values for packs that were NOT received in this iteration,
+        # but have been seen recently (adaptively scaled based on refresh interval).
+        max_age = max(30.0, self.data_refresh_interval * 3.0)
+        for p_id, (cached_res, last_seen) in list(self.dynamic_cache.items()):
+            if p_id not in dynamic_results:
+                if current_time - last_seen <= max_age:
+                    dynamic_results[p_id] = cached_res
+                else:
+                    # Clean up expired cache
+                    self.logger.warning(f"Pack {p_id} went offline (no data for {max_age}s), removing from cache")
+                    self.dynamic_cache.pop(p_id, None)
+                    self.setup_cache.pop(p_id, None)
+                    self.static_cache.pop(p_id, None)
+
         # Merge cached values for any packs that were detected but didn't receive setup/static frames in this iteration
         for pack_id in dynamic_results:
             if pack_id not in setup_results and pack_id in self.setup_cache:
                 setup_results[pack_id] = self.setup_cache[pack_id]
             if pack_id not in static_results and pack_id in self.static_cache:
                 static_results[pack_id] = self.static_cache[pack_id]
+
+        # Update last read results
+        self.last_dynamic_results = dynamic_results
+        self.last_read_time = current_time
 
         return dynamic_results, setup_results, static_results
 
