@@ -5,6 +5,10 @@ description:
 # Changelog
 
 
+## 1.9.54
+
+-   [JKBMS] Map Modbus Slave ID directly as pack ID to support 0-based communication address configurations (addresses 0, 1, 2, 3...) and resolve pack mapping conflicts in Home Assistant.
+
 ---------------
 
 
