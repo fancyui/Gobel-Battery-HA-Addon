@@ -58,4 +58,4 @@ configuration:
     description: "Set to 1 to generate random test data (for developer debugging)."
   jk_display_index_start:
     name: "JKBMS Display Index Start"
-    description: "Choose whether the JKBMS pack label matches the physical dial-up address ('00' starts at pack_00) or shifts to start from pack_01 ('01')."
+    description: "Choose whether the JKBMS pack label matches the physical dial-up address ('00' starts at pack_00) or shifts to start from pack_01 ('01'). ⚠️ WARNING: Changing this setting alters the MQTT entity ID format, which will cause existing entities in Home Assistant to become unavailable and create duplicate entities. If you must switch, delete this device from the Home Assistant MQTT integration first, then restart the Add-on to rebuild. Do not change unless necessary."

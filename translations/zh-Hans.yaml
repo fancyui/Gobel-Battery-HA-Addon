@@ -58,4 +58,4 @@ configuration:
     description: "设为 1 以启用随机生成的测试数据（开发人员调试用）。"
   jk_display_index_start:
     name: "JKBMS 前台标签显示起始方式"
-    description: "选择 JKBMS 电池包标签是与物理拨码地址完全保持一致（'00'，即第一台电池标记为 pack_00），还是统一强制从 pack_01 开始标记（'01'）。"
+    description: "选择 JKBMS 电池包标签是与物理拨码地址完全保持一致（'00'，即第一台电池标记为 pack_00），还是统一强制从 pack_01 开始标记（'01'）。⚠️ 警告：切换此设置会更改 MQTT 实体 ID 格式，导致 Home Assistant 中的旧实体失效并产生重复实体。若必须切换，请先在 Home Assistant 的 MQTT 集成中删除此设备，然后重启 Add-on 重新生成。无特殊需求请勿修改。"

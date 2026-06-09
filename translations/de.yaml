@@ -58,4 +58,4 @@ configuration:
     description: "Auf 1 setzen, um zufällige Testdaten zu generieren (für Entwickler-Debugging)."
   jk_display_index_start:
     name: "JKBMS Start-Anzeigeindex"
-    description: "Wählen Sie, ob das JKBMS-Pack-Label mit der physischen DIP-Adresse übereinstimmt ('00' beginnt bei pack_00) oder verschoben wird, um ab pack_01 zu beginnen ('01')."
+    description: "Wählen Sie, ob das JKBMS-Pack-Label mit der physischen DIP-Adresse übereinstimmt ('00' beginnt bei pack_00) oder verschoben wird, um ab pack_01 zu beginnen ('01'). ⚠️ WARNUNG: Das Ändern dieser Einstellung ändert das Format der MQTT-Entitäts-IDs, wodurch vorhandene Entitäten in Home Assistant unbrauchbar werden und Duplikate entstehen. Falls Sie wechseln müssen, löschen Sie dieses Gerät zuerst aus der Home Assistant MQTT-Integration und starten Sie das Add-on neu, um die Entitäten neu aufzubauen. Nicht ohne Notwendigkeit ändern."
