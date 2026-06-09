@@ -5,7 +5,7 @@ description:
 # Changelog
 
 
-## 1.9.65
+## 1.9.66
 
 -   [Addon] Add multilingual translation support (English, Germany and Chinese) for configuration options to display user-friendly names and descriptions in the Home Assistant Add-on settings page.
 
