@@ -32,7 +32,7 @@ options:
   battery_port: "rs232"
   bms_type: "PACE_LV"
   bms_ip_address: "10.0.0.5"
-  bms_ip_port: 9999
+  bms_ip_port: 8899
   bms_usb_port: "/dev/ttyUSB0"
   bms_baud_rate: 115200
   data_refresh_interval: 5
