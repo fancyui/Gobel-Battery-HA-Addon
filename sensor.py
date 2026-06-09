@@ -61,6 +61,8 @@ baud_rate = config.get('bms_baud_rate')
 data_refresh_interval = config.get('data_refresh_interval')
 debug = config.get('debug')
 if_random = config.get('if_random')
+jk_display_index_start = str(config.get('jk_display_index_start', '01')).strip()
+jk_pack_index_start = 0 if jk_display_index_start in ['0', '00'] else 1
 
 device_nameprocessed = device_name.lower().replace(" ", "_")
 
@@ -110,7 +112,7 @@ def run():
     mqtt_client.loop_start()
 
     # JK-native MQTT publisher (lightweight wrapper, created unconditionally)
-    ha_comm_jk = HA_MQTT_JK(ha_comm)
+    ha_comm_jk = HA_MQTT_JK(ha_comm, jk_pack_index_start)
 
     # Schedule the BMS re-initialization (this already calls connect())
     if not schedule_bms_reinit():
@@ -213,7 +215,8 @@ def run():
                 bms_type=bms_type,
                 data_refresh_interval=data_refresh_interval,
                 debug=debug,
-                if_random=if_random
+                if_random=if_random,
+                pack_index_start=jk_pack_index_start
             )
 
             logger.info("JK_PB BMS Monitor Working...")
