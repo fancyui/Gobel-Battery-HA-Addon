@@ -59,7 +59,7 @@ schema:
   bms_ip_address: str
   bms_ip_port: int
   bms_usb_port: str
-  bms_bauud_rate: int
+  bms_baud_rate: int
   data_refresh_interval: int
   debug: int
   if_random: int
