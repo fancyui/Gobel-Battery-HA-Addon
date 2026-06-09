@@ -30,14 +30,15 @@ function glance($device_name, $bms_type) {
   return $output;
 }
 
-function pack_warn_entity_filter($device_name, $total_packs_num, $bms_type) {
+function pack_warn_entity_filter($device_name, $total_packs_num, $bms_type, $jk_display_index_start = '01') {
   $output = "";
   for ($i = 0; $i < $total_packs_num; $i++) {
-    $pack_str = "pack_" . sprintf("%02d", $i+1);
+    $display_i = ($bms_type == 'jkbms' && ($jk_display_index_start == '00' || $jk_display_index_start == '0')) ? $i : $i + 1;
+    $pack_str = "pack_" . sprintf("%02d", $display_i);
     $output .= "      - type: entity-filter\n";
     $output .= "        card:\n";
     $output .= "          type: entities\n";
-    $output .= "          title: Pack " . sprintf("%02d", $i+1) . " Warning\n";
+    $output .= "          title: Pack " . sprintf("%02d", $display_i) . " Warning\n";
     $output .= "        conditions:\n";
     $output .= "          - condition: state\n";
     $output .= "            state: 'on'\n";
@@ -144,14 +145,15 @@ function pack_warn_entity_filter($device_name, $total_packs_num, $bms_type) {
   return $output;
 }
 
-function cell_warn_entity_filter($device_name, $total_packs_num, $num_cells, $bms_type) {
+function cell_warn_entity_filter($device_name, $total_packs_num, $num_cells, $bms_type, $jk_display_index_start = '01') {
   $output = "";
   for ($i = 0; $i < $total_packs_num; $i++) {
-    $pack_str = "pack_" . sprintf("%02d", $i+1);
+    $display_i = ($bms_type == 'jkbms' && ($jk_display_index_start == '00' || $jk_display_index_start == '0')) ? $i : $i + 1;
+    $pack_str = "pack_" . sprintf("%02d", $display_i);
     $output .= "      - type: entity-filter\n";
     $output .= "        card:\n";
     $output .= "          type: entities\n";
-    $output .= "          title: Pack " . sprintf("%02d", $i+1) . " Cell Warning\n";
+    $output .= "          title: Pack " . sprintf("%02d", $display_i) . " Cell Warning\n";
     $output .= "        conditions:\n";
     $output .= "          - condition: state\n";
     $output .= "            state_not: normal\n";
@@ -210,18 +212,19 @@ function total_entities($device_name, $bms_type) {
   return $output;
 }
 
-function pack_settings_entities($device_name, $total_packs_num, $bms_type) {
+function pack_settings_entities($device_name, $total_packs_num, $bms_type, $jk_display_index_start = '01') {
   $output = "";
   if ($bms_type != 'jkbms') {
     return $output;
   }
   for ($i = 0; $i < $total_packs_num; $i++) {
-    $pack_str = "pack_" . sprintf("%02d", $i+1);
+    $display_i = ($jk_display_index_start == '00' || $jk_display_index_start == '0') ? $i : $i + 1;
+    $pack_str = "pack_" . sprintf("%02d", $display_i);
     $sensor_prefix = "sensor." . $device_name . "_" . $pack_str . "_" . $pack_str . "_setting_";
     $binary_prefix = "binary_sensor." . $device_name . "_" . $pack_str . "_" . $pack_str . "_setting_";
     
     $output .= "      - type: entities\n";
-    $output .= "        title: Pack " . sprintf("%02d", $i+1) . " Settings\n";
+    $output .= "        title: Pack " . sprintf("%02d", $display_i) . " Settings\n";
     $output .= "        state_color: true\n";
     $output .= "        view_layout:\n";
     $output .= "          position: sidebar\n";
@@ -294,17 +297,18 @@ function pack_settings_entities($device_name, $total_packs_num, $bms_type) {
   return $output;
 }
 
-function pack_entities($device_name, $total_packs_num, $bms_type) {
+function pack_entities($device_name, $total_packs_num, $bms_type, $jk_display_index_start = '01') {
   $output = "";
   for ($i = 0; $i < $total_packs_num; $i++) {
-    $pack_str = "pack_" . sprintf("%02d", $i+1);
+    $display_i = ($bms_type == 'jkbms' && ($jk_display_index_start == '00' || $jk_display_index_start == '0')) ? $i : $i + 1;
+    $pack_str = "pack_" . sprintf("%02d", $display_i);
     
     $output .= "      - type: vertical-stack\n";
     $output .= "        cards:\n";
     
     // 1. Glance Card for live metrics
     $output .= "          - type: glance\n";
-    $output .= "            title: Pack " . sprintf("%02d", $i+1) . " Overview\n";
+    $output .= "            title: Pack " . sprintf("%02d", $display_i) . " Overview\n";
     $output .= "            entities:\n";
     if ($bms_type == 'jkbms') {
       $sensor_prefix = "sensor." . $device_name . "_" . $pack_str . "_" . $pack_str . "_view_";
@@ -341,7 +345,7 @@ function pack_entities($device_name, $total_packs_num, $bms_type) {
       $binary_prefix = "binary_sensor." . $device_name . "_" . $pack_str . "_" . $pack_str . "_view_";
       
       $output .= "          - type: grid\n";
-      $output .= "            title: Pack " . sprintf("%02d", $i+1) . " Details\n";
+      $output .= "            title: Pack " . sprintf("%02d", $display_i) . " Details\n";
       $output .= "            columns: 3\n";
       $output .= "            square: false\n";
       $output .= "            cards:\n";
@@ -434,11 +438,12 @@ function pack_entities($device_name, $total_packs_num, $bms_type) {
   return $output;
 }
 
-function pack_cell_history($device_name, $total_packs_num, $num_cells, $bms_type) {
+function pack_cell_history($device_name, $total_packs_num, $num_cells, $bms_type, $jk_display_index_start = '01') {
   $output = "";
   for ($i = 0; $i < $total_packs_num; $i++) {
-    $pack_str = "pack_" . sprintf("%02d", $i+1);
-    $output .= "      - title: Pack " . sprintf("%02d", $i+1) . " Cell Voltages\n";
+    $display_i = ($bms_type == 'jkbms' && ($jk_display_index_start == '00' || $jk_display_index_start == '0')) ? $i : $i + 1;
+    $pack_str = "pack_" . sprintf("%02d", $display_i);
+    $output .= "      - title: Pack " . sprintf("%02d", $display_i) . " Cell Voltages\n";
     $output .= "        type: history-graph\n";
     $output .= "        hours_to_show: 48\n";
     $output .= "        min_y_axis: 2000\n";
@@ -457,11 +462,12 @@ function pack_cell_history($device_name, $total_packs_num, $num_cells, $bms_type
   return $output;
 }
 
-function pack_temp_history($device_name, $total_packs_num, $num_temps, $bms_type) {
+function pack_temp_history($device_name, $total_packs_num, $num_temps, $bms_type, $jk_display_index_start = '01') {
   $output = "";
   for ($i = 0; $i < $total_packs_num; $i++) {
-    $pack_str = "pack_" . sprintf("%02d", $i+1);
-    $output .= "      - title: Pack " . sprintf("%02d", $i+1) . " Temperatures\n";
+    $display_i = ($bms_type == 'jkbms' && ($jk_display_index_start == '00' || $jk_display_index_start == '0')) ? $i : $i + 1;
+    $pack_str = "pack_" . sprintf("%02d", $display_i);
+    $output .= "      - title: Pack " . sprintf("%02d", $display_i) . " Temperatures\n";
     $output .= "        type: history-graph\n";
     $output .= "        hours_to_show: 48\n";
     $output .= "        entities:\n";
@@ -491,16 +497,16 @@ function pack_temp_history($device_name, $total_packs_num, $num_temps, $bms_type
   return $output;
 }
 
-function generate_dashboard_template($device_name, $total_packs_num, $num_cells, $num_temps, $bms_type) {
+function generate_dashboard_template($device_name, $total_packs_num, $num_cells, $num_temps, $bms_type, $jk_display_index_start = '01') {
     $output = views($bms_type);
     $output .= glance($device_name, $bms_type);
-    $output .= pack_warn_entity_filter($device_name, $total_packs_num, $bms_type);
-    $output .= cell_warn_entity_filter($device_name, $total_packs_num, $num_cells, $bms_type);
+    $output .= pack_warn_entity_filter($device_name, $total_packs_num, $bms_type, $jk_display_index_start);
+    $output .= cell_warn_entity_filter($device_name, $total_packs_num, $num_cells, $bms_type, $jk_display_index_start);
     $output .= total_entities($device_name, $bms_type);
-    $output .= pack_settings_entities($device_name, $total_packs_num, $bms_type);
-    $output .= pack_entities($device_name, $total_packs_num, $bms_type);
-    $output .= pack_cell_history($device_name, $total_packs_num, $num_cells, $bms_type);
-    $output .= pack_temp_history($device_name, $total_packs_num, $num_temps, $bms_type);
+    $output .= pack_settings_entities($device_name, $total_packs_num, $bms_type, $jk_display_index_start);
+    $output .= pack_entities($device_name, $total_packs_num, $bms_type, $jk_display_index_start);
+    $output .= pack_cell_history($device_name, $total_packs_num, $num_cells, $bms_type, $jk_display_index_start);
+    $output .= pack_temp_history($device_name, $total_packs_num, $num_temps, $bms_type, $jk_display_index_start);
 
     $output = str_replace(" ", "&nbsp;", $output);
 
@@ -514,6 +520,7 @@ if (isset($_GET['device_name'])) {
   $num_cells = $_GET['num_cells'];
   $num_temps = $_GET['num_temps'];
   $bms_type = isset($_GET['bms_type']) ? $_GET['bms_type'] : 'pacebms';
+  $jk_display_index_start = isset($_GET['jk_display_index_start']) ? $_GET['jk_display_index_start'] : '01';
 
   $device_name = strtolower(str_replace(" ", "_", $device_name));
 }
@@ -591,9 +598,35 @@ if (isset($_GET['device_name'])) {
       <option value="pacebms" <?php if (isset($_GET['bms_type']) && $_GET['bms_type'] == 'pacebms') echo 'selected'; ?>>PACE BMS</option>
       <option value="jkbms" <?php if (isset($_GET['bms_type']) && $_GET['bms_type'] == 'jkbms') echo 'selected'; ?>>JK BMS</option>
     </select>
+
+    <div id="jk_index_container" style="display: none;">
+      <select name="jk_display_index_start" class="input_box" style="margin-top: 10px; height: 35px; background: #fff; border: 1px solid #ccc; padding: 5px;">
+        <option value="01" <?php if (isset($_GET['jk_display_index_start']) && $_GET['jk_display_index_start'] == '01') echo 'selected'; ?>>JK Display Index Start: 01</option>
+        <option value="00" <?php if (isset($_GET['jk_display_index_start']) && $_GET['jk_display_index_start'] == '00') echo 'selected'; ?>>JK Display Index Start: 00</option>
+      </select>
+      <small>JK Display Index Start: "00" matches dial-up exactly; "01" shifts index to start from 01.</small>
+    </div>
+
     <input type="submit" name="Generate" class="cssButton button_send">
   </form>
 </div>
+
+<script>
+  // Toggle JK display index container based on bms_type select selection
+  const bmsTypeSelect = document.querySelector('select[name="bms_type"]');
+  const jkIndexContainer = document.getElementById('jk_index_container');
+  function toggleJkIndex() {
+    if (bmsTypeSelect && bmsTypeSelect.value === 'jkbms') {
+      jkIndexContainer.style.display = 'block';
+    } else if (jkIndexContainer) {
+      jkIndexContainer.style.display = 'none';
+    }
+  }
+  if (bmsTypeSelect && jkIndexContainer) {
+    bmsTypeSelect.addEventListener('change', toggleJkIndex);
+    toggleJkIndex();
+  }
+</script>
 
 <?php if (isset($_GET['device_name'])) { ?>
 
@@ -604,7 +637,7 @@ if (isset($_GET['device_name'])) {
 </div>
 
 <div id="yaml_codes" style="white-space: pre-wrap; background-color: #222; color: #fff; font-family: monospace; padding: 10px;">
-  <?php echo generate_dashboard_template($device_name, $total_packs_num, $num_cells, $num_temps, $bms_type); ?>
+  <?php echo generate_dashboard_template($device_name, $total_packs_num, $num_cells, $num_temps, $bms_type, $jk_display_index_start); ?>
 </div>
 
 <script>
