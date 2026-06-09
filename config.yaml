@@ -1,6 +1,6 @@
 name: "Gobel Battery Monitor"
 description: "Battery Monitor supports various BMS - Home Assistant Addon"
-version: "1.9.61"
+version: "1.9.62"
 slug: "gobel_battery_monitor"
 url: "https://github.com/fancyui/Gobel-Battery-HA-Addon"
 init: false
@@ -38,7 +38,11 @@ options:
   data_refresh_interval: 5
   debug: 0
   if_random: 0
+  # JKBMS pack display label start method.
+  # - "00": matches the physical dial-up address exactly (e.g. dial 00 -> pack_00, dial 03 -> pack_03).
+  # - "01": shifts index to always start from pack_01 (e.g. dial 00 -> pack_01, dial 03 -> pack_04).
   jk_display_index_start: "01"
+
 schema:
   host_name: str
   mqtt_broker: str
@@ -59,4 +63,5 @@ schema:
   data_refresh_interval: int
   debug: int
   if_random: int
+  # Option for JKBMS pack label starting method: "00" (pack_00) or "01" (pack_01)
   jk_display_index_start: list(00|01)
