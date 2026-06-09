@@ -46,7 +46,7 @@ configuration:
     description: "The serial port path (for Serial connection, e.g., /dev/ttyUSB0)."
   bms_baud_rate:
     name: "BMS Baud Rate"
-    description: "The baud rate of the BMS communication (usually 9600 or 115200)."
+    description: "BMS serial communication baud rate. If it is JKBMS or Gobel PC BMS, please set it to 115200. Other BMS are usually 9600 or 115200."
   data_refresh_interval:
     name: "Data Refresh Interval"
     description: "Interval in seconds between telemetry data updates."

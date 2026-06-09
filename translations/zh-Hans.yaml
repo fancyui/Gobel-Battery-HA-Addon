@@ -46,7 +46,7 @@ configuration:
     description: "串口设备的物理路径（仅用于串口连接方式，例如 /dev/ttyUSB0）。"
   bms_baud_rate:
     name: "BMS 波特率"
-    description: "BMS 串口通信波特率（通常为 9600 或 115200）。"
+    description: "BMS 串口通信波特率。如果是 JKBMS 或 Gobel PC BMS，请将其设置为 115200。其它 BMS 通常为 9600或 115200。"
   data_refresh_interval:
     name: "数据刷新间隔"
     description: "遥测数据更新的时间间隔（单位：秒）。"
