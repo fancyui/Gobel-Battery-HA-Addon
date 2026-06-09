@@ -1,6 +1,6 @@
 name: "Gobel Battery Monitor"
 description: "Battery Monitor supports various BMS - Home Assistant Addon"
-version: "1.9.60"
+version: "1.9.61"
 slug: "gobel_battery_monitor"
 url: "https://github.com/fancyui/Gobel-Battery-HA-Addon"
 init: false
@@ -38,6 +38,7 @@ options:
   data_refresh_interval: 5
   debug: 0
   if_random: 0
+  jk_display_index_start: "01"
 schema:
   host_name: str
   mqtt_broker: str
@@ -58,3 +59,4 @@ schema:
   data_refresh_interval: int
   debug: int
   if_random: int
+  jk_display_index_start: list(00|01)

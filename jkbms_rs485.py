@@ -22,7 +22,7 @@ class JKBMS485:
     Other firmware versions may have different 55AA frame layouts.
     """
 
-    def __init__(self, bms_comm, ha_comm, bms_type, data_refresh_interval, debug, if_random, ha_comm_jk=None):
+    def __init__(self, bms_comm, ha_comm, bms_type, data_refresh_interval, debug, if_random, ha_comm_jk=None, pack_index_start=1):
         self.bms_comm = bms_comm
         self.ha_comm = ha_comm
         self.ha_comm_jk = ha_comm_jk          # JK-native MQTT publisher (HA_MQTT_JK or None)
@@ -30,6 +30,7 @@ class JKBMS485:
         self.data_refresh_interval = data_refresh_interval
         self.debug = debug
         self.if_random = if_random
+        self.pack_index_start = pack_index_start
 
 
         logging.basicConfig(level=logging.DEBUG if debug else logging.INFO,
@@ -1442,7 +1443,7 @@ class JKBMS485:
             self.ha_comm.publish_sensor_discovery("random_number", "R", icons['random_number'], deviceclasses['random_number'], stateclasses['random_number'])
 
         for pack in analog_data:
-            pack_i = pack.get('pack_id', 0) + 1
+            pack_i = pack.get('pack_id', 0) + self.pack_index_start
             for key, value in pack.items():
                 if key == 'pack_id':
                     continue
@@ -1500,7 +1501,7 @@ class JKBMS485:
             return None
 
         for pack in warn_data:
-            pack_i = pack.get('pack_id', 0) + 1
+            pack_i = pack.get('pack_id', 0) + self.pack_index_start
             for key, value in pack.items():
                 if key == 'pack_id':
                     continue

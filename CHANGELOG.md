@@ -5,6 +5,13 @@ description:
 # Changelog
 
 
+## 1.9.61
+
+-   [JKBMS] Add `jk_display_index_start` configuration setting with choices "00" or "01" (default) to allow matching the Home Assistant entity and pack labels with the physical dial-up address of the battery pack.
+
+---------------
+
+
 ## 1.9.60
 
 -   [JKBMS] Refactor JK BMS serial reader into an asynchronous background listener thread to completely prevent serial port blocking in the main loop. Non-55AA frames (like Modbus master queries) are automatically filtered and discarded. Main publishing logic fetches telemetry from thread-safe caches with 0.0s latency, resolving HA entity and pack count fluctuations.

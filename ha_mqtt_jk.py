@@ -32,8 +32,9 @@ class HA_MQTT_JK:
         ha_comm: An initialized HA_MQTT instance.
     """
 
-    def __init__(self, ha_comm):
+    def __init__(self, ha_comm, pack_index_start=1):
         self.mqtt = ha_comm
+        self.pack_index_start = pack_index_start
         self.logger = logging.getLogger(__name__)
 
     def _get_pack_device_info(self, pack_num):
@@ -97,9 +98,9 @@ class HA_MQTT_JK:
         for pack_data in packs_sorted:
             pack_id_val = pack_data.get('pack_id')
             if pack_id_val is not None:
-                pack_num = pack_id_val + 1  # 0-based protocol → 1-based MQTT
+                pack_num = pack_id_val + self.pack_index_start  # 0-based protocol → custom-based MQTT
             else:
-                pack_num = packs_sorted.index(pack_data) + 1
+                pack_num = packs_sorted.index(pack_data) + self.pack_index_start
             self._publish_pack_analog(pack_data, pack_num)
 
     # ------------------------------------------------------------------ #
@@ -369,9 +370,9 @@ class HA_MQTT_JK:
         for pack in packs_sorted:
             pack_id_val = pack.get('pack_id')
             if pack_id_val is not None:
-                pack_num = pack_id_val + 1  # 0-based protocol → 1-based MQTT
+                pack_num = pack_id_val + self.pack_index_start  # 0-based protocol → custom-based MQTT
             else:
-                pack_num = packs_sorted.index(pack) + 1
+                pack_num = packs_sorted.index(pack) + self.pack_index_start
             self._publish_pack_warnings(pack, pack_num)
 
     def _publish_pack_warnings(self, pack, pack_num):
