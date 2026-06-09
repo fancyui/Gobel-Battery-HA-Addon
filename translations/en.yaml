@@ -1,0 +1,61 @@
+configuration:
+  host_name:
+    name: "Host Name"
+    description: "The hostname of the Home Assistant instance."
+  mqtt_broker:
+    name: "MQTT Broker"
+    description: "The hostname or IP address of your MQTT broker."
+  mqtt_port:
+    name: "MQTT Port"
+    description: "The port of your MQTT broker."
+  mqtt_username:
+    name: "MQTT Username"
+    description: "The username for MQTT broker authentication."
+  mqtt_password:
+    name: "MQTT Password"
+    description: "The password for MQTT broker authentication."
+  device_name:
+    name: "Device Name"
+    description: "The custom name of the battery monitor device in Home Assistant."
+  battery_manufacturer:
+    name: "Battery Manufacturer"
+    description: "The manufacturer of your battery (e.g., Gobel Power)."
+  battery_model:
+    name: "Battery Model"
+    description: "The model of your battery."
+  max_parallel_allowed:
+    name: "Max Parallel Packs"
+    description: "Maximum number of parallel battery packs allowed."
+  connection_type:
+    name: "Connection Type"
+    description: "Choose how to connect to the BMS (serial, ethernet, or wifi)."
+  battery_port:
+    name: "Battery Port Type"
+    description: "The physical port used to connect (rs232 or rs485)."
+  bms_type:
+    name: "BMS Type"
+    description: "The type/brand of BMS (PACE_LV, JK_PB, TDT, or PACE_LV_WIFI)."
+  bms_ip_address:
+    name: "BMS IP Address"
+    description: "The IP address of the BMS (for Ethernet/WiFi connection)."
+  bms_ip_port:
+    name: "BMS IP Port"
+    description: "The TCP port of the BMS (for Ethernet/WiFi connection)."
+  bms_usb_port:
+    name: "BMS USB/Serial Port"
+    description: "The serial port path (for Serial connection, e.g., /dev/ttyUSB0)."
+  bms_baud_rate:
+    name: "BMS Baud Rate"
+    description: "The baud rate of the BMS communication (usually 9600 or 115200)."
+  data_refresh_interval:
+    name: "Data Refresh Interval"
+    description: "Interval in seconds between telemetry data updates."
+  debug:
+    name: "Enable Debug Logs"
+    description: "Set to 1 to enable verbose debug logs, or 0 for normal logs."
+  if_random:
+    name: "Random Test Data"
+    description: "Set to 1 to generate random test data (for developer debugging)."
+  jk_display_index_start:
+    name: "JKBMS Display Index Start"
+    description: "Choose whether the JKBMS pack label matches the physical dial-up address ('00' starts at pack_00) or shifts to start from pack_01 ('01')."

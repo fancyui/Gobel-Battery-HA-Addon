@@ -1,0 +1,61 @@
+configuration:
+  host_name:
+    name: "主机名"
+    description: "Home Assistant 实例的主机名。"
+  mqtt_broker:
+    name: "MQTT Broker 地址"
+    description: "MQTT 服务器的主机名或 IP 地址。"
+  mqtt_port:
+    name: "MQTT 端口"
+    description: "MQTT 服务器的端口号。"
+  mqtt_username:
+    name: "MQTT 用户名"
+    description: "连接 MQTT 服务器所使用的用户名。"
+  mqtt_password:
+    name: "MQTT 密码"
+    description: "连接 MQTT 服务器所使用的密码。"
+  device_name:
+    name: "设备名称"
+    description: "在 Home Assistant 中显示的电池监控设备自定义名称。"
+  battery_manufacturer:
+    name: "电池制造商"
+    description: "电池的制造商（例如 Gobel Power）。"
+  battery_model:
+    name: "电池型号"
+    description: "电池的具体型号。"
+  max_parallel_allowed:
+    name: "最大并联包数"
+    description: "系统允许的最大并联电池包数量。"
+  connection_type:
+    name: "连接类型"
+    description: "与 BMS 的连接方式（串口 serial、以太网 ethernet 或 wifi）。"
+  battery_port:
+    name: "电池接口类型"
+    description: "连接 BMS 所使用的物理接口（rs232 或 rs485）。"
+  bms_type:
+    name: "BMS 类型"
+    description: "BMS 的品牌/类型（PACE_LV、JK_PB、TDT 或 PACE_LV_WIFI）。"
+  bms_ip_address:
+    name: "BMS IP 地址"
+    description: "BMS 对应的 IP 地址（仅用于网络连接方式）。"
+  bms_ip_port:
+    name: "BMS 端口号"
+    description: "BMS 对应的 TCP 端口号（仅用于网络连接方式）。"
+  bms_usb_port:
+    name: "BMS 串口设备路径"
+    description: "串口设备的物理路径（仅用于串口连接方式，例如 /dev/ttyUSB0）。"
+  bms_baud_rate:
+    name: "BMS 波特率"
+    description: "BMS 串口通信波特率（通常为 9600 或 115200）。"
+  data_refresh_interval:
+    name: "数据刷新间隔"
+    description: "遥测数据更新的时间间隔（单位：秒）。"
+  debug:
+    name: "启用调试日志"
+    description: "设为 1 启用详细调试日志，设为 0 仅输出标准日志。"
+  if_random:
+    name: "随机测试数据"
+    description: "设为 1 以启用随机生成的测试数据（开发人员调试用）。"
+  jk_display_index_start:
+    name: "JKBMS 前台标签显示起始方式"
+    description: "选择 JKBMS 电池包标签是与物理拨码地址完全保持一致（'00'，即第一台电池标记为 pack_00），还是统一强制从 pack_01 开始标记（'01'）。"
