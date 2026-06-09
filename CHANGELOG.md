@@ -5,6 +5,48 @@ description:
 # Changelog
 
 
+## 1.9.60
+
+-   [JKBMS] Refactor JK BMS serial reader into an asynchronous background listener thread to completely prevent serial port blocking in the main loop. Non-55AA frames (like Modbus master queries) are automatically filtered and discarded. Main publishing logic fetches telemetry from thread-safe caches with 0.0s latency, resolving HA entity and pack count fluctuations.
+
+---------------
+
+
+## 1.9.59
+
+-   [JKBMS] Make dynamic telemetry cache expiration adaptive based on the refresh interval (`max(30s, refresh_interval * 3)`) to support larger refresh interval settings (e.g. 20s) without false-offline reports.
+
+---------------
+
+
+## 1.9.58
+
+-   [JKBMS] Optimize passive read loop by increasing reading timeout to 8.0s (fully covering the observed 7.0s cycle time for 16 packs) and adding a 5-second freshness cache bypass to prevent double reading from blocking the serial port.
+
+---------------
+
+
+## 1.9.57
+
+-   [JKBMS] Further increase passive reading timeout window from 2.0s to 4.0s to guarantee a full 3.2-second sequential polling cycle of 16 packs is captured.
+
+---------------
+
+
+## 1.9.56
+
+-   [JKBMS] Increase passive reading timeout window from 1.0s to 2.0s to reliably capture telemetry frames from up to 16 parallel battery packs.
+
+---------------
+
+
+## 1.9.55
+
+-   [JKBMS] Cache dynamic telemetry frames for up to 30 seconds to prevent pack count (total_packs_num) and battery entities from fluctuating due to temporary packet drops or serial read timeouts.
+
+---------------
+
+
 ## 1.9.54
 
 -   [JKBMS] Map Modbus Slave ID directly as pack ID to support 0-based communication address configurations (addresses 0, 1, 2, 3...) and resolve pack mapping conflicts in Home Assistant.
