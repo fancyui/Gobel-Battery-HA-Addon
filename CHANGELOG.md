@@ -5,6 +5,13 @@ description:
 # Changelog
 
 
+## 1.9.66
+
+-   [Addon] Add multilingual translation support (English, Germany and Chinese) for configuration options to display user-friendly names and descriptions in the Home Assistant Add-on settings page.
+
+---------------
+
+
 ## 1.9.61
 
 -   [JKBMS] Add `jk_display_index_start` configuration setting with choices "00" or "01" (default) to allow matching the Home Assistant entity and pack labels with the physical dial-up address of the battery pack.

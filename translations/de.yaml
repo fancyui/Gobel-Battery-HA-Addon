@@ -1,0 +1,61 @@
+configuration:
+  host_name:
+    name: "Hostname"
+    description: "Der Hostname der Home Assistant-Instanz."
+  mqtt_broker:
+    name: "MQTT-Broker"
+    description: "Der Hostname oder die IP-Adresse Ihres MQTT-Brokers."
+  mqtt_port:
+    name: "MQTT-Port"
+    description: "Der Port Ihres MQTT-Brokers."
+  mqtt_username:
+    name: "MQTT-Benutzername"
+    description: "Der Benutzername für die Authentifizierung am MQTT-Broker."
+  mqtt_password:
+    name: "MQTT-Passwort"
+    description: "Das Passwort für die Authentifizierung am MQTT-Broker."
+  device_name:
+    name: "Gerätename"
+    description: "Der benutzerdefinierte Name des Batterieüberwachungsgeräts in Home Assistant."
+  battery_manufacturer:
+    name: "Batteriehersteller"
+    description: "Der Hersteller Ihrer Batterie (z. B. Gobel Power)."
+  battery_model:
+    name: "Batteriemodell"
+    description: "Das Modell Ihrer Batterie."
+  max_parallel_allowed:
+    name: "Maximale parallele Packs"
+    description: "Maximale Anzahl an erlaubten parallelen Batteriepacks."
+  connection_type:
+    name: "Verbindungstyp"
+    description: "Wählen Sie, wie die Verbindung zum BMS hergestellt werden soll (seriell, Ethernet oder WLAN)."
+  battery_port:
+    name: "Batterie-Porttyp"
+    description: "Der für die Verbindung verwendete physische Port (rs232 oder rs485)."
+  bms_type:
+    name: "BMS-Typ"
+    description: "Der Typ/die Marke des BMS (PACE_LV, JK_PB, TDT oder PACE_LV_WIFI)."
+  bms_ip_address:
+    name: "BMS IP-Adresse"
+    description: "Die IP-Adresse des BMS (für Ethernet/WLAN-Verbindung)."
+  bms_ip_port:
+    name: "BMS IP-Port"
+    description: "Der TCP-Port des BMS (für Ethernet/WLAN-Verbindung)."
+  bms_usb_port:
+    name: "BMS USB-/Serieller Port"
+    description: "Der serielle Port-Pfad (für serielle Verbindung, z. B. /dev/ttyUSB0)."
+  bms_baud_rate:
+    name: "BMS Baudrate"
+    description: "BMS serielle Kommunikationsbaudrate. Wenn es sich um ein JKBMS oder Gobel PC BMS handelt, stellen Sie diese bitte auf 115200 ein. Andere BMS verwenden normalerweise 9600 oder 115200."
+  data_refresh_interval:
+    name: "Datenaktualisierungsintervall"
+    description: "Intervall in Sekunden zwischen den Aktualisierungen der Telemetriedaten."
+  debug:
+    name: "Debug-Protokolle aktivieren"
+    description: "Auf 1 setzen, um ausführliche Debug-Protokolle zu aktivieren, oder auf 0 für normale Protokolle."
+  if_random:
+    name: "Zufällige Testdaten"
+    description: "Auf 1 setzen, um zufällige Testdaten zu generieren (für Entwickler-Debugging)."
+  jk_display_index_start:
+    name: "JKBMS Start-Anzeigeindex"
+    description: "Wählen Sie, ob das JKBMS-Pack-Label mit der physischen DIP-Adresse übereinstimmt ('00' beginnt bei pack_00) oder verschoben wird, um ab pack_01 zu beginnen ('01'). ⚠️ WARNUNG: Das Ändern dieser Einstellung ändert das Format der MQTT-Entitäts-IDs, wodurch vorhandene Entitäten in Home Assistant unbrauchbar werden und Duplikate entstehen. Falls Sie wechseln müssen, löschen Sie dieses Gerät zuerst aus der Home Assistant MQTT-Integration und starten Sie das Add-on neu, um die Entitäten neu aufzubauen. Nicht ohne Notwendigkeit ändern."
