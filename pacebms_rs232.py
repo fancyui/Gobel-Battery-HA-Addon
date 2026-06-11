@@ -21,6 +21,85 @@ class PACEBMS232:
         self.total_energy_discharged = 0.0
         self.last_energy_time = time.time()
 
+        # Salvage/cache states for out-of-order packets
+        self.cached_analog_data = None
+        self.cached_warning_data = None
+
+    def identify_packet_type(self, response):
+        """
+        Identify whether the received response is an analog packet or warning packet.
+        Returns 'analog', 'warning', or None if invalid.
+        """
+        if not response or not response.startswith('~'):
+            return None
+        
+        # Strip any trailing whitespace/carriage return
+        response = response.strip()
+        
+        # Check minimum length for header + checksum
+        if len(response) < 17:
+            return None
+            
+        try:
+            # Check command success (CID1 = 46, RTN = 00)
+            cid1 = response[5:7]
+            rtn = response[7:9]
+            if cid1 != '46' or rtn != '00':
+                return None
+                
+            # Extract LENID (3 characters starting at index 10)
+            lenid = int(response[10:13], 16)
+            
+            # Extract number of packs (2 characters starting at index 15)
+            num_packs = int(response[15:17], 16)
+            
+            if num_packs <= 0:
+                return None
+                
+            ratio = lenid / num_packs
+            if ratio > 110:
+                return 'analog'
+            else:
+                return 'warning'
+        except Exception as e:
+            self.logger.error(f"Error identifying packet type: {e}")
+            return None
+
+    def process_incoming_response(self, response, expected_type):
+        """
+        Processes the received raw response.
+        If it matches expected_type, parses and returns it.
+        If it matches the OTHER type, parses it, caches it, and returns None.
+        If it matches neither, discards it (returns None).
+        """
+        packet_type = self.identify_packet_type(response)
+        if packet_type is None:
+            self.logger.warning(f"Received invalid or unidentifiable packet: {response[:30]}...")
+            return None
+            
+        if packet_type == expected_type:
+            if expected_type == 'analog':
+                return self.parse_analog_data(response)
+            else:
+                return self.parse_warning_data(response)
+        else:
+            self.logger.warning(f"Protocol Desync: Expected {expected_type} packet, but received {packet_type} packet. Salvaging...")
+            try:
+                if packet_type == 'analog':
+                    analog_data = self.parse_analog_data(response)
+                    if analog_data:
+                        self.cached_analog_data = analog_data
+                        self.logger.debug("Successfully salvaged and cached Analog data.")
+                else:
+                    warning_data = self.parse_warning_data(response)
+                    if warning_data:
+                        self.cached_warning_data = warning_data
+                        self.logger.debug("Successfully salvaged and cached Warning data.")
+            except Exception as e:
+                self.logger.error(f"Error parsing salvaged {packet_type} data: {e}")
+            
+            return None
+
     def lchksum_calc(self, lenid):
         try:
             chksum = sum(int(chr(lenid[element]), 16) for element in range(len(lenid))) % 16
@@ -1171,11 +1250,17 @@ class PACEBMS232:
     
     
     def get_analog_data(self, pack_number=None):
-        
         try:
+            # Check cache first
+            if self.cached_analog_data is not None:
+                self.logger.debug("Returning Analog data from salvage cache.")
+                data = self.cached_analog_data
+                self.cached_analog_data = None
+                return data
+
             # Generate request
             self.logger.debug(f"Trying to prepare analog request")
-            request = self.generate_bms_request("analog",pack_number)
+            request = self.generate_bms_request("analog", pack_number)
             self.logger.debug(f"analog request: {request}")
 
             # Send request to BMS
@@ -1192,24 +1277,27 @@ class PACEBMS232:
             if response is None:
                 return None
             
-            # Parse analog data from response
-            self.logger.debug(f"Trying to parse analog data")
-            analog_data = self.parse_analog_data(response)
-            self.logger.debug(f"analog data parsed: {analog_data}")
-            return analog_data
+            # Process and validate response
+            return self.process_incoming_response(response, 'analog')
     
         except Exception as e:
-            self.logger.error(f"An error occurred: {e}")
+            self.logger.error(f"An error occurred in get_analog_data: {e}")
             return None
     
     
     
     def get_warning_data(self, pack_number=None):
-        
         try:
+            # Check cache first
+            if self.cached_warning_data is not None:
+                self.logger.debug("Returning Warning data from salvage cache.")
+                data = self.cached_warning_data
+                self.cached_warning_data = None
+                return data
+
             # Generate request
             self.logger.debug(f"Trying to prepare warning request")
-            request = self.generate_bms_request("warning_info",pack_number)
+            request = self.generate_bms_request("warning_info", pack_number)
             self.logger.debug(f"warning request: {request}")
             
             # Send request to BMS
@@ -1226,15 +1314,11 @@ class PACEBMS232:
             if response is None:
                 return None
             
-            # Parse analog data from response
-            self.logger.debug(f"Trying to parse warning data")
-            warning_data = self.parse_warning_data(response)
-            self.logger.debug(f"warning data parsed: {warning_data}")
-    
-            return warning_data
+            # Process and validate response
+            return self.process_incoming_response(response, 'warning')
     
         except Exception as e:
-            self.logger.error(f"An error occurred: {e}")
+            self.logger.error(f"An error occurred in get_warning_data: {e}")
             return None
     
     
