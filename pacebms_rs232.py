@@ -798,7 +798,41 @@ class PACEBMS232:
     
         packs_info = []
     
-        for _ in range(pack_number):
+        # Dynamically determine the number of status bytes (W) per pack
+        found_w = None
+        for target_len in [len(warnstate_bytes) - 2, len(warnstate_bytes)]:
+            if target_len <= 1:
+                continue
+            for test_w in range(10, 50):
+                test_offset = index
+                valid = True
+                for pack_index in range(pack_number):
+                    if test_offset >= target_len:
+                        valid = False
+                        break
+                    num_cells = warnstate_bytes[test_offset]
+                    test_offset += 1 + num_cells
+                    if test_offset >= target_len:
+                        valid = False
+                        break
+                    num_temps = warnstate_bytes[test_offset]
+                    test_offset += 1 + num_temps
+                    # Skip test_w warning/status fields
+                    test_offset += test_w
+                
+                if valid and test_offset == target_len:
+                    found_w = test_w
+                    break
+            if found_w is not None:
+                break
+
+        if found_w is None:
+            self.logger.error("Failed to dynamically determine warning status bytes size! Defaulting to 17.")
+            found_w = 17
+        else:
+            self.logger.debug(f"Dynamically determined warning status bytes W = {found_w}")
+
+        for pack_index in range(pack_number):
             pack_info = {}
     
             # Parse 1. Cell number
@@ -901,8 +935,7 @@ class PACEBMS232:
             
             pack_info['balance_state_2'] = warnstate_bytes[index]
             index += 1
-
-
+ 
             # Detailed interpretation for Warn State 1 based on Char A.24
             warn_state_1 = warnstate_bytes[index]
             pack_info['warn_state_1'] = {
@@ -928,12 +961,16 @@ class PACEBMS232:
                 'warn_high_charge_temp': bool(warn_state_2 & 0b00000001),
             }
             index += 1
-            index += 1
-
+            
+            # Skip any remaining warning status bytes
+            remaining_w = found_w - 12
+            if remaining_w > 0:
+                index += remaining_w
     
             packs_info.append(pack_info)
     
         return packs_info
+
 
 
 
