@@ -5,6 +5,14 @@ description:
 # Changelog
 
 
+## 1.9.70
+
+-   [PACE232] Dynamically determine user-defined fields and warning status bytes parsing lengths to support differing battery pack firmware versions.
+-   [PACE232] Implement a ratiometric packet classification method to differentiate Analog and Warning response packets. Delayed/out-of-order packets are salvaged, parsed, and cached to prevent Home Assistant sensor state corruption.
+
+---------------
+
+
 ## 1.9.66
 
 -   [Addon] Add multilingual translation support (English, Germany and Chinese) for configuration options to display user-friendly names and descriptions in the Home Assistant Add-on settings page.
