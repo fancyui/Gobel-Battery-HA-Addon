@@ -384,8 +384,7 @@ class PACEBMS232:
         # Ignore the first character if it is '~'
         if response[0] == '~':
             response = response[1:]
-
-    
+ 
         # Split the response into fields (assuming each field is 2 characters representing a byte)
         fields = [response[i:i + 2] for i in range(0, len(response), 2)]
     
@@ -410,6 +409,41 @@ class PACEBMS232:
         num_packs = int(fields[offset], 16)
         offset += 1
     
+        if num_packs <= 0:
+            return []
+
+        # Dynamically calculate the number of user-defined bytes (U) per pack
+        found_u = None
+        for test_u in range(0, 100):
+            test_offset = offset
+            valid = True
+            for pack_index in range(num_packs):
+                if test_offset >= len(fields) - 2:
+                    valid = False
+                    break
+                num_cells = int(fields[test_offset], 16)
+                test_offset += 1 + num_cells * 2
+                if test_offset >= len(fields) - 2:
+                    valid = False
+                    break
+                num_temps = int(fields[test_offset], 16)
+                test_offset += 1 + num_temps * 2
+                # Skip current (2), total voltage (2), remaining capacity (2), define_number_p (1) -> 7 fields
+                test_offset += 7
+                # Skip test_u user-defined fields
+                test_offset += test_u
+            
+            # After parsing all packs, the test_offset should land exactly at len(fields) - 2
+            if valid and test_offset == len(fields) - 2:
+                found_u = test_u
+                break
+
+        if found_u is None:
+            self.logger.error("Failed to dynamically determine user-defined fields size! Defaulting to 20.")
+            found_u = 20
+
+        self.logger.debug(f"Dynamically determined user-defined bytes U = {found_u}")
+
         for pack_index in range(num_packs):
             pack_data = {}
     
@@ -425,25 +459,24 @@ class PACEBMS232:
                 cell_voltages.append(voltage)
                 offset += 2
             pack_data['cell_voltages'] = cell_voltages
-
+ 
             cell_voltage_max = max(cell_voltages)
             cell_voltage_min = min(cell_voltages)
             cell_voltage_max_index = cell_voltages.index(cell_voltage_max) + 1
             cell_voltage_min_index = cell_voltages.index(cell_voltage_min) + 1
-
+ 
             pack_data['cell_voltage_max'] = cell_voltage_max
             pack_data['cell_voltage_min'] = cell_voltage_min
             pack_data['cell_voltage_max_index'] = cell_voltage_max_index
             pack_data['cell_voltage_min_index'] = cell_voltage_min_index
-
+ 
             pack_data['cell_voltage_diff'] = cell_voltage_max - cell_voltage_min
     
             # Number of temperature sensors
             num_temps = int(fields[offset], 16)
             offset += 1
             pack_data['view_num_temps'] = num_temps
-
-    
+ 
             # Temperatures
             temperatures = []
             for temp_index in range(num_temps):
@@ -456,7 +489,7 @@ class PACEBMS232:
             # Pack current
             pack_current = fields[offset] + fields[offset + 1]  # Combine two bytes for current
             pack_current = self.hex_to_signed(pack_current) / 100
-
+ 
             offset += 2
             
             pack_data['view_current'] = pack_current
@@ -466,10 +499,10 @@ class PACEBMS232:
             pack_total_voltage = round(pack_total_voltage / 1000, 2)  # Convert mV to V
             offset += 2
             pack_data['view_voltage'] = pack_total_voltage
-
+ 
             pack_power = round(pack_total_voltage * pack_current / 1000, 4) # Convert W to kW
             pack_data['view_power'] = pack_power
-
+ 
             # 使用累积能量计算
             cumulative_charged, cumulative_discharged = self.calculate_cumulative_energy(pack_power)
             pack_data['view_energy_charged'] = cumulative_charged
@@ -483,67 +516,79 @@ class PACEBMS232:
             # Define number P
             define_number_p = int(fields[offset], 16)
             offset += 1
+            pack_data['define_number_p'] = define_number_p
     
-            # Pack full capacity
-            pack_full_capacity = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for full capacity
-            pack_full_capacity = round(pack_full_capacity / 100, 2)  # Convert 10mAH to AH
-            offset += 2
-            pack_data['view_full_capacity'] = pack_full_capacity
+            # Parse user-defined items based on found_u
+            u_offset = 0
+
+            # 1. Full Capacity (2 bytes)
+            if found_u - u_offset >= 2:
+                pack_full_capacity = int(fields[offset] + fields[offset + 1], 16)
+                pack_full_capacity_val = round(pack_full_capacity / 100, 2)
+                pack_data['view_full_capacity'] = pack_full_capacity_val
+                offset += 2
+                u_offset += 2
+            else:
+                pack_data['view_full_capacity'] = 0.0
     
-            # Cycle number
-            cycle_number = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for cycle number
-            offset += 2
-            pack_data['view_cycle_number'] = cycle_number
-    
-            # Pack design capacity
-            pack_design_capacity = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for design capacity
-            pack_design_capacity = round(pack_design_capacity / 100, 2)  # Convert 10mAH to AH
-            offset += 2
-            pack_data['view_design_capacity'] = pack_design_capacity
+            # 2. Cycle Count (2 bytes)
+            if found_u - u_offset >= 2:
+                cycle_number = int(fields[offset] + fields[offset + 1], 16)
+                pack_data['view_cycle_number'] = cycle_number
+                offset += 2
+                u_offset += 2
 
-            # Pack SOC
-            pack_soc = int(fields[offset], 16)  # SOC in percentage
-            offset += 1
-            pack_data['view_SOC'] = round(pack_soc, 1)
+            # 3. Design Capacity (2 bytes)
+            if found_u - u_offset >= 2:
+                pack_design_capacity = int(fields[offset] + fields[offset + 1], 16)
+                pack_design_capacity_val = round(pack_design_capacity / 100, 2)
+                pack_data['view_design_capacity'] = pack_design_capacity_val
+                offset += 2
+                u_offset += 2
 
-            # Accumulated charge capacity
-            # accumulated_charge_capacity = int(fields[offset] + fields[offset + 1] + fields[offset + 2] + fields[offset + 3], 16)  # Combine four bytes for accumulated charge capacity
-            # accumulated_charge_capacity = round(accumulated_charge_capacity, 2)  # Convert to AH
-            offset += 4
-            # pack_data['accumulated_charge_capacity'] = accumulated_charge_capacity
+            # 4. SOC (1 byte)
+            if found_u - u_offset >= 1:
+                pack_soc = int(fields[offset], 16)
+                pack_data['view_SOC'] = round(float(pack_soc), 1)
+                offset += 1
+                u_offset += 1
+            else:
+                if pack_data.get('view_full_capacity', 0) > 0:
+                    pack_data['view_SOC'] = round(pack_remain_capacity / pack_data['view_full_capacity'] * 100, 1)
+                else:
+                    pack_data['view_SOC'] = 0.0
 
-            # Accumulated discharge capacity
-            # accumulated_discharge_capacity = int(fields[offset] + fields[offset + 1] + fields[offset + 2] + fields[offset + 3], 16)  # Combine four bytes for accumulated discharge capacity
-            # accumulated_discharge_capacity = round(accumulated_discharge_capacity, 2)  # Convert to AH
-            offset += 4
-            # pack_data['accumulated_discharge_capacity'] = accumulated_discharge_capacity
+            # 5. Cumulative Charge Capacity (4 bytes)
+            if found_u - u_offset >= 4:
+                offset += 4
+                u_offset += 4
 
-            # Pack SOH
-            pack_soh = int(fields[offset], 16)  # SOH in percentage
-            offset += 1
-            pack_data['view_SOH'] = round(pack_soh, 1)
+            # 6. Cumulative Discharge Capacity (4 bytes)
+            if found_u - u_offset >= 4:
+                offset += 4
+                u_offset += 4
 
-            # Vbat independent total voltage
-            # vbat_total_voltage = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for Vbat total voltage
-            # vbat_total_voltage = round(vbat_total_voltage / 1000, 2)  # Convert 10mV to V
-            offset += 2
-            # pack_data['view_voltage_2nd'] = vbat_total_voltage
+            # 7. SOH (1 byte)
+            if found_u - u_offset >= 1:
+                pack_soh = int(fields[offset], 16)
+                pack_data['view_SOH'] = round(float(pack_soh), 1)
+                offset += 1
+                u_offset += 1
+            else:
+                if pack_data.get('view_design_capacity', 0) > 0:
+                    pack_data['view_SOH'] = round(pack_data['view_full_capacity'] / pack_data['view_design_capacity'] * 100, 0)
+                else:
+                    pack_data['view_SOH'] = 100.0
 
-            # Secondary current sampling
-            # secondary_current = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for secondary current
-            # secondary_current = self.hex_to_signed(secondary_current) / 100  # Convert 10mA to A
-            offset += 2
-            # pack_data['secondary_current'] = secondary_current
+            # Skip any remaining user-defined fields
+            remaining_u = found_u - u_offset
+            if remaining_u > 0:
+                offset += remaining_u
     
             packs_data.append(pack_data)
-
-        # print(packs_data)
     
         return packs_data
-    
-    
-    
-    
+
     def extract_warnstate(self, data):
         # Ensure the data starts with the SOI character (~)
         if data[0] != '~':
