@@ -1143,6 +1143,7 @@ class PACEBMS232:
 
             # Send request to BMS
             self.logger.debug(f"Trying to send analog request")
+            self.bms_comm.flush()
             if not self.bms_comm.send_data(request):
                 return None
             self.logger.debug(f"analog request sent")
@@ -1176,6 +1177,7 @@ class PACEBMS232:
             
             # Send request to BMS
             self.logger.debug(f"Trying to send warning request")
+            self.bms_comm.flush()
             if not self.bms_comm.send_data(request):
                 return None
             self.logger.debug(f"warning request sent")
@@ -1276,6 +1278,7 @@ class PACEBMS232:
 
             # Send request to BMS
             self.logger.debug(f"Trying to send pack num request")
+            self.bms_comm.flush()
             if not self.bms_comm.send_data(request):
                 return None
             self.logger.debug(f"pack num request sent")
@@ -1543,7 +1546,7 @@ class PACEBMS232:
         self.ha_comm.publish_sensor_state(total_current, 'A', "total_current")
         self.ha_comm.publish_sensor_discovery("total_current", "A", icons['total_current'], deviceclasses['total_current'], stateclasses['total_current'])
 
-        total_soc = round(total_remain_capacity / total_full_capacity * 100, 1) 
+        total_soc = round(total_remain_capacity / total_full_capacity * 100, 1) if total_full_capacity > 0 else 0.0
         self.ha_comm.publish_sensor_state(total_soc, '%', "total_SOC")
         self.ha_comm.publish_sensor_discovery("total_SOC", "%", icons['total_SOC'], deviceclasses['total_SOC'], stateclasses['total_SOC'])
 
