@@ -195,6 +195,38 @@ class BMSCommunication:
             self.logger.error(f"Error receiving TCP Modbus response: {e}")
             return None
 
+    def flush(self):
+        """
+        Flush any stale/buffered data from the connection (serial input buffer or TCP socket buffer)
+        before sending a new command.
+        """
+        if not self.bms_connection:
+            return
+        try:
+            if hasattr(self.bms_connection, 'reset_input_buffer'):
+                self.bms_connection.reset_input_buffer()
+                self.logger.debug("Flushed serial input buffer")
+            elif hasattr(self.bms_connection, 'recv'):
+                import socket as _socket
+                original_timeout = self.bms_connection.gettimeout()
+                self.bms_connection.settimeout(0.01)
+                flushed = 0
+                while True:
+                    try:
+                        chunk = self.bms_connection.recv(4096)
+                        if not chunk:
+                            break
+                        flushed += len(chunk)
+                    except _socket.timeout:
+                        break
+                    except Exception:
+                        break
+                self.bms_connection.settimeout(original_timeout)
+                if flushed > 0:
+                    self.logger.debug(f"Flushed {flushed} stale bytes from TCP socket buffer")
+        except Exception as e:
+            self.logger.debug(f"Buffer flush error: {e}")
+
     def flush_jkbms_buffer(self):
         """
         Flush any stale/buffered data from the socket before sending a new command.

@@ -21,6 +21,85 @@ class PACEBMS232:
         self.total_energy_discharged = 0.0
         self.last_energy_time = time.time()
 
+        # Salvage/cache states for out-of-order packets
+        self.cached_analog_data = None
+        self.cached_warning_data = None
+
+    def identify_packet_type(self, response):
+        """
+        Identify whether the received response is an analog packet or warning packet.
+        Returns 'analog', 'warning', or None if invalid.
+        """
+        if not response or not response.startswith('~'):
+            return None
+        
+        # Strip any trailing whitespace/carriage return
+        response = response.strip()
+        
+        # Check minimum length for header + checksum
+        if len(response) < 17:
+            return None
+            
+        try:
+            # Check command success (CID1 = 46, RTN = 00)
+            cid1 = response[5:7]
+            rtn = response[7:9]
+            if cid1 != '46' or rtn != '00':
+                return None
+                
+            # Extract LENID (3 characters starting at index 10)
+            lenid = int(response[10:13], 16)
+            
+            # Extract number of packs (2 characters starting at index 15)
+            num_packs = int(response[15:17], 16)
+            
+            if num_packs <= 0:
+                return None
+                
+            ratio = lenid / num_packs
+            if ratio > 110:
+                return 'analog'
+            else:
+                return 'warning'
+        except Exception as e:
+            self.logger.error(f"Error identifying packet type: {e}")
+            return None
+
+    def process_incoming_response(self, response, expected_type):
+        """
+        Processes the received raw response.
+        If it matches expected_type, parses and returns it.
+        If it matches the OTHER type, parses it, caches it, and returns None.
+        If it matches neither, discards it (returns None).
+        """
+        packet_type = self.identify_packet_type(response)
+        if packet_type is None:
+            self.logger.warning(f"Received invalid or unidentifiable packet: {response[:30]}...")
+            return None
+            
+        if packet_type == expected_type:
+            if expected_type == 'analog':
+                return self.parse_analog_data(response)
+            else:
+                return self.parse_warning_data(response)
+        else:
+            self.logger.warning(f"Protocol Desync: Expected {expected_type} packet, but received {packet_type} packet. Salvaging...")
+            try:
+                if packet_type == 'analog':
+                    analog_data = self.parse_analog_data(response)
+                    if analog_data:
+                        self.cached_analog_data = analog_data
+                        self.logger.debug("Successfully salvaged and cached Analog data.")
+                else:
+                    warning_data = self.parse_warning_data(response)
+                    if warning_data:
+                        self.cached_warning_data = warning_data
+                        self.logger.debug("Successfully salvaged and cached Warning data.")
+            except Exception as e:
+                self.logger.error(f"Error parsing salvaged {packet_type} data: {e}")
+            
+            return None
+
     def lchksum_calc(self, lenid):
         try:
             chksum = sum(int(chr(lenid[element]), 16) for element in range(len(lenid))) % 16
@@ -384,8 +463,7 @@ class PACEBMS232:
         # Ignore the first character if it is '~'
         if response[0] == '~':
             response = response[1:]
-
-    
+ 
         # Split the response into fields (assuming each field is 2 characters representing a byte)
         fields = [response[i:i + 2] for i in range(0, len(response), 2)]
     
@@ -410,6 +488,41 @@ class PACEBMS232:
         num_packs = int(fields[offset], 16)
         offset += 1
     
+        if num_packs <= 0:
+            return []
+
+        # Dynamically calculate the number of user-defined bytes (U) per pack
+        found_u = None
+        for test_u in range(0, 100):
+            test_offset = offset
+            valid = True
+            for pack_index in range(num_packs):
+                if test_offset >= len(fields) - 2:
+                    valid = False
+                    break
+                num_cells = int(fields[test_offset], 16)
+                test_offset += 1 + num_cells * 2
+                if test_offset >= len(fields) - 2:
+                    valid = False
+                    break
+                num_temps = int(fields[test_offset], 16)
+                test_offset += 1 + num_temps * 2
+                # Skip current (2), total voltage (2), remaining capacity (2), define_number_p (1) -> 7 fields
+                test_offset += 7
+                # Skip test_u user-defined fields
+                test_offset += test_u
+            
+            # After parsing all packs, the test_offset should land exactly at len(fields) - 2
+            if valid and test_offset == len(fields) - 2:
+                found_u = test_u
+                break
+
+        if found_u is None:
+            self.logger.error("Failed to dynamically determine user-defined fields size! Defaulting to 20.")
+            found_u = 20
+
+        self.logger.debug(f"Dynamically determined user-defined bytes U = {found_u}")
+
         for pack_index in range(num_packs):
             pack_data = {}
     
@@ -425,25 +538,24 @@ class PACEBMS232:
                 cell_voltages.append(voltage)
                 offset += 2
             pack_data['cell_voltages'] = cell_voltages
-
+ 
             cell_voltage_max = max(cell_voltages)
             cell_voltage_min = min(cell_voltages)
             cell_voltage_max_index = cell_voltages.index(cell_voltage_max) + 1
             cell_voltage_min_index = cell_voltages.index(cell_voltage_min) + 1
-
+ 
             pack_data['cell_voltage_max'] = cell_voltage_max
             pack_data['cell_voltage_min'] = cell_voltage_min
             pack_data['cell_voltage_max_index'] = cell_voltage_max_index
             pack_data['cell_voltage_min_index'] = cell_voltage_min_index
-
+ 
             pack_data['cell_voltage_diff'] = cell_voltage_max - cell_voltage_min
     
             # Number of temperature sensors
             num_temps = int(fields[offset], 16)
             offset += 1
             pack_data['view_num_temps'] = num_temps
-
-    
+ 
             # Temperatures
             temperatures = []
             for temp_index in range(num_temps):
@@ -456,7 +568,7 @@ class PACEBMS232:
             # Pack current
             pack_current = fields[offset] + fields[offset + 1]  # Combine two bytes for current
             pack_current = self.hex_to_signed(pack_current) / 100
-
+ 
             offset += 2
             
             pack_data['view_current'] = pack_current
@@ -466,10 +578,10 @@ class PACEBMS232:
             pack_total_voltage = round(pack_total_voltage / 1000, 2)  # Convert mV to V
             offset += 2
             pack_data['view_voltage'] = pack_total_voltage
-
+ 
             pack_power = round(pack_total_voltage * pack_current / 1000, 4) # Convert W to kW
             pack_data['view_power'] = pack_power
-
+ 
             # 使用累积能量计算
             cumulative_charged, cumulative_discharged = self.calculate_cumulative_energy(pack_power)
             pack_data['view_energy_charged'] = cumulative_charged
@@ -483,67 +595,79 @@ class PACEBMS232:
             # Define number P
             define_number_p = int(fields[offset], 16)
             offset += 1
+            pack_data['define_number_p'] = define_number_p
     
-            # Pack full capacity
-            pack_full_capacity = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for full capacity
-            pack_full_capacity = round(pack_full_capacity / 100, 2)  # Convert 10mAH to AH
-            offset += 2
-            pack_data['view_full_capacity'] = pack_full_capacity
+            # Parse user-defined items based on found_u
+            u_offset = 0
+
+            # 1. Full Capacity (2 bytes)
+            if found_u - u_offset >= 2:
+                pack_full_capacity = int(fields[offset] + fields[offset + 1], 16)
+                pack_full_capacity_val = round(pack_full_capacity / 100, 2)
+                pack_data['view_full_capacity'] = pack_full_capacity_val
+                offset += 2
+                u_offset += 2
+            else:
+                pack_data['view_full_capacity'] = 0.0
     
-            # Cycle number
-            cycle_number = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for cycle number
-            offset += 2
-            pack_data['view_cycle_number'] = cycle_number
-    
-            # Pack design capacity
-            pack_design_capacity = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for design capacity
-            pack_design_capacity = round(pack_design_capacity / 100, 2)  # Convert 10mAH to AH
-            offset += 2
-            pack_data['view_design_capacity'] = pack_design_capacity
+            # 2. Cycle Count (2 bytes)
+            if found_u - u_offset >= 2:
+                cycle_number = int(fields[offset] + fields[offset + 1], 16)
+                pack_data['view_cycle_number'] = cycle_number
+                offset += 2
+                u_offset += 2
 
-            # Pack SOC
-            pack_soc = int(fields[offset], 16)  # SOC in percentage
-            offset += 1
-            pack_data['view_SOC'] = round(pack_soc, 1)
+            # 3. Design Capacity (2 bytes)
+            if found_u - u_offset >= 2:
+                pack_design_capacity = int(fields[offset] + fields[offset + 1], 16)
+                pack_design_capacity_val = round(pack_design_capacity / 100, 2)
+                pack_data['view_design_capacity'] = pack_design_capacity_val
+                offset += 2
+                u_offset += 2
 
-            # Accumulated charge capacity
-            # accumulated_charge_capacity = int(fields[offset] + fields[offset + 1] + fields[offset + 2] + fields[offset + 3], 16)  # Combine four bytes for accumulated charge capacity
-            # accumulated_charge_capacity = round(accumulated_charge_capacity, 2)  # Convert to AH
-            offset += 4
-            # pack_data['accumulated_charge_capacity'] = accumulated_charge_capacity
+            # 4. SOC (1 byte)
+            if found_u - u_offset >= 1:
+                pack_soc = int(fields[offset], 16)
+                pack_data['view_SOC'] = round(float(pack_soc), 1)
+                offset += 1
+                u_offset += 1
+            else:
+                if pack_data.get('view_full_capacity', 0) > 0:
+                    pack_data['view_SOC'] = round(pack_remain_capacity / pack_data['view_full_capacity'] * 100, 1)
+                else:
+                    pack_data['view_SOC'] = 0.0
 
-            # Accumulated discharge capacity
-            # accumulated_discharge_capacity = int(fields[offset] + fields[offset + 1] + fields[offset + 2] + fields[offset + 3], 16)  # Combine four bytes for accumulated discharge capacity
-            # accumulated_discharge_capacity = round(accumulated_discharge_capacity, 2)  # Convert to AH
-            offset += 4
-            # pack_data['accumulated_discharge_capacity'] = accumulated_discharge_capacity
+            # 5. Cumulative Charge Capacity (4 bytes)
+            if found_u - u_offset >= 4:
+                offset += 4
+                u_offset += 4
 
-            # Pack SOH
-            pack_soh = int(fields[offset], 16)  # SOH in percentage
-            offset += 1
-            pack_data['view_SOH'] = round(pack_soh, 1)
+            # 6. Cumulative Discharge Capacity (4 bytes)
+            if found_u - u_offset >= 4:
+                offset += 4
+                u_offset += 4
 
-            # Vbat independent total voltage
-            # vbat_total_voltage = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for Vbat total voltage
-            # vbat_total_voltage = round(vbat_total_voltage / 1000, 2)  # Convert 10mV to V
-            offset += 2
-            # pack_data['view_voltage_2nd'] = vbat_total_voltage
+            # 7. SOH (1 byte)
+            if found_u - u_offset >= 1:
+                pack_soh = int(fields[offset], 16)
+                pack_data['view_SOH'] = round(float(pack_soh), 1)
+                offset += 1
+                u_offset += 1
+            else:
+                if pack_data.get('view_design_capacity', 0) > 0:
+                    pack_data['view_SOH'] = round(pack_data['view_full_capacity'] / pack_data['view_design_capacity'] * 100, 0)
+                else:
+                    pack_data['view_SOH'] = 100.0
 
-            # Secondary current sampling
-            # secondary_current = int(fields[offset] + fields[offset + 1], 16)  # Combine two bytes for secondary current
-            # secondary_current = self.hex_to_signed(secondary_current) / 100  # Convert 10mA to A
-            offset += 2
-            # pack_data['secondary_current'] = secondary_current
+            # Skip any remaining user-defined fields
+            remaining_u = found_u - u_offset
+            if remaining_u > 0:
+                offset += remaining_u
     
             packs_data.append(pack_data)
-
-        # print(packs_data)
     
         return packs_data
-    
-    
-    
-    
+
     def extract_warnstate(self, data):
         # Ensure the data starts with the SOI character (~)
         if data[0] != '~':
@@ -753,7 +877,41 @@ class PACEBMS232:
     
         packs_info = []
     
-        for _ in range(pack_number):
+        # Dynamically determine the number of status bytes (W) per pack
+        found_w = None
+        for target_len in [len(warnstate_bytes) - 2, len(warnstate_bytes)]:
+            if target_len <= 1:
+                continue
+            for test_w in range(10, 50):
+                test_offset = index
+                valid = True
+                for pack_index in range(pack_number):
+                    if test_offset >= target_len:
+                        valid = False
+                        break
+                    num_cells = warnstate_bytes[test_offset]
+                    test_offset += 1 + num_cells
+                    if test_offset >= target_len:
+                        valid = False
+                        break
+                    num_temps = warnstate_bytes[test_offset]
+                    test_offset += 1 + num_temps
+                    # Skip test_w warning/status fields
+                    test_offset += test_w
+                
+                if valid and test_offset == target_len:
+                    found_w = test_w
+                    break
+            if found_w is not None:
+                break
+
+        if found_w is None:
+            self.logger.error("Failed to dynamically determine warning status bytes size! Defaulting to 17.")
+            found_w = 17
+        else:
+            self.logger.debug(f"Dynamically determined warning status bytes W = {found_w}")
+
+        for pack_index in range(pack_number):
             pack_info = {}
     
             # Parse 1. Cell number
@@ -856,8 +1014,7 @@ class PACEBMS232:
             
             pack_info['balance_state_2'] = warnstate_bytes[index]
             index += 1
-
-
+ 
             # Detailed interpretation for Warn State 1 based on Char A.24
             warn_state_1 = warnstate_bytes[index]
             pack_info['warn_state_1'] = {
@@ -883,12 +1040,16 @@ class PACEBMS232:
                 'warn_high_charge_temp': bool(warn_state_2 & 0b00000001),
             }
             index += 1
-            index += 1
-
+            
+            # Skip any remaining warning status bytes
+            remaining_w = found_w - 12
+            if remaining_w > 0:
+                index += remaining_w
     
             packs_info.append(pack_info)
     
         return packs_info
+
 
 
 
@@ -1089,15 +1250,22 @@ class PACEBMS232:
     
     
     def get_analog_data(self, pack_number=None):
-        
         try:
+            # Check cache first
+            if self.cached_analog_data is not None:
+                self.logger.debug("Returning Analog data from salvage cache.")
+                data = self.cached_analog_data
+                self.cached_analog_data = None
+                return data
+
             # Generate request
             self.logger.debug(f"Trying to prepare analog request")
-            request = self.generate_bms_request("analog",pack_number)
+            request = self.generate_bms_request("analog", pack_number)
             self.logger.debug(f"analog request: {request}")
 
             # Send request to BMS
             self.logger.debug(f"Trying to send analog request")
+            self.bms_comm.flush()
             if not self.bms_comm.send_data(request):
                 return None
             self.logger.debug(f"analog request sent")
@@ -1109,28 +1277,32 @@ class PACEBMS232:
             if response is None:
                 return None
             
-            # Parse analog data from response
-            self.logger.debug(f"Trying to parse analog data")
-            analog_data = self.parse_analog_data(response)
-            self.logger.debug(f"analog data parsed: {analog_data}")
-            return analog_data
+            # Process and validate response
+            return self.process_incoming_response(response, 'analog')
     
         except Exception as e:
-            self.logger.error(f"An error occurred: {e}")
+            self.logger.error(f"An error occurred in get_analog_data: {e}")
             return None
     
     
     
     def get_warning_data(self, pack_number=None):
-        
         try:
+            # Check cache first
+            if self.cached_warning_data is not None:
+                self.logger.debug("Returning Warning data from salvage cache.")
+                data = self.cached_warning_data
+                self.cached_warning_data = None
+                return data
+
             # Generate request
             self.logger.debug(f"Trying to prepare warning request")
-            request = self.generate_bms_request("warning_info",pack_number)
+            request = self.generate_bms_request("warning_info", pack_number)
             self.logger.debug(f"warning request: {request}")
             
             # Send request to BMS
             self.logger.debug(f"Trying to send warning request")
+            self.bms_comm.flush()
             if not self.bms_comm.send_data(request):
                 return None
             self.logger.debug(f"warning request sent")
@@ -1142,15 +1314,11 @@ class PACEBMS232:
             if response is None:
                 return None
             
-            # Parse analog data from response
-            self.logger.debug(f"Trying to parse warning data")
-            warning_data = self.parse_warning_data(response)
-            self.logger.debug(f"warning data parsed: {warning_data}")
-    
-            return warning_data
+            # Process and validate response
+            return self.process_incoming_response(response, 'warning')
     
         except Exception as e:
-            self.logger.error(f"An error occurred: {e}")
+            self.logger.error(f"An error occurred in get_warning_data: {e}")
             return None
     
     
@@ -1231,6 +1399,7 @@ class PACEBMS232:
 
             # Send request to BMS
             self.logger.debug(f"Trying to send pack num request")
+            self.bms_comm.flush()
             if not self.bms_comm.send_data(request):
                 return None
             self.logger.debug(f"pack num request sent")
@@ -1498,7 +1667,7 @@ class PACEBMS232:
         self.ha_comm.publish_sensor_state(total_current, 'A', "total_current")
         self.ha_comm.publish_sensor_discovery("total_current", "A", icons['total_current'], deviceclasses['total_current'], stateclasses['total_current'])
 
-        total_soc = round(total_remain_capacity / total_full_capacity * 100, 1) 
+        total_soc = round(total_remain_capacity / total_full_capacity * 100, 1) if total_full_capacity > 0 else 0.0
         self.ha_comm.publish_sensor_state(total_soc, '%', "total_SOC")
         self.ha_comm.publish_sensor_discovery("total_SOC", "%", icons['total_SOC'], deviceclasses['total_SOC'], stateclasses['total_SOC'])
 
