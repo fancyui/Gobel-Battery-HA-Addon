@@ -152,11 +152,11 @@ class PACEBMSWIFI:
 
         if cid2 == '42':
             self.latest_analog_data = self.parse_analog_data_wifi(fields)
-            self.logger.debug("Parsed analog data successfully")
+            self.logger.debug(f"analog data parsed: {self.latest_analog_data}")
             return True
         elif cid2 == '44':
             self.latest_warning_data = self.parse_warning_data_wifi(fields)
-            self.logger.debug("Parsed warning data successfully")
+            self.logger.debug(f"warning data parsed: {self.latest_warning_data}")
             return True
         else:
             self.logger.warning(f"Unhandled passive CID2/RTN: {cid2}")

@@ -307,6 +307,7 @@ class PACEBMS232:
         else:
             packs_data = self.parse_analog_data_v2(response)
 
+        self.logger.debug(f"analog data parsed: {packs_data}")
         return packs_data
 
     def parse_analog_data_v1(self, response):
@@ -1084,6 +1085,7 @@ class PACEBMS232:
             }
             packs_data.append(pack_data)
     
+        self.logger.debug(f"warning data parsed: {packs_data}")
         return packs_data
     
     

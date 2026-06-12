@@ -288,7 +288,7 @@ class PACEBMS485:
         pack_data['view_SOH'] = round(pack_full_capacity / pack_design_capacity * 100, 0)
 
         # packs_data.append(pack_data)
-    
+        self.logger.debug(f"analog data parsed: {pack_data}")
         return pack_data
     
     
@@ -520,7 +520,7 @@ class PACEBMS485:
             'warn_state_2': pack['warn_state_2']
         }
         # packs_data.append(pack_data)
-    
+        self.logger.debug(f"warning data parsed: {pack_data}")
         return pack_data
     
     
@@ -684,7 +684,6 @@ class PACEBMS485:
             # Parse analog data from response
             self.logger.debug(f"Trying to parse analog data")
             analog_data = self.parse_analog_data(response)
-            self.logger.debug(f"analog data parsed: {analog_data}")
             return analog_data
     
         except Exception as e:
@@ -717,8 +716,6 @@ class PACEBMS485:
             # Parse analog data from response
             self.logger.debug(f"Trying to parse warning data")
             warning_data = self.parse_warning_data(response)
-            self.logger.debug(f"warning data parsed: {warning_data}")
-    
             return warning_data
     
         except Exception as e:
