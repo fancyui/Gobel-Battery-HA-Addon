@@ -5,6 +5,13 @@ description:
 # Changelog
 
 
+## 1.9.71
+
+-   [PACE485] Fix cell temperature sensors unit (from '℃' to standard '°C') so Home Assistant accepts the sensors.
+
+---------------
+
+
 ## 1.9.70
 
 -   [PACE232] Dynamically determine user-defined fields and warning status bytes parsing lengths to support differing battery pack firmware versions.
