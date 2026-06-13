@@ -5,6 +5,14 @@ description:
 # Changelog
 
 
+## 1.9.72
+
+-   [PACE/TDT] Expose active balancing status (`balance_state_1` and `balance_state_2`) sensors for PACE (RS232, RS485, WiFi) and TDT BMS protocols.
+-   [BMS] Standardize debug logging format for parsed analog and warning telemetry across JK, PACE, and TDT BMS drivers.
+
+---------------
+
+
 ## 1.9.71
 
 -   [PACE485] Fix cell temperature sensors unit (from '℃' to standard '°C') so Home Assistant accepts the sensors.
