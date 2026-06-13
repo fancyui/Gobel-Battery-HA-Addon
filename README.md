@@ -4,6 +4,10 @@ description:
 
 # Gobel Power Battery Home Assistant Add-on (JK BMS, Pace BMS, TDT BMS)
 
+[Deutsch](docs/de/README.md) | [简体中文](docs/zh-cn/README.md)
+
+> **Note**: Looking for the ioBroker version? Check out the [ioBroker Gobel BMS Monitor Adapter](https://github.com/fancyui/ioBroker.gobel-bms-monitor).
+
 The ultimate Home Assistant integration for smart energy storage monitoring. This add-on provides robust, real-time data logging and diagnostics for your LiFePO4 battery banks running Pace BMS, JK BMS, or TDT BMS hardware. 
 
 Seamlessly bridge your solar energy storage system (ESS) with your home automation network using standard protocols like MQTT to monitor battery health, individual cell voltages, state of charge (SoC), and system protections.
