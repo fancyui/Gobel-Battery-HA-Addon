@@ -1023,7 +1023,7 @@ class JKBMS485:
 
             pack_list.append(pack_data)
 
-        self.logger.debug(f"Finished getting JK BMS analog data: {pack_list}")
+        self.logger.debug(f"analog data parsed: {pack_list}")
         return pack_list
 
     # ---------------------------------------------------------------------------
@@ -1180,7 +1180,7 @@ class JKBMS485:
 
             pack_list.append(data)
 
-        self.logger.debug(f"Finished getting JK BMS native data: {pack_list}")
+        self.logger.debug(f"analog data parsed (native): {pack_list}")
         return pack_list
 
     def get_warning_data(self, pack_number=None):
@@ -1227,7 +1227,7 @@ class JKBMS485:
             }
             warning_data.append(pack_warning)
 
-        self.logger.debug(f"Finished getting JK BMS warning data: {warning_data}")
+        self.logger.debug(f"warning data parsed: {warning_data}")
         return warning_data
 
     # ---------------------------------------------------------------------------

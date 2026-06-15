@@ -5,6 +5,38 @@ description:
 # Changelog
 
 
+## 1.9.74
+
+-   [PACE/TDT] Separate Passive and Active Balancing Status into distinct sensors:
+    *   **Passive Balancing Status**:
+        *   Keys: `balancing_status_passive_1`, `balancing_status_passive_2`
+        *   HA discovery name: `Pack 0x Balancing Status Passive 1 / 2`
+        *   Value: Raw bitmask bypass-resistor active byte values (multiple bits can be 1).
+    *   **Active Balancing Status**:
+        *   Keys: `balancing_status_active_1`, `balancing_status_active_2`
+        *   HA discovery name: `Pack 0x Balancing Status Active 1 / 2`
+        *   Value: Decoded cell index (1-8, 9-16). Returns 0 when active balancing is inactive.
+-   [TDT] Fix ValueError crash when balance state values are greater than 1.
+
+---------------
+
+
+## 1.9.73
+
+-   [PACE/TDT] Add raw ASCII and Hexadecimal packet logging for all telemetry send and receive operations when `debug` configuration is enabled.
+-   [PACE/TDT] Fix method signatures for capacity and product info methods.
+
+---------------
+
+
+## 1.9.72
+
+-   [PACE/TDT] Expose active balancing status (`balance_state_1` and `balance_state_2`) sensors for PACE (RS232, RS485, WiFi) and TDT BMS protocols.
+-   [BMS] Standardize debug logging format for parsed analog and warning telemetry across JK, PACE, and TDT BMS drivers.
+
+---------------
+
+
 ## 1.9.71
 
 -   [PACE485] Fix cell temperature sensors unit (from '℃' to standard '°C') so Home Assistant accepts the sensors.
