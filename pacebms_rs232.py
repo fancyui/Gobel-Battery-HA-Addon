@@ -830,11 +830,17 @@ class PACEBMS232:
             }
             index += 1
             
-            pack_info['balance_state_1'] = warnstate_bytes[index]
+            # V1 doesn't support active balancing status, defaulting to 0
+            passive_bal_1 = warnstate_bytes[index]
             index += 1
             
-            pack_info['balance_state_2'] = warnstate_bytes[index]
+            passive_bal_2 = warnstate_bytes[index]
             index += 1
+
+            pack_info['balancing_status_passive_1'] = passive_bal_1
+            pack_info['balancing_status_passive_2'] = passive_bal_2
+            pack_info['balancing_status_active_1'] = 0
+            pack_info['balancing_status_active_2'] = 0
 
 
             # Detailed interpretation for Warn State 1 based on Char A.24
@@ -1010,10 +1016,10 @@ class PACEBMS232:
             }
             index += 1
             
-            pack_info['balance_state_1'] = warnstate_bytes[index]
+            passive_bal_1 = warnstate_bytes[index]
             index += 1
             
-            pack_info['balance_state_2'] = warnstate_bytes[index]
+            passive_bal_2 = warnstate_bytes[index]
             index += 1
  
             # Detailed interpretation for Warn State 1 based on Char A.24
@@ -1042,8 +1048,27 @@ class PACEBMS232:
             }
             index += 1
             
-            # Skip any remaining warning status bytes
+            # Parse active balancing status bytes from remaining bytes
             remaining_w = found_w - 12
+            active_bal_1 = 0
+            active_bal_2 = 0
+            if remaining_w >= 4:
+                active_bal_1 = warnstate_bytes[index + 2]
+                active_bal_2 = warnstate_bytes[index + 3]
+            
+            def get_balancing_cell(bitmask, offset_cell):
+                if not bitmask:
+                    return 0
+                for i in range(8):
+                    if bitmask & (1 << i):
+                        return i + offset_cell
+                return 0
+
+            pack_info['balancing_status_passive_1'] = passive_bal_1
+            pack_info['balancing_status_passive_2'] = passive_bal_2
+            pack_info['balancing_status_active_1'] = get_balancing_cell(active_bal_1, 1)
+            pack_info['balancing_status_active_2'] = get_balancing_cell(active_bal_2, 9)
+
             if remaining_w > 0:
                 index += remaining_w
     
@@ -1078,8 +1103,10 @@ class PACEBMS232:
                 'instruction_state': pack['instruction_state'],
                 'control_state': pack['control_state'],
                 'fault_state': pack['fault_state'],
-                'balance_state_1': pack['balance_state_1'],
-                'balance_state_2': pack['balance_state_2'],
+                'balancing_status_passive_1': pack['balancing_status_passive_1'],
+                'balancing_status_passive_2': pack['balancing_status_passive_2'],
+                'balancing_status_active_1': pack['balancing_status_active_1'],
+                'balancing_status_active_2': pack['balancing_status_active_2'],
                 'warn_state_1': pack['warn_state_1'],
                 'warn_state_2': pack['warn_state_2']
             }
@@ -1822,11 +1849,11 @@ class PACEBMS232:
                     for sub_key, sub_value in value.items():
                         self.ha_comm.publish_binary_sensor_state(sub_value, f"pack_{pack_i:02}_{sub_key}")
                         self.ha_comm.publish_binary_sensor_discovery(f"pack_{pack_i:02}_{sub_key}",icon)
-                elif key in ('balance_state_1', 'balance_state_2'):
+                elif key in ('balancing_status_passive_1', 'balancing_status_passive_2', 'balancing_status_active_1', 'balancing_status_active_2'):
                     icon = "mdi:scale-balance"
                     self.ha_comm.publish_warn_state(value, f"pack_{pack_i:02}_{key}")
                     self.ha_comm.publish_warn_discovery(f"pack_{pack_i:02}_{key}", icon)
-                elif key not in ['cell_number', 'temp_sensor_number', 'control_state', 'balance_state_1', 'balance_state_2']:
+                elif key not in ['cell_number', 'temp_sensor_number', 'control_state', 'balancing_status_passive_1', 'balancing_status_passive_2', 'balancing_status_active_1', 'balancing_status_active_2']:
                     icon = "mdi:battery-heart-variant"
                     self.ha_comm.publish_warn_state(value, f"pack_{pack_i:02}_{key}")
                     self.ha_comm.publish_warn_discovery(f"pack_{pack_i:02}_{key}",icon)

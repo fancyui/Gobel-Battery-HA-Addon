@@ -471,14 +471,16 @@ class PACEBMSWIFI:
                 }
                 offset += 1
 
-            # 13. balance_state_1
+            # 13. balancing_status_passive_1
+            passive_bal_1 = 0
             if offset < len(fields):
-                pack['balance_state_1'] = int(fields[offset], 16)
+                passive_bal_1 = int(fields[offset], 16)
                 offset += 1
 
-            # 14. balance_state_2
+            # 14. balancing_status_passive_2
+            passive_bal_2 = 0
             if offset < len(fields):
-                pack['balance_state_2'] = int(fields[offset], 16)
+                passive_bal_2 = int(fields[offset], 16)
                 offset += 1
 
             # 15. Warn State 1
@@ -515,15 +517,32 @@ class PACEBMSWIFI:
             # Skip ProtectStates3
             if offset < len(fields):
                 offset += 1
-            # Skip ActiveEqualisationStates1
+            # Parse ActiveEqualisationStates1 (Active Balancing Status 1)
+            active_bal_1 = 0
             if offset < len(fields):
+                active_bal_1 = int(fields[offset], 16)
                 offset += 1
-            # Skip ActiveEqualisationStates2
+            # Parse ActiveEqualisationStates2 (Active Balancing Status 2)
+            active_bal_2 = 0
             if offset < len(fields):
+                active_bal_2 = int(fields[offset], 16)
                 offset += 1
             # Skip ErrStates3
             if offset < len(fields):
                 offset += 1
+
+            def get_balancing_cell(bitmask, offset_cell):
+                if not bitmask:
+                    return 0
+                for i in range(8):
+                    if bitmask & (1 << i):
+                        return i + offset_cell
+                return 0
+
+            pack['balancing_status_passive_1'] = passive_bal_1
+            pack['balancing_status_passive_2'] = passive_bal_2
+            pack['balancing_status_active_1'] = get_balancing_cell(active_bal_1, 1)
+            pack['balancing_status_active_2'] = get_balancing_cell(active_bal_2, 9)
 
             packs_data.append(pack)
 
@@ -831,11 +850,11 @@ class PACEBMSWIFI:
                     for sub_key, sub_value in value.items():
                         self.ha_comm.publish_binary_sensor_state(sub_value, f"pack_{pack_i:02}_{sub_key}")
                         self.ha_comm.publish_binary_sensor_discovery(f"pack_{pack_i:02}_{sub_key}", icon)
-                elif key in ('balance_state_1', 'balance_state_2'):
+                elif key in ('balancing_status_passive_1', 'balancing_status_passive_2', 'balancing_status_active_1', 'balancing_status_active_2'):
                     icon = "mdi:scale-balance"
                     self.ha_comm.publish_warn_state(value, f"pack_{pack_i:02}_{key}")
                     self.ha_comm.publish_warn_discovery(f"pack_{pack_i:02}_{key}", icon)
-                elif key not in ['cell_number', 'temp_sensor_number', 'control_state', 'balance_state_1', 'balance_state_2']:
+                elif key not in ['cell_number', 'temp_sensor_number', 'control_state', 'balancing_status_passive_1', 'balancing_status_passive_2', 'balancing_status_active_1', 'balancing_status_active_2']:
                     icon = "mdi:battery-heart-variant"
                     self.ha_comm.publish_warn_state(value, f"pack_{pack_i:02}_{key}")
                     self.ha_comm.publish_warn_discovery(f"pack_{pack_i:02}_{key}", icon)
