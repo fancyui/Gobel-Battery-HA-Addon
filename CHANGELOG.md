@@ -5,6 +5,14 @@ description:
 # Changelog
 
 
+## 1.9.73
+
+-   [PACE/TDT] Add raw ASCII and Hexadecimal packet logging for all telemetry send and receive operations when `debug` configuration is enabled.
+-   [PACE/TDT] Fix method signatures for capacity and product info methods.
+
+---------------
+
+
 ## 1.9.72
 
 -   [PACE/TDT] Expose active balancing status (`balance_state_1` and `balance_state_2`) sensors for PACE (RS232, RS485, WiFi) and TDT BMS protocols.

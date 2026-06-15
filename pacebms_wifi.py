@@ -133,6 +133,7 @@ class PACEBMSWIFI:
 
         # Clean/preprocess frame
         frame_clean = frame.strip()
+        self.logger.debug(f"Raw Recv: {frame_clean} (Hex: {frame_clean.encode('ascii', errors='ignore').hex().upper()})")
         if "gobel" in frame_clean.lower():
             self.logger.debug("Received heartbeat 'gobel'")
             return True

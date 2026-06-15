@@ -670,6 +670,7 @@ class PACEBMS485:
 
             # Send request to BMS
             self.logger.debug(f"Trying to send analog request")
+            self.logger.debug(f"Raw Send: {request.decode('ascii', errors='ignore').strip()} (Hex: {request.hex().upper()})")
             if not self.bms_comm.send_data(request):
                 return None
             self.logger.debug(f"analog request sent")
@@ -677,6 +678,7 @@ class PACEBMS485:
             # Receive response from BMS
             self.logger.debug(f"Trying to receive analog data")
             response = self.bms_comm.receive_data()
+            self.logger.debug(f"Raw Recv: {response} (Hex: {response.encode('ascii', errors='ignore').hex().upper() if response is not None else ''})")
             self.logger.debug(f"analog data recieved: {response}")
             if response is None:
                 return None
@@ -702,6 +704,7 @@ class PACEBMS485:
             
             # Send request to BMS
             self.logger.debug(f"Trying to send warning request")
+            self.logger.debug(f"Raw Send: {request.decode('ascii', errors='ignore').strip()} (Hex: {request.hex().upper()})")
             if not self.bms_comm.send_data(request):
                 return None
             self.logger.debug(f"warning request sent")
@@ -709,6 +712,7 @@ class PACEBMS485:
             # Receive response from BMS
             self.logger.debug(f"Trying to receive warning data")
             response = self.bms_comm.receive_data()
+            self.logger.debug(f"Raw Recv: {response} (Hex: {response.encode('ascii', errors='ignore').hex().upper() if response is not None else ''})")
             self.logger.debug(f"warning data recieved: {response}")
             if response is None:
                 return None
@@ -724,7 +728,7 @@ class PACEBMS485:
     
     
     
-    def get_capacity_data(bms_connection, pack_number=None):
+    def get_capacity_data(self, pack_number=None):
         
         try:
             # Generate request
@@ -734,6 +738,7 @@ class PACEBMS485:
 
             # Send request to BMS
             self.logger.debug(f"Trying to send capacity request")
+            self.logger.debug(f"Raw Send: {request.decode('ascii', errors='ignore').strip()} (Hex: {request.hex().upper()})")
             if not self.bms_comm.send_data(request):
                 return None
             self.logger.debug(f"capacity request sent")
@@ -741,6 +746,7 @@ class PACEBMS485:
             # Receive response from BMS
             self.logger.debug(f"Trying to receive capacity data")
             response = self.bms_comm.receive_data()
+            self.logger.debug(f"Raw Recv: {response} (Hex: {response.encode('ascii', errors='ignore').hex().upper() if response is not None else ''})")
             self.logger.debug(f"capacity data recieved: {response}")
             if response is None:
                 return None
@@ -757,7 +763,7 @@ class PACEBMS485:
     
     
     
-    def get_product_info_data(bms_connection, pack_number=None):
+    def get_product_info_data(self, pack_number=None):
         
         try:
             # Generate request
@@ -767,6 +773,7 @@ class PACEBMS485:
 
             # Send request to BMS
             self.logger.debug(f"Trying to send product info request")
+            self.logger.debug(f"Raw Send: {request.decode('ascii', errors='ignore').strip()} (Hex: {request.hex().upper()})")
             if not self.bms_comm.send_data(request):
                 return None
             self.logger.debug(f"product info request sent")
@@ -774,6 +781,7 @@ class PACEBMS485:
             # Receive response from BMS
             self.logger.debug(f"Trying to receive product info data")
             response = self.bms_comm.receive_data()
+            self.logger.debug(f"Raw Recv: {response} (Hex: {response.encode('ascii', errors='ignore').hex().upper() if response is not None else ''})")
             self.logger.debug(f"product info data recieved: {response}")
             if response is None:
                 return None
@@ -800,6 +808,7 @@ class PACEBMS485:
 
             # Send request to BMS
             self.logger.debug(f"Trying to send pack num request")
+            self.logger.debug(f"Raw Send: {request.decode('ascii', errors='ignore').strip()} (Hex: {request.hex().upper()})")
             if not self.bms_comm.send_data(request):
                 return None
             self.logger.debug(f"pack num request sent")
@@ -807,6 +816,7 @@ class PACEBMS485:
             # Receive response from BMS
             self.logger.debug(f"Trying to receive pack num data")
             response = self.bms_comm.receive_data()
+            self.logger.debug(f"Raw Recv: {response} (Hex: {response.encode('ascii', errors='ignore').hex().upper() if response is not None else ''})")
             self.logger.debug(f"pack num data recieved: {response}")
             if response is None:
                 return None
