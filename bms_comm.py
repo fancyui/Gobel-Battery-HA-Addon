@@ -237,6 +237,11 @@ class BMSCommunication:
         if not self.bms_connection:
             return
         try:
+            if hasattr(self.bms_connection, 'reset_input_buffer'):
+                self.bms_connection.reset_input_buffer()
+                self.logger.debug("JK BMS: Flushed serial input buffer")
+                return
+
             original_timeout = self.bms_connection.gettimeout()
             self.bms_connection.settimeout(0.05)
             flushed = 0
@@ -279,11 +284,16 @@ class BMSCommunication:
 
             while True:
                 try:
-                    original_timeout = self.bms_connection.gettimeout()
-                    self.bms_connection.settimeout(0.2)
-
-                    chunk = self.bms_connection.recv(2048)
-                    self.bms_connection.settimeout(original_timeout)
+                    if hasattr(self.bms_connection, 'read'):
+                        original_timeout = self.bms_connection.timeout
+                        self.bms_connection.timeout = 0.2
+                        chunk = self.bms_connection.read(2048)
+                        self.bms_connection.timeout = original_timeout
+                    else:
+                        original_timeout = self.bms_connection.gettimeout()
+                        self.bms_connection.settimeout(0.2)
+                        chunk = self.bms_connection.recv(2048)
+                        self.bms_connection.settimeout(original_timeout)
 
                     if chunk:
                         all_data += chunk
@@ -349,11 +359,17 @@ class BMSCommunication:
                         continue
 
                 try:
-                    original_timeout = self.bms_connection.gettimeout()
-                    self.bms_connection.settimeout(0.2)
-
-                    chunk = self.bms_connection.recv(4096)
-                    self.bms_connection.settimeout(original_timeout)
+                    is_serial = hasattr(self.bms_connection, 'read')
+                    if is_serial:
+                        original_timeout = self.bms_connection.timeout
+                        self.bms_connection.timeout = 0.2
+                        chunk = self.bms_connection.read(4096)
+                        self.bms_connection.timeout = original_timeout
+                    else:
+                        original_timeout = self.bms_connection.gettimeout()
+                        self.bms_connection.settimeout(0.2)
+                        chunk = self.bms_connection.recv(4096)
+                        self.bms_connection.settimeout(original_timeout)
 
                     if chunk:
                         all_data += chunk
@@ -361,19 +377,24 @@ class BMSCommunication:
                         got_data = True
                         idle_count = 0
                     else:
-                        # recv() returned b'' — server closed the TCP connection
-                        self.logger.warning("JK BMS: Connection closed by remote (recv=b''), reconnecting...")
-                        try:
-                            self.bms_connection.close()
-                        except Exception:
-                            pass
-                        self.bms_connection = None
-                        if self.connect():
-                            self.logger.info("JK BMS: Reconnected successfully")
-                            idle_count = 0
+                        if is_serial:
+                            # For serial, b'' just means read timeout, no data available.
+                            # This is normal, not a connection close.
+                            idle_count += 1
                         else:
-                            self.logger.error("JK BMS: Reconnect failed, aborting read")
-                            break
+                            # recv() returned b'' — server closed the TCP connection
+                            self.logger.warning("JK BMS: Connection closed by remote (recv=b''), reconnecting...")
+                            try:
+                                self.bms_connection.close()
+                            except Exception:
+                                pass
+                            self.bms_connection = None
+                            if self.connect():
+                                self.logger.info("JK BMS: Reconnected successfully")
+                                idle_count = 0
+                            else:
+                                self.logger.error("JK BMS: Reconnect failed, aborting read")
+                                break
 
                 except _socket.timeout:
                     idle_count += 1
