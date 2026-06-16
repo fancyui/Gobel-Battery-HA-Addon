@@ -5,6 +5,13 @@ description:
 # Changelog
 
 
+## 1.9.76
+
+-   [PACE232] Fix protocol desync issue where warning packets were misclassified as analog packets due to the lowered classification threshold. Reverted threshold to 110 and properly normalized LENID to characters.
+
+---------------
+
+
 ## 1.9.75
 
 -   [PACE232] Fix packet ratio classification threshold (lowered to 55) to correctly support multi-pack configurations, resolving cell voltage, temperature, and SOC telemetry corruption.

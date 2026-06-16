@@ -56,8 +56,10 @@ class PACEBMS232:
             if num_packs <= 0:
                 return None
                 
-            ratio = lenid / num_packs
-            if ratio > 55:
+            # Normalize lenid to characters if it is reported in bytes
+            normalized_lenid = lenid * 2 if len(response) > 2 * lenid else lenid
+            ratio = normalized_lenid / num_packs
+            if ratio > 110:
                 return 'analog'
             else:
                 return 'warning'
