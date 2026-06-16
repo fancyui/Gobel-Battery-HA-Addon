@@ -326,13 +326,13 @@ function pack_entities($device_name, $total_packs_num, $bms_type, $jk_display_in
       $output .= "                name: MOS Temp\n";
       $output .= "            columns: 6\n";
     } else {
-      $output .= "              - entity: sensor." . $device_name . "_pack_" . sprintf("%02d", $i+1) . "_view_SOC\n";
+      $output .= "              - entity: sensor." . $device_name . "_pack_" . sprintf("%02d", $i+1) . "_view_soc\n";
       $output .= "                name: SOC\n";
       $output .= "              - entity: sensor." . $device_name . "_pack_" . sprintf("%02d", $i+1) . "_view_voltage\n";
       $output .= "                name: Voltage\n";
       $output .= "              - entity: sensor." . $device_name . "_pack_" . sprintf("%02d", $i+1) . "_view_current\n";
       $output .= "                name: Current\n";
-      $output .= "              - entity: sensor." . $device_name . "_pack_" . sprintf("%02d", $i+1) . "_view_SOH\n";
+      $output .= "              - entity: sensor." . $device_name . "_pack_" . sprintf("%02d", $i+1) . "_view_soh\n";
       $output .= "                name: SOH\n";
       $output .= "              - entity: sensor." . $device_name . "_pack_" . sprintf("%02d", $i+1) . "_view_cycle_number\n";
       $output .= "                name: Cycles\n";
@@ -404,7 +404,7 @@ function pack_entities($device_name, $total_packs_num, $bms_type, $jk_display_in
     } else {
       $output .= "          - type: grid\n";
       $output .= "            title: Pack " . sprintf("%02d", $i+1) . " Details\n";
-      $output .= "            columns: 2\n";
+      $output .= "            columns: 3\n";
       $output .= "            square: false\n";
       $output .= "            cards:\n";
       
@@ -433,6 +433,19 @@ function pack_entities($device_name, $total_packs_num, $bms_type, $jk_display_in
       $output .= "                    name: Cells Number\n";
       $output .= "                  - entity: sensor." . $device_name . "_pack_" . sprintf("%02d", $i+1) . "_view_num_temps\n";
       $output .= "                    name: NTC Number\n";
+
+      // Column 3: Balancing Status
+      $output .= "              - type: entities\n";
+      $output .= "                title: Balancing Status\n";
+      $output .= "                entities:\n";
+      $output .= "                  - entity: sensor." . $device_name . "_pack_" . sprintf("%02d", $i+1) . "_balancing_status_active_1\n";
+      $output .= "                    name: Balancing Status Active 1\n";
+      $output .= "                  - entity: sensor." . $device_name . "_pack_" . sprintf("%02d", $i+1) . "_balancing_status_active_2\n";
+      $output .= "                    name: Balancing Status Active 2\n";
+      $output .= "                  - entity: sensor." . $device_name . "_pack_" . sprintf("%02d", $i+1) . "_balancing_status_passive_1\n";
+      $output .= "                    name: Balancing Status Passive 1\n";
+      $output .= "                  - entity: sensor." . $device_name . "_pack_" . sprintf("%02d", $i+1) . "_balancing_status_passive_2\n";
+      $output .= "                    name: Balancing Status Passive 2\n";
     }
   }
   return $output;
