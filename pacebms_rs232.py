@@ -57,7 +57,7 @@ class PACEBMS232:
                 return None
                 
             ratio = lenid / num_packs
-            if ratio > 110:
+            if ratio > 55:
                 return 'analog'
             else:
                 return 'warning'
@@ -1052,9 +1052,11 @@ class PACEBMS232:
             remaining_w = found_w - 12
             active_bal_1 = 0
             active_bal_2 = 0
-            if remaining_w >= 4:
-                active_bal_1 = warnstate_bytes[index + 2]
-                active_bal_2 = warnstate_bytes[index + 3]
+            if remaining_w >= 3:
+                if index + 1 < len(warnstate_bytes):
+                    active_bal_1 = warnstate_bytes[index + 1]
+                if index + 2 < len(warnstate_bytes):
+                    active_bal_2 = warnstate_bytes[index + 2]
             
             def get_balancing_cell(bitmask, offset_cell):
                 if not bitmask:

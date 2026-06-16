@@ -5,6 +5,15 @@ description:
 # Changelog
 
 
+## 1.9.75
+
+-   [PACE232] Fix packet ratio classification threshold (lowered to 55) to correctly support multi-pack configurations, resolving cell voltage, temperature, and SOC telemetry corruption.
+-   [PACE/TDT] Fix IndexError parsing crashes on firmware versions without active balancing support by implementing safe boundary checks.
+-   [PACE/TDT] Correct active balancing status byte offsets across PACE RS232, RS485, and TDT RS232 protocols.
+
+---------------
+
+
 ## 1.9.74
 
 -   [PACE/TDT] Separate Passive and Active Balancing Status into distinct sensors:
