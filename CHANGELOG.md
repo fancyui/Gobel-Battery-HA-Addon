@@ -5,6 +5,13 @@ description:
 # Changelog
 
 
+## 1.9.78
+
+-   [JKBMS] Fix 'Serial' object has no attribute 'gettimeout' AttributeError when connecting the BMS over a serial port in passive listening mode.
+
+---------------
+
+
 ## 1.9.77
 
 -   [PACE232] Implement robust structural validation for packet type classification. Distinguishes analog and warning packets by validating their schema structure for the reported number of parallel packs, automatically adapting to varying firmware data lengths (user-defined fields size U and warning status bytes W). This resolves protocol desync, cell voltage, temperature, and SOC telemetry corruption in multi-pack configurations.
