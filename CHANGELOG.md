@@ -5,6 +5,15 @@ description:
 # Changelog
 
 
+## 1.9.77
+
+-   [PACE232] Implement robust structural validation for packet type classification. Distinguishes analog and warning packets by validating their schema structure for the reported number of parallel packs, automatically adapting to varying firmware data lengths (user-defined fields size U and warning status bytes W). This resolves protocol desync, cell voltage, temperature, and SOC telemetry corruption in multi-pack configurations.
+-   [PACE/TDT] Fix IndexError parsing crashes on firmware versions without active balancing support by implementing safe boundary checks.
+-   [PACE/TDT] Correct active balancing status byte offsets across PACE RS232, RS485, and TDT RS232 protocols.
+
+---------------
+
+
 ## 1.9.74
 
 -   [PACE/TDT] Separate Passive and Active Balancing Status into distinct sensors:

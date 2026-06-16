@@ -55,12 +55,77 @@ class PACEBMS232:
             
             if num_packs <= 0:
                 return None
-                
-            ratio = lenid / num_packs
-            if ratio > 110:
+
+            # Remove SOI (~) and split into hex byte strings
+            stripped_resp = response[1:]
+            fields = [stripped_resp[i:i+2] for i in range(0, len(stripped_resp), 2)]
+            
+            if len(fields) < 10:
+                return None
+
+            # 1. Structural check: Does it fit the analog packet schema?
+            is_analog = False
+            for test_u in range(0, 100):
+                offset = 8
+                valid = True
+                for pack_index in range(num_packs):
+                    if offset >= len(fields) - 2:
+                        valid = False
+                        break
+                    try:
+                        num_cells = int(fields[offset], 16)
+                        offset += 1 + num_cells * 2
+                        if offset >= len(fields) - 2:
+                            valid = False
+                            break
+                        num_temps = int(fields[offset], 16)
+                        offset += 1 + num_temps * 2
+                        offset += 7  # Skip current(2), voltage(2), remain_cap(2), define_number_p(1)
+                        offset += test_u
+                    except (ValueError, IndexError):
+                        valid = False
+                        break
+                if valid and offset == len(fields) - 2:
+                    is_analog = True
+                    break
+
+            # 2. Structural check: Does it fit the warning packet schema?
+            is_warning = False
+            for test_w in range(10, 50):
+                offset = 8
+                valid = True
+                for pack_index in range(num_packs):
+                    if offset >= len(fields) - 2:
+                        valid = False
+                        break
+                    try:
+                        num_cells = int(fields[offset], 16)
+                        offset += 1 + num_cells
+                        if offset >= len(fields) - 2:
+                            valid = False
+                            break
+                        num_temps = int(fields[offset], 16)
+                        offset += 1 + num_temps
+                        offset += test_w
+                    except (ValueError, IndexError):
+                        valid = False
+                        break
+                if valid and offset == len(fields) - 2:
+                    is_warning = True
+                    break
+
+            if is_analog and not is_warning:
                 return 'analog'
-            else:
+            elif is_warning and not is_analog:
                 return 'warning'
+            else:
+                # Fallback to ratiometric classification if both or neither match structurally
+                normalized_lenid = lenid * 2 if len(response) > 2 * lenid else lenid
+                ratio = normalized_lenid / num_packs
+                if ratio > 110:
+                    return 'analog'
+                else:
+                    return 'warning'
         except Exception as e:
             self.logger.error(f"Error identifying packet type: {e}")
             return None
@@ -1052,9 +1117,11 @@ class PACEBMS232:
             remaining_w = found_w - 12
             active_bal_1 = 0
             active_bal_2 = 0
-            if remaining_w >= 4:
-                active_bal_1 = warnstate_bytes[index + 2]
-                active_bal_2 = warnstate_bytes[index + 3]
+            if remaining_w >= 3:
+                if index + 1 < len(warnstate_bytes):
+                    active_bal_1 = warnstate_bytes[index + 1]
+                if index + 2 < len(warnstate_bytes):
+                    active_bal_2 = warnstate_bytes[index + 2]
             
             def get_balancing_cell(bitmask, offset_cell):
                 if not bitmask:
