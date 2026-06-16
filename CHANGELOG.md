@@ -10,6 +10,7 @@ description:
 -   [PACE232] Implement robust structural validation for packet type classification. Distinguishes analog and warning packets by validating their schema structure for the reported number of parallel packs, automatically adapting to varying firmware data lengths (user-defined fields size U and warning status bytes W). This resolves protocol desync, cell voltage, temperature, and SOC telemetry corruption in multi-pack configurations.
 -   [PACE/TDT] Fix IndexError parsing crashes on firmware versions without active balancing support by implementing safe boundary checks.
 -   [PACE/TDT] Correct active balancing status byte offsets across PACE RS232, RS485, and TDT RS232 protocols.
+-   [Dashboard] Add active and passive balancing status sensors to the PACE/TDT BMS pack details grid layout in the HA dashboard. Correct entity case mismatch (from uppercase SOC/SOH to lowercase soc/soh) to align with Home Assistant's automatically registered lowercase MQTT entity IDs.
 
 ---------------
 
