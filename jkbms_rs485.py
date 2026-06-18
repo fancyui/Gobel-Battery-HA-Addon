@@ -1068,6 +1068,10 @@ class JKBMS485:
                 data['cell_voltage_max'] = max(cells)
                 data['cell_voltage_min'] = min(cells)
                 data['cell_voltage_diff'] = max(cells) - min(cells)
+                data['cell_voltage_max_index'] = dynamic.get('cell_voltage_max_index', cells.index(max(cells))) + 1
+                data['cell_voltage_min_index'] = dynamic.get('cell_voltage_min_index', cells.index(min(cells))) + 1
+                if 'cell_voltage_avg' in dynamic:
+                    data['cell_voltage_avg'] = dynamic['cell_voltage_avg']
 
             # Temperatures (battery NTCs only)
             temps = []
@@ -1270,6 +1274,7 @@ class JKBMS485:
             'cell_voltage_max_index': '',
             'cell_voltage_min_index': '',
             'cell_voltage_diff': 'mV',
+            'cell_voltage_avg': 'mV',
             'view_num_temps': 'NTCs',
             'temperatures': '°C',
             'view_current': 'A',
@@ -1309,6 +1314,7 @@ class JKBMS485:
             'cell_voltage_max_index': 'mdi:database',
             'cell_voltage_min_index': 'mdi:database',
             'cell_voltage_diff': 'mdi:format-align-middle',
+            'cell_voltage_avg': 'mdi:sine-wave',
             'view_num_temps': 'mdi:database',
             'temperatures': 'mdi:thermometer',
             'view_current': 'mdi:current-dc',
@@ -1348,6 +1354,7 @@ class JKBMS485:
             'cell_voltage_max_index': 'null',
             'cell_voltage_min_index': 'null',
             'cell_voltage_diff': 'voltage',
+            'cell_voltage_avg': 'voltage',
             'temperatures': 'temperature',
             'view_num_cells': 'null',
             'view_num_temps': 'null',
@@ -1389,6 +1396,7 @@ class JKBMS485:
             'cell_voltage_max_index': 'measurement',
             'cell_voltage_min_index': 'measurement',
             'cell_voltage_diff': 'measurement',
+            'cell_voltage_avg': 'measurement',
             'view_num_temps': 'measurement',
             'temperatures': 'measurement',
             'view_current': 'measurement',
