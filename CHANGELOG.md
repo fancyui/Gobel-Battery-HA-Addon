@@ -5,6 +5,14 @@ description:
 # Changelog
 
 
+## 1.9.79
+
+-   [JKBMS] Add support for publishing average cell voltage (`cell_voltage_avg`), maximum voltage cell index (`cell_voltage_max_index`), and minimum voltage cell index (`cell_voltage_min_index`) to Home Assistant via MQTT.
+-   [JKBMS] Convert raw 0-based cell index telemetry values from the JK protocol to 1-based index sensors to align with standard cell naming.
+
+---------------
+
+
 ## 1.9.78
 
 -   [JKBMS] Fix 'Serial' object has no attribute 'gettimeout' AttributeError when connecting the BMS over a serial port in passive listening mode.
