@@ -3,8 +3,13 @@
 [English](../../README.md) | [Deutsch](../de/README.md)
 
 > **注意**：寻找 ioBroker 版本？请访问 [ioBroker Gobel BMS Monitor 适配器](https://github.com/fancyui/ioBroker.gobel-bms-monitor)。
+>
+> [!TIP]
+> **寻找原生集成 (Integration) 版本？**  
+> 我们推出了全新的 **[Gobel Power 电池 Home Assistant 原生集成](https://github.com/fancyui/Gobel-Battery-HA-Integration)** 的预发布测试版本 (Pre-release)！  
+> 该集成直接运行于 Home Assistant 内部（无需配置 MQTT Broker），并且原生支持**多站点/多设备同时监控**（可同时独立连接并采集不同 IP 或串口的多个电池组）。欢迎下载测试并向我们反馈！
 
-最强大的智能储能电池监控 Home Assistant 集成插件。此插件为运行 Pace BMS、JK BMS 或 TDT BMS 硬件 of LiFePO4 电池包提供稳定、实时的遥测数据记录和诊断功能。
+最强大的智能储能电池监控 Home Assistant 集成插件。此插件为运行 Pace BMS、JK BMS 或 TDT BMS 硬件 of LiFePO4 电池包提供稳定、实时的遥测数据记录 and 诊断功能。
 
 通过使用 MQTT 等标准协议，无缝桥接您的太阳能储能系统 (ESS) 与您的家庭自动化网络，以实时监控电池健康状况、单体电池电压、充电状态 (SoC) 以及系统保护状态。
 

@@ -7,6 +7,11 @@ description:
 [Deutsch](docs/de/README.md) | [简体中文](docs/zh-cn/README.md)
 
 > **Note**: Looking for the ioBroker version? Check out the [ioBroker Gobel BMS Monitor Adapter](https://github.com/fancyui/ioBroker.gobel-bms-monitor).
+>
+> [!TIP]
+> **Looking for a Native Home Assistant Integration?**  
+> We have launched a pre-release of the native **[Gobel Power Battery Home Assistant Integration](https://github.com/fancyui/Gobel-Battery-HA-Integration)**!  
+> It runs directly inside Home Assistant without requiring an MQTT broker, and supports **multi-site monitoring** (connecting to multiple batteries on different IPs, ports, or serial interfaces simultaneously). We welcome your testing and feedback!
 
 The ultimate Home Assistant integration for smart energy storage monitoring. This add-on provides robust, real-time data logging and diagnostics for your LiFePO4 battery banks running Pace BMS, JK BMS, or TDT BMS hardware. 
 

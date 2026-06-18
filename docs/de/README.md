@@ -3,6 +3,11 @@
 [English](../../README.md) | [简体中文](../zh-cn/README.md)
 
 > **Hinweis**: Suchen Sie nach der ioBroker-Version? Besuchen Sie den [ioBroker Gobel BMS Monitor Adapter](https://github.com/fancyui/ioBroker.gobel-bms-monitor).
+>
+> [!TIP]
+> **Suchen Sie nach der nativen Home Assistant Integration?**  
+> Wir haben eine Vorabversion (Pre-release) der nativen **[Gobel Power Battery Home Assistant Integration](https://github.com/fancyui/Gobel-Battery-HA-Integration)** veröffentlicht!  
+> Sie läuft direkt in Home Assistant (kein MQTT-Broker erforderlich) und unterstützt die **Multi-Site-Überwachung** (gleichzeitige Verbindung mit mehreren Batteriebänken über verschiedene IP-Adressen, Ports oder serielle Anschlüsse). Wir freuen uns auf Ihr Feedback und Ihre Testergebnisse!
 
 Die ultimative Home Assistant-Integration für die intelligente Überwachung von Energiespeichern. Dieses Add-on bietet eine robuste Echtzeit-Datenprotokollierung und -Diagnose für Ihre LiFePO4-Batteriebänke mit Pace BMS-, JK BMS- oder TDT BMS-Hardware.
 

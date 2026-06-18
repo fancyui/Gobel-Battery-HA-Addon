@@ -366,6 +366,12 @@ function pack_entities($device_name, $total_packs_num, $bms_type, $jk_display_in
       $output .= "                    name: Cell Voltage Min\n";
       $output .= "                  - entity: " . $sensor_prefix . "cell_voltage_diff\n";
       $output .= "                    name: Cell Voltage Diff\n";
+      $output .= "                  - entity: " . $sensor_prefix . "cell_voltage_avg\n";
+      $output .= "                    name: Cell Voltage Avg\n";
+      $output .= "                  - entity: " . $sensor_prefix . "cell_voltage_max_index\n";
+      $output .= "                    name: Max Cell Voltage Index\n";
+      $output .= "                  - entity: " . $sensor_prefix . "cell_voltage_min_index\n";
+      $output .= "                    name: Min Cell Voltage Index\n";
       
       // Column 2: Specs & Stats
       $output .= "              - type: entities\n";
