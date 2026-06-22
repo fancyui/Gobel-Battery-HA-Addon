@@ -51,6 +51,7 @@ class JKBMS485:
         
         # Thread safety lock and background listener thread
         self.cache_lock = threading.Lock()
+        self.is_first_poll = True
         self.running = True
         self.thread = threading.Thread(target=self._read_loop, name="jkbms_listener", daemon=True)
         self.thread.start()
@@ -804,10 +805,40 @@ class JKBMS485:
         import time
         current_time = time.time()
 
-        # Wait up to 10 seconds at startup (if caches are empty) to let background thread populate data
-        start_wait = current_time
-        while not self.dynamic_cache and (time.time() - start_wait < 10.0):
-            time.sleep(0.2)
+        # First-poll discovery: wait until pack count stabilizes (no new packs for 3s),
+        # with a maximum timeout of 15s. This auto-adapts to any number of packs:
+        #   - 4 packs  → finishes in ~5s
+        #   - 16 packs → finishes in ~13s
+        # A full broadcast cycle for N packs is roughly N × 3 frames × 200ms.
+        if getattr(self, "is_first_poll", True):
+            self.is_first_poll = False
+            start_wait = current_time
+            last_pack_count = 0
+            stable_since = None
+
+            while time.time() - start_wait < 15.0:
+                if not self.dynamic_cache:
+                    time.sleep(0.2)
+                    continue
+
+                current_pack_count = len(self.dynamic_cache)
+
+                if current_pack_count != last_pack_count:
+                    # New pack discovered — reset the stability timer
+                    last_pack_count = current_pack_count
+                    stable_since = time.time()
+                    self.logger.info(
+                        f"Discovery: found {current_pack_count} pack(s), waiting for more..."
+                    )
+                elif stable_since and time.time() - stable_since >= 3.0:
+                    # Pack count stable for 3s — discovery complete
+                    self.logger.info(
+                        f"Discovery complete: {current_pack_count} pack(s) "
+                        f"found after {time.time() - start_wait:.1f}s"
+                    )
+                    break
+
+                time.sleep(0.2)
 
         dynamic_results = {}
         setup_results = {}
