@@ -97,7 +97,10 @@ class BMSCommunication:
         try:
             # Check if the connection is a serial connection
             if hasattr(self.bms_connection, 'readline'):
-                raw_data = self.bms_connection.readline()
+                if hasattr(self.bms_connection, 'read_until'):
+                    raw_data = self.bms_connection.read_until(b'\r')
+                else:
+                    raw_data = self.bms_connection.readline()
                 if return_raw:
                     return raw_data
                 else:
