@@ -840,6 +840,7 @@ class JKBMS485:
 
                 time.sleep(0.2)
 
+        current_time = time.time()  # Refresh after potential discovery wait
         dynamic_results = {}
         setup_results = {}
         static_results = {}
