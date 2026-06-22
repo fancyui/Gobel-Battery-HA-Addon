@@ -467,11 +467,11 @@ class PACEBMS485:
         W = len(warnstate_bytes) - start_warn_idx
         active_bal_1 = 0
         active_bal_2 = 0
-        if W >= 15:
-            if start_warn_idx + 13 < len(warnstate_bytes):
-                active_bal_1 = warnstate_bytes[start_warn_idx + 13]
+        if W >= 16:
             if start_warn_idx + 14 < len(warnstate_bytes):
-                active_bal_2 = warnstate_bytes[start_warn_idx + 14]
+                active_bal_1 = warnstate_bytes[start_warn_idx + 14]
+            if start_warn_idx + 15 < len(warnstate_bytes):
+                active_bal_2 = warnstate_bytes[start_warn_idx + 15]
 
         def get_balancing_cell(bitmask, offset_cell):
             if not bitmask:
