@@ -5,6 +5,13 @@ description:
 # Changelog
 
 
+## 1.9.81
+
+-   [PACE/TDT] Fix active balancing status parsing incorrectly reporting values due to shifted byte offsets in RS232 and RS485 protocols.
+
+---------------
+
+
 ## 1.9.80
 
 -   [JKBMS] Optimize startup passive listening wait window to ensure all parallel packs check in before completing the initial poll.
