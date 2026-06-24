@@ -5,6 +5,27 @@ description:
 # Changelog
 
 
+## 1.9.82
+
+-   [BMS] Fix socket buffer truncation and telemetry protocol desynchronization over Ethernet/WiFi connections by implementing TCP stream buffering and reading until carriage return delimiter.
+
+---------------
+
+
+## 1.9.81
+
+-   [PACE/TDT] Fix active balancing status parsing incorrectly reporting values due to shifted byte offsets in RS232 and RS485 protocols.
+
+---------------
+
+
+## 1.9.80
+
+-   [JKBMS] Optimize startup passive listening wait window to ensure all parallel packs check in before completing the initial poll.
+
+---------------
+
+
 ## 1.9.79
 
 -   [JKBMS] Add support for publishing average cell voltage (`cell_voltage_avg`), maximum voltage cell index (`cell_voltage_max_index`), and minimum voltage cell index (`cell_voltage_min_index`) to Home Assistant via MQTT.
