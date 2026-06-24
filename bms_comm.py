@@ -11,6 +11,7 @@ class BMSCommunication:
         self.ethernet_port = ethernet_port
         self.buffer_size = buffer_size
         self.bms_connection = None
+        self._tcp_buffer = b''
 
         # Configure logging
         logging.basicConfig(level=logging.DEBUG if debug else logging.INFO,
@@ -35,6 +36,7 @@ class BMSCommunication:
                 self.bms_connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 self.bms_connection.settimeout(3)
                 self.bms_connection.connect((self.ethernet_ip, self.ethernet_port))
+                self._tcp_buffer = b''
                 self.logger.info(f"Connected to BMS over Ethernet: {self.ethernet_ip}:{self.ethernet_port}")
                 return self.bms_connection
             except socket.error as e:
@@ -116,9 +118,39 @@ class BMSCommunication:
                     else:
                         return None
                 else:
-                    # Original string receiving method, for other BMS
-                    raw_data = self.bms_connection.recv(self.buffer_size)
-                    received_data = raw_data.decode().strip()
+                    # Original string receiving method, for other BMS.
+                    # We maintain a buffer in self._tcp_buffer and read until b'\r' is received.
+                    if not hasattr(self, '_tcp_buffer'):
+                        self._tcp_buffer = b''
+                    
+                    import time
+                    start_time = time.time()
+                    timeout = self.bms_connection.gettimeout() or 3.0
+                    
+                    while b'\r' not in self._tcp_buffer:
+                        if time.time() - start_time > timeout:
+                            break
+                        try:
+                            # Read chunks of data
+                            chunk = self.bms_connection.recv(4096)
+                            if not chunk:
+                                break
+                            self._tcp_buffer += chunk
+                        except socket.timeout:
+                            break
+                        except Exception as e:
+                            self.logger.error(f"Error reading socket: {e}")
+                            break
+                    
+                    if b'\r' in self._tcp_buffer:
+                        idx = self._tcp_buffer.index(b'\r')
+                        raw_data = self._tcp_buffer[:idx + 1]
+                        self._tcp_buffer = self._tcp_buffer[idx + 1:]
+                    else:
+                        raw_data = self._tcp_buffer
+                        self._tcp_buffer = b''
+                    
+                    received_data = raw_data.decode('ascii', errors='ignore').strip()
             else:
                 raise ValueError("Unsupported connection type")
 
@@ -211,6 +243,7 @@ class BMSCommunication:
                 self.logger.debug("Flushed serial input buffer")
             elif hasattr(self.bms_connection, 'recv'):
                 import socket as _socket
+                self._tcp_buffer = b''
                 original_timeout = self.bms_connection.gettimeout()
                 self.bms_connection.settimeout(0.01)
                 flushed = 0

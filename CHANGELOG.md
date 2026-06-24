@@ -5,6 +5,13 @@ description:
 # Changelog
 
 
+## 1.9.82
+
+-   [BMS] Fix socket buffer truncation and telemetry protocol desynchronization over Ethernet/WiFi connections by implementing TCP stream buffering and reading until carriage return delimiter.
+
+---------------
+
+
 ## 1.9.81
 
 -   [PACE/TDT] Fix active balancing status parsing incorrectly reporting values due to shifted byte offsets in RS232 and RS485 protocols.
