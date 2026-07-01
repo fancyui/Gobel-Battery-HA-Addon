@@ -5,6 +5,13 @@ description:
 # Changelog
 
 
+## 1.9.83
+
+-   [JKBMS] Fix connection recovery hang over Ethernet/WiFi connections when socket exceptions occur (e.g. after network disconnect or switch update) by closing the connection and resetting it to None to trigger automatic reconnects.
+
+---------------
+
+
 ## 1.9.82
 
 -   [BMS] Fix socket buffer truncation and telemetry protocol desynchronization over Ethernet/WiFi connections by implementing TCP stream buffering and reading until carriage return delimiter.
