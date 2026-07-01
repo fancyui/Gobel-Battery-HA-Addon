@@ -438,6 +438,12 @@ class BMSCommunication:
                 except Exception as e:
                     self.logger.warning(f"JK BMS receive error: {e}")
                     idle_count += 1
+                    if self.bms_connection:
+                        try:
+                            self.bms_connection.close()
+                        except Exception:
+                            pass
+                        self.bms_connection = None
 
                 if got_data and idle_count >= idle_timeout:
                     break
