@@ -5,6 +5,13 @@ description:
 # Changelog
 
 
+## 1.9.84
+
+-   [Pace BMS] Fix false-positive structural matches in dynamic U/W byte calculation (e.g., when the battery is fully charged and current is 0A) by enforcing non-zero cell and temperature counts and utilizing a hybrid division calculation with fallback.
+
+---------------
+
+
 ## 1.9.83
 
 -   [JKBMS] Fix connection recovery hang over Ethernet/WiFi connections when socket exceptions occur (e.g. after network disconnect or switch update) by closing the connection and resetting it to None to trigger automatic reconnects.

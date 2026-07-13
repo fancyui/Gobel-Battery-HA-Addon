@@ -65,7 +65,23 @@ class PACEBMS232:
 
             # 1. Structural check: Does it fit the analog packet schema?
             is_analog = False
-            for test_u in range(0, 100):
+            total_data_bytes = len(fields) - 10
+            analog_candidates = []
+            if total_data_bytes % num_packs == 0:
+                try:
+                    pack_data_size = total_data_bytes // num_packs
+                    num_cells = int(fields[8], 16)
+                    num_temps = int(fields[8 + 1 + num_cells * 2], 16)
+                    candidate_u = pack_data_size - (1 + num_cells * 2 + 1 + num_temps * 2 + 7)
+                    if 0 <= candidate_u < 100:
+                        analog_candidates.append(candidate_u)
+                except (ValueError, IndexError):
+                    pass
+
+            if not analog_candidates:
+                analog_candidates = range(0, 100)
+
+            for test_u in analog_candidates:
                 offset = 8
                 valid = True
                 for pack_index in range(num_packs):
@@ -74,11 +90,17 @@ class PACEBMS232:
                         break
                     try:
                         num_cells = int(fields[offset], 16)
+                        if num_cells <= 0:
+                            valid = False
+                            break
                         offset += 1 + num_cells * 2
                         if offset >= len(fields) - 2:
                             valid = False
                             break
                         num_temps = int(fields[offset], 16)
+                        if num_temps <= 0:
+                            valid = False
+                            break
                         offset += 1 + num_temps * 2
                         offset += 7  # Skip current(2), voltage(2), remain_cap(2), define_number_p(1)
                         offset += test_u
@@ -91,7 +113,22 @@ class PACEBMS232:
 
             # 2. Structural check: Does it fit the warning packet schema?
             is_warning = False
-            for test_w in range(10, 50):
+            warning_candidates = []
+            if total_data_bytes % num_packs == 0:
+                try:
+                    pack_data_size = total_data_bytes // num_packs
+                    num_cells = int(fields[8], 16)
+                    num_temps = int(fields[8 + 1 + num_cells], 16)
+                    candidate_w = pack_data_size - (1 + num_cells + 1 + num_temps)
+                    if 10 <= candidate_w < 50:
+                        warning_candidates.append(candidate_w)
+                except (ValueError, IndexError):
+                    pass
+
+            if not warning_candidates:
+                warning_candidates = range(10, 50)
+
+            for test_w in warning_candidates:
                 offset = 8
                 valid = True
                 for pack_index in range(num_packs):
@@ -100,11 +137,17 @@ class PACEBMS232:
                         break
                     try:
                         num_cells = int(fields[offset], 16)
+                        if num_cells <= 0:
+                            valid = False
+                            break
                         offset += 1 + num_cells
                         if offset >= len(fields) - 2:
                             valid = False
                             break
                         num_temps = int(fields[offset], 16)
+                        if num_temps <= 0:
+                            valid = False
+                            break
                         offset += 1 + num_temps
                         offset += test_w
                     except (ValueError, IndexError):
@@ -559,7 +602,23 @@ class PACEBMS232:
 
         # Dynamically calculate the number of user-defined bytes (U) per pack
         found_u = None
-        for test_u in range(0, 100):
+        total_data_bytes = len(fields) - 10
+        analog_candidates = []
+        if total_data_bytes % num_packs == 0:
+            try:
+                pack_data_size = total_data_bytes // num_packs
+                num_cells = int(fields[offset], 16)
+                num_temps = int(fields[offset + 1 + num_cells * 2], 16)
+                candidate_u = pack_data_size - (1 + num_cells * 2 + 1 + num_temps * 2 + 7)
+                if 0 <= candidate_u < 100:
+                    analog_candidates.append(candidate_u)
+            except (ValueError, IndexError):
+                pass
+
+        if not analog_candidates:
+            analog_candidates = range(0, 100)
+
+        for test_u in analog_candidates:
             test_offset = offset
             valid = True
             for pack_index in range(num_packs):
@@ -567,11 +626,17 @@ class PACEBMS232:
                     valid = False
                     break
                 num_cells = int(fields[test_offset], 16)
+                if num_cells <= 0:
+                    valid = False
+                    break
                 test_offset += 1 + num_cells * 2
                 if test_offset >= len(fields) - 2:
                     valid = False
                     break
                 num_temps = int(fields[test_offset], 16)
+                if num_temps <= 0:
+                    valid = False
+                    break
                 test_offset += 1 + num_temps * 2
                 # Skip current (2), total voltage (2), remaining capacity (2), define_number_p (1) -> 7 fields
                 test_offset += 7
@@ -954,7 +1019,24 @@ class PACEBMS232:
         for target_len in [len(warnstate_bytes) - 2, len(warnstate_bytes)]:
             if target_len <= 1:
                 continue
-            for test_w in range(10, 50):
+
+            total_data_bytes = target_len - index
+            warning_candidates = []
+            if total_data_bytes % pack_number == 0:
+                try:
+                    pack_data_size = total_data_bytes // pack_number
+                    num_cells = warnstate_bytes[index]
+                    num_temps = warnstate_bytes[index + 1 + num_cells]
+                    candidate_w = pack_data_size - (1 + num_cells + 1 + num_temps)
+                    if 10 <= candidate_w < 50:
+                        warning_candidates.append(candidate_w)
+                except IndexError:
+                    pass
+
+            if not warning_candidates:
+                warning_candidates = range(10, 50)
+
+            for test_w in warning_candidates:
                 test_offset = index
                 valid = True
                 for pack_index in range(pack_number):
@@ -962,11 +1044,17 @@ class PACEBMS232:
                         valid = False
                         break
                     num_cells = warnstate_bytes[test_offset]
+                    if num_cells <= 0:
+                        valid = False
+                        break
                     test_offset += 1 + num_cells
                     if test_offset >= target_len:
                         valid = False
                         break
                     num_temps = warnstate_bytes[test_offset]
+                    if num_temps <= 0:
+                        valid = False
+                        break
                     test_offset += 1 + num_temps
                     # Skip test_w warning/status fields
                     test_offset += test_w
