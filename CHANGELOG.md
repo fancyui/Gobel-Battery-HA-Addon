@@ -5,6 +5,13 @@ description:
 # Changelog
 
 
+## 1.9.85
+
+-   [MQTT] Fix Home Assistant MQTT discovery rejection caused by empty `icon`, `state_class`, or `device_class` attributes, and stop publishing unused `define_number_p` sensor to HA.
+
+---------------
+
+
 ## 1.9.84
 
 -   [Pace BMS] Fix false-positive structural matches in dynamic U/W byte calculation (e.g., when the battery is fully charged and current is 0A) by enforcing non-zero cell and temperature counts and utilizing a hybrid division calculation with fallback.

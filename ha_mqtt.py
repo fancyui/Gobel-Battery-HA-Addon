@@ -54,20 +54,23 @@ class HA_MQTT:
             "has_entity_name": False,
             "state_topic": f"{main_topic}/{self.device_name}_{entity_id}/state",
             "unique_id": f"{self.device_name}_{entity_id}",
-            "icon": icon,
             "value_template": "{{ value }}",
             "device": self.device_info
         }
         
+        # Only add the icon attribute if icon is not empty
+        if icon and icon.strip():
+            payload["icon"] = icon
+
         # Only add the unit_of_measurement attribute if the unit is not empty
         if unit and unit.strip():
             payload["unit_of_measurement"] = unit
             
-        # Only add the state_class attribute if it is not 'null' (text values like version info do not need state_class)
-        if stateclass != 'null':
+        # Only add the state_class attribute if it is not 'null' and not empty
+        if stateclass and stateclass != 'null' and stateclass.strip():
             payload["state_class"] = stateclass
             
-        if deviceclass != 'null':
+        if deviceclass and deviceclass != 'null' and deviceclass.strip():
             payload["device_class"] = deviceclass
 
         if precision is not None:
@@ -154,10 +157,11 @@ class HA_MQTT:
             "unique_id": f"{self.device_name}_{entity_id}",
             "payload_on": True,
             "payload_off": False,
-            "icon": icon,
             "value_template": "{{ value_json.state }}",
             "device": self.device_info
         }
+        if icon and icon.strip():
+            payload["icon"] = icon
         # self.logger.debug(f"Discovery payload: {json.dumps(payload)}")
         try:
             self.mqtt_client.publish(topic, json.dumps(payload), retain=True)
@@ -190,10 +194,11 @@ class HA_MQTT:
             "has_entity_name": False,
             "state_topic": f"{main_topic}/{self.device_name}_{entity_id}/state",
             "unique_id": f"{self.device_name}_{entity_id}",
-            "icon": icon,
             "value_template": "{{ value_json.state }}",
             "device": self.device_info
         }
+        if icon and icon.strip():
+            payload["icon"] = icon
         # self.logger.debug(f"Discovery payload: {json.dumps(payload)}")
         try:
             self.mqtt_client.publish(topic, json.dumps(payload), retain=True)

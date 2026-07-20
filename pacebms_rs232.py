@@ -726,7 +726,6 @@ class PACEBMS232:
             # Define number P
             define_number_p = int(fields[offset], 16)
             offset += 1
-            pack_data['define_number_p'] = define_number_p
     
             # Parse user-defined items based on found_u
             u_offset = 0
