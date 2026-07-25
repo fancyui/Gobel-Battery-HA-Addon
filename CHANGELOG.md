@@ -5,6 +5,13 @@ description:
 # Changelog
 
 
+## 1.9.86
+
+-   [JKBMS] Fix setup frame voltage register parsing for `VolInverterMaxCharge` (Inverter Max Charge Voltage) at offset 38 and `VolFloatCharge` (Float Charge Voltage) at offset 42 (previously misidentified as battery undervoltage/overvoltage protection).
+
+---------------
+
+
 ## 1.9.85
 
 -   [MQTT] Fix Home Assistant MQTT discovery rejection caused by empty `icon`, `state_class`, or `device_class` attributes, and stop publishing unused `define_number_p` sensor to HA.

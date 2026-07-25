@@ -111,8 +111,8 @@ fields_v = [
     (0x0014, "VolBalanTrig",     "均衡开启压差",         0.001, "V"),
     (0x0018, "VolSOC100%",       "SOC=100%电压",         0.001, "V"),
     (0x001C, "VolSOC0%",         "SOC=0%电压",           0.001, "V"),
-    (0x0020, "VolBatUVP",        "整组欠压保护",         0.001, "V"),
-    (0x0024, "VolBatOVP",        "整组过压保护",         0.001, "V"),
+    (0x0020, "VolInverterMaxCharge", "逆变器最大充电电压", 0.001, "V"),
+    (0x0024, "VolFloatCharge",       "浮充电压",             0.001, "V"),
     (0x0028, "VolSysPwrOff",     "自动关机电压",         0.001, "V"),
 ]
 for r, name, desc, scale, unit in fields_v:
