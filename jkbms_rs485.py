@@ -704,8 +704,8 @@ class JKBMS485:
             result['vol_balan_trig'] = struct.unpack_from('<I', data, 26)[0] / 1000.0
             result['vol_soc_100'] = struct.unpack_from('<I', data, 30)[0] / 1000.0
             result['vol_soc_0'] = struct.unpack_from('<I', data, 34)[0] / 1000.0
-            result['vol_bat_uvp'] = struct.unpack_from('<I', data, 38)[0] / 1000.0
-            result['vol_bat_ovp'] = struct.unpack_from('<I', data, 42)[0] / 1000.0
+            result['vol_inverter_max_charge'] = struct.unpack_from('<I', data, 38)[0] / 1000.0
+            result['vol_float_charge'] = struct.unpack_from('<I', data, 42)[0] / 1000.0
             result['vol_sys_pwr_off'] = struct.unpack_from('<I', data, 46)[0] / 1000.0
 
         if 82 <= len(data):
@@ -1007,8 +1007,8 @@ class JKBMS485:
                     'vol_balan_trig': 'view_vol_balan_trig',
                     'vol_soc_100': 'view_vol_soc_100',
                     'vol_soc_0': 'view_vol_soc_0',
-                    'vol_bat_uvp': 'view_vol_bat_uvp',
-                    'vol_bat_ovp': 'view_vol_bat_ovp',
+                    'vol_inverter_max_charge': 'view_vol_inverter_max_charge',
+                    'vol_float_charge': 'view_vol_float_charge',
                     'vol_sys_pwr_off': 'view_vol_sys_pwr_off',
                     'cur_bat_c_oc': 'view_cur_bat_c_oc',
                     'tim_bat_c_ocp_dly': 'view_tim_bat_c_ocp_dly',
