@@ -255,6 +255,10 @@ function pack_settings_entities($device_name, $total_packs_num, $bms_type, $jk_d
     $output .= "            name: Cell Undervoltage Protection\n";
     $output .= "          - entity: " . $sensor_prefix . "cell_undervoltage_recovery\n";
     $output .= "            name: Cell Undervoltage Recovery\n";
+    $output .= "          - entity: " . $sensor_prefix . "inverter_max_charge_voltage\n";
+    $output .= "            name: Inverter Max Charge Voltage\n";
+    $output .= "          - entity: " . $sensor_prefix . "float_charge_voltage\n";
+    $output .= "            name: Float Charge Voltage\n";
     $output .= "          - entity: " . $sensor_prefix . "balance_start_voltage\n";
     $output .= "            name: Balance Start Voltage\n";
     $output .= "          - entity: " . $sensor_prefix . "balance_trigger_voltage\n";

@@ -325,8 +325,8 @@
 | 26-29 | 4    | `0A 00 00 00`  | UINT32le | Balance Start Voltage Difference  | 10 → 0.010 V       | VolBalanTrig     |
 | 30-33 | 4    | `75 0D 00 00`  | UINT32le | SOC=100% Voltage                  | 3445 → 3.445 V     | VolSOC100%       |
 | 34-37 | 4    | `8C 0A 00 00`  | UINT32le | SOC=0% Voltage                    | 2700 → 2.700 V     | VolSOC0%         |
-| 38-41 | 4    | `7A 0D 00 00`  | UINT32le | Pack Under-voltage Protection     | 3450 → 3.450 V     | VolBatUVP        |
-| 42-45 | 4    | `48 0D 00 00`  | UINT32le | Pack Over-voltage Protection      | 3400 → 3.400 V     | VolBatOVP        |
+| 38-41 | 4    | `7A 0D 00 00`  | UINT32le | Inverter Max Charge Voltage        | 3450 → 3.450 V     | VolInverterMaxCharge |
+| 42-45 | 4    | `48 0D 00 00`  | UINT32le | Float Charge Voltage               | 3400 → 3.400 V     | VolFloatCharge   |
 | 46-49 | 4    | `BA 09 00 00`  | UINT32le | Auto Power-off Voltage            | 2490 → 2.490 V     | VolSysPwrOff     |
 
 
@@ -476,8 +476,8 @@ C4 09 00 00                          ← Cell UVP: 2500 mV (2.500V)
 0A 00 00 00                          ← Balance Start Voltage Diff: 10 mV (0.010V)
 75 0D 00 00                          ← SOC=100% Voltage: 3445 mV (3.445V)
 8C 0A 00 00                          ← SOC=0% Voltage: 2700 mV (2.700V)
-7A 0D 00 00                          ← Pack UVP: 3450 mV (3.450V)
-48 0D 00 00                          ← Pack OVP: 3400 mV (3.400V)
+7A 0D 00 00                          ← Inverter Max Charge Voltage: 3450 mV (3.450V)
+48 0D 00 00                          ← Float Charge Voltage: 3400 mV (3.400V)
 BA 09 00 00                          ← Auto Power-off Voltage: 2490 mV (2.490V)
 30 75 00 00                          ← Continuous Charge Current: 30000 mA (30A)
 03 00 00 00                          ← Charge OCP Delay: 3 s
