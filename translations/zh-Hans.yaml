@@ -1,7 +1,7 @@
 configuration:
   host_name:
-    name: "主机名"
-    description: "Home Assistant 实例的主机名。"
+    name: "MQTT 自动发现前缀"
+    description: "Home Assistant 的 MQTT 自动发现前缀（Discovery Prefix）。必须与 Home Assistant 中 MQTT 集成的『自动发现前缀』保持一致（默认为 homeassistant），否则传感器将无法自动被 HA 识别。"
   mqtt_broker:
     name: "MQTT Broker 地址"
     description: "MQTT 服务器的主机名或 IP 地址。"

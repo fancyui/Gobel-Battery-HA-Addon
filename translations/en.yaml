@@ -1,7 +1,7 @@
 configuration:
   host_name:
-    name: "Host Name"
-    description: "The hostname of the Home Assistant instance."
+    name: "MQTT Discovery Prefix"
+    description: "The MQTT discovery prefix for Home Assistant. Must match the 'Discovery prefix' in Home Assistant's MQTT integration (default is 'homeassistant'), otherwise sensors will not be automatically discovered."
   mqtt_broker:
     name: "MQTT Broker"
     description: "The hostname or IP address of your MQTT broker."

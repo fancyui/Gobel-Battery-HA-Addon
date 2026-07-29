@@ -19,6 +19,7 @@ usb: true
 panel_icon: "mdi:home-battery"
 
 options:
+  # Home Assistant MQTT Discovery Prefix (默认为 homeassistant，需与 HA 中的 MQTT 发现前缀一致)
   host_name: homeassistant
   mqtt_broker: homeassistant.local
   mqtt_port: 1883
