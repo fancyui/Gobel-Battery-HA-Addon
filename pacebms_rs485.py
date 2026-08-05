@@ -605,21 +605,25 @@ class PACEBMS485:
         adr = response[2:4]
         fixed_hex = response[4:6]
         rtn = response[6:8]
-        length = response[8:10]
-        lenid = response[10:12]
+        lchksum = response[8:9]
+        lenid = response[9:12]
 
-        # Determine the length of DATAINFO
-        if lenid == '02':
-            data_info_length = 2  # 2 characters for address confirmation
-        else:
-            raise ValueError("Invalid LENID value")
+        if rtn != '00':
+            raise ValueError(f"Pack number request returned error code: {rtn}")
 
-        data_info = response[12:14]
+        # Some BMS return a short ACK for CID2=0x90 with LENID=000 and no DATAINFO.
+        # In that case, the confirmed pack address is the ADR field.
+        if lenid == '000':
+            return int(adr, 16)
 
-        # Convert DATAINFO from hex to integer
-        address_value = int(data_info, 16)
+        # Other devices may return one-byte DATAINFO (echo address) with LENID=002.
+        if lenid == '002':
+            data_info = response[12:14]
+            if len(data_info) != 2:
+                raise ValueError("Invalid DATAINFO length for LENID=002")
+            return int(data_info, 16)
 
-        return address_value
+        raise ValueError(f"Invalid LENID value for pack number response: {lenid}")
     
     
     def parse_software_version_data(self, response):
