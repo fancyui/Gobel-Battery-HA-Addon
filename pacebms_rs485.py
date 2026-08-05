@@ -238,7 +238,8 @@ class PACEBMS485:
 
         # Pack current
         pack_current = fields[offset] + fields[offset + 1]  # Combine two bytes for current
-        pack_current = self.hex_to_signed(pack_current) / 100
+        # For this PACE RS485 response variant, current unit is 0.1A.
+        pack_current = self.hex_to_signed(pack_current) / 10
 
         offset += 2
         
@@ -1098,7 +1099,7 @@ class PACEBMS485:
         self.ha_comm.publish_sensor_state(total_voltage, 'V', "total_voltage")
         self.ha_comm.publish_sensor_discovery("total_voltage", "V", icons['total_voltage'], deviceclasses['total_voltage'], stateclasses['total_voltage'])
 
-        total_power = round(sum(d.get('view_power', 0) for d in analog_data),1)
+        total_power = round(sum(d.get('view_power', 0) for d in analog_data),2)
         self.ha_comm.publish_sensor_state(total_power, 'kW', "total_power")
         self.ha_comm.publish_sensor_discovery("total_power", "kW", icons['total_power'], deviceclasses['total_power'], stateclasses['total_power'])
 
