@@ -3,11 +3,12 @@ import logging
 
 class PACEBMS485:
 
-    def __init__(self, bms_comm, ha_comm, data_refresh_interval, debug, if_random):
+    def __init__(self, bms_comm, ha_comm, data_refresh_interval, debug, if_random, current_scale=100):
         self.bms_comm = bms_comm
         self.ha_comm = ha_comm
         self.data_refresh_interval = data_refresh_interval
         self.if_random = if_random
+        self.current_scale = current_scale if (current_scale and current_scale > 0) else 100
 
         # Configure logging
         logging.basicConfig(level=logging.DEBUG if debug else logging.INFO,
@@ -238,7 +239,7 @@ class PACEBMS485:
 
         # Pack current
         pack_current = fields[offset] + fields[offset + 1]  # Combine two bytes for current
-        pack_current = self.hex_to_signed(pack_current) / 100
+        pack_current = self.hex_to_signed(pack_current) / self.current_scale
 
         offset += 2
         
@@ -605,25 +606,25 @@ class PACEBMS485:
         adr = response[2:4]
         fixed_hex = response[4:6]
         rtn = response[6:8]
-        lchksum = response[8:9]
-        lenid = response[9:12]
+        length = response[8:10]
+        lenid = response[10:12]
+        lenid_3 = response[9:12] if len(response) >= 12 else ""
 
         if rtn != '00':
-            raise ValueError(f"Pack number request returned error code: {rtn}")
+            raise ValueError(f"BMS returned error RTN code: {rtn}")
 
-        # Some BMS return a short ACK for CID2=0x90 with LENID=000 and no DATAINFO.
-        # In that case, the confirmed pack address is the ADR field.
-        if lenid == '000':
-            return int(adr, 16)
-
-        # Other devices may return one-byte DATAINFO (echo address) with LENID=002.
-        if lenid == '002':
+        # Determine the length of DATAINFO / parse address value
+        if lenid == '00' or lenid_3 == '000':
+            # Short ACK variant: LENID = 00H (no DATAINFO). Confirmed address is ADR from header.
+            address_value = int(adr, 16)
+        elif lenid == '02' or lenid_3 == '002':
+            # Echo DATAINFO variant (Table A.10): LENID = 02H (2 hex digits DATAINFO payload).
             data_info = response[12:14]
-            if len(data_info) != 2:
-                raise ValueError("Invalid DATAINFO length for LENID=002")
-            return int(data_info, 16)
+            address_value = int(data_info, 16)
+        else:
+            raise ValueError(f"Invalid LENID value: {lenid}")
 
-        raise ValueError(f"Invalid LENID value for pack number response: {lenid}")
+        return address_value
     
     
     def parse_software_version_data(self, response):
@@ -865,10 +866,11 @@ class PACEBMS485:
     def check_if_pack_exsit(self, pack_number):
         try:
             pack_num_data = self.get_pack_num_data(pack_number)
-            if int(pack_num_data) == pack_number:
+            if pack_num_data is not None and int(pack_num_data) == pack_number:
                 if_exsit = pack_number
             else:
                 if_exsit = False
+            return if_exsit
 
         except Exception as e:
             self.logger.error(f"An error occurred: {e}")
