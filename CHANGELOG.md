@@ -5,6 +5,14 @@ description:
 # Changelog
 
 
+## 1.9.87
+
+-   [PACE BMS RS485] Fix pack discovery failure on batteries that respond with short ACK frames (`LENID 000` / 0-byte DATAINFO) for CID2 90 pack-number requests.
+-   [PACE BMS] Add configurable `pace_current_scale` option (default `100` for 0.01A / 10mA resolution) allowing users with 0.1A resolution BMS hardware to set scaling to `10` without affecting standard devices.
+
+---------------
+
+
 ## 1.9.86
 
 -   [JKBMS] Fix setup frame voltage register parsing for `VolInverterMaxCharge` (Inverter Max Charge Voltage) at offset 38 and `VolFloatCharge` (Float Charge Voltage) at offset 42 (previously misidentified as battery undervoltage/overvoltage protection).
