@@ -56,6 +56,9 @@ configuration:
   if_random:
     name: "Zufällige Testdaten"
     description: "Auf 1 setzen, um zufällige Testdaten zu generieren (für Entwickler-Debugging)."
+  pace_current_scale:
+    name: "PACE BMS Stromskalierungs-Divisor"
+    description: "Divisor zur Berechnung des PACE BMS Pack-Stroms. Standardwert ist 100 (Standard 10mA / 0,01A Auflösung). Stellen Sie für BMS-Modelle mit 100mA / 0,1A Auflösung 10 ein."
   jk_display_index_start:
     name: "JKBMS Start-Anzeigeindex"
     description: "Wählen Sie, ob das JKBMS-Pack-Label mit der physischen DIP-Adresse übereinstimmt ('00' beginnt bei pack_00) oder verschoben wird, um ab pack_01 zu beginnen ('01'). ⚠️ WARNUNG: Das Ändern dieser Einstellung ändert das Format der MQTT-Entitäts-IDs, wodurch vorhandene Entitäten in Home Assistant unbrauchbar werden und Duplikate entstehen. Falls Sie wechseln müssen, löschen Sie dieses Gerät zuerst aus der Home Assistant MQTT-Integration und starten Sie das Add-on neu, um die Entitäten neu aufzubauen. Nicht ohne Notwendigkeit ändern."
