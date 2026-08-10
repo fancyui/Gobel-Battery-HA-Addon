@@ -5,6 +5,13 @@ description:
 # Changelog
 
 
+## 1.9.87
+
+-   [JKBMS] Fix signed power direction so discharge energy is accumulated separately from charged energy.
+
+---------------
+
+
 ## 1.9.86
 
 -   [JKBMS] Fix setup frame voltage register parsing for `VolInverterMaxCharge` (Inverter Max Charge Voltage) at offset 38 and `VolFloatCharge` (Float Charge Voltage) at offset 42 (previously misidentified as battery undervoltage/overvoltage protection).
