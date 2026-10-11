@@ -39,16 +39,18 @@ class HA_MQTT:
         self.logger.debug("Initializing MQTT client")
         self.mqtt_client = mqtt.Client()
         self.mqtt_client.username_pw_set(self.mqtt_user, self.mqtt_password)
-        self.logger.info(f"Use TLS to connect: {self.mqtt_tls}")
         if self.mqtt_tls:
             if self.mqtt_tls_ca_path:
-                self.logger.info(f"TLS CA-File Path: {self.mqtt_tls_ca_path}")
+                self.mqtt_client.tls_set(ca_certs=self.mqtt_tls_ca_path)
+                self.logger.info(f"Using TLS CA file: {self.mqtt_tls_ca_path}")
             else:
-                self.logger.info("Use system's default CA certificate store")
-        self.logger.info(f"Connecting to MQTT broker at {self.mqtt_broker}:{self.mqtt_port}")
+                self.mqtt_client.tls_set()
+                self.logger.info("TLS enabled, using system's default CA certificate store")
+            self.logger.info(f"Connecting to MQTT broker at {self.mqtt_broker}:{self.mqtt_port} (TLS)")
+        else:
+            self.logger.info(f"Connecting to MQTT broker at {self.mqtt_broker}:{self.mqtt_port}")
         try:
             self.mqtt_client.connect(self.mqtt_broker, self.mqtt_port, 60)
-            # TODO: Add TLS connect option
             self.logger.info("Connected to MQTT broker successfully")
         except Exception as e:
             self.logger.error(f"Failed to connect to MQTT broker: {e}")
