@@ -45,6 +45,8 @@ mqtt_broker = config.get('mqtt_broker')
 mqtt_port = config.get('mqtt_port')
 mqtt_username = config.get('mqtt_username')
 mqtt_password = config.get('mqtt_password')
+mqtt_tls = config.get('mqtt_tls')
+mqtt_tls_ca_path = config.get('mqtt_tls_ca_path')
 host_name = config.get('host_name')
 mqtt_discovery_topic = config.get('mqtt_discovery_topic')
 device_name = config.get('device_name')
@@ -104,7 +106,7 @@ def run():
     # Connect to HA_REST_API
     # ha_comm = HA_REST_API(long_lived_access_token)
     # Connect to HA_MQTT
-    ha_comm = HA_MQTT(mqtt_broker, mqtt_port, mqtt_username, mqtt_password, host_name, device_name, device_info, debug)
+    ha_comm = HA_MQTT(mqtt_broker, mqtt_port, mqtt_username, mqtt_password, mqtt_tls, mqtt_tls_ca_path, host_name, device_name, device_info, debug)
     mqtt_client = ha_comm.connect()
     if not mqtt_client:
         logger.info("HA Connection failed")

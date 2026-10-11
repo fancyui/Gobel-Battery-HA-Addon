@@ -4,11 +4,13 @@ import logging
 
 class HA_MQTT:
 
-    def __init__(self, mqtt_broker, mqtt_port, mqtt_user, mqtt_password, host_name, device_name, device_info, debug):
+    def __init__(self, mqtt_broker, mqtt_port, mqtt_user, mqtt_password, mqtt_tls, mqtt_tls_ca_path, host_name, device_name, device_info, debug):
         self.mqtt_broker = mqtt_broker
         self.mqtt_port = mqtt_port
         self.mqtt_user = mqtt_user
         self.mqtt_password = mqtt_password
+        self.mqtt_tls = mqtt_tls
+        self.mqtt_tls_ca_path = mqtt_tls_ca_path
         self.host_name = host_name
         self.device_name = device_name
         self.device_info = device_info
@@ -37,9 +39,16 @@ class HA_MQTT:
         self.logger.debug("Initializing MQTT client")
         self.mqtt_client = mqtt.Client()
         self.mqtt_client.username_pw_set(self.mqtt_user, self.mqtt_password)
+        self.logger.info(f"Use TLS to connect: {self.mqtt_tls}")
+        if self.mqtt_tls:
+            if self.mqtt_tls_ca_path:
+                self.logger.info(f"TLS CA-File Path: {self.mqtt_tls_ca_path}")
+            else:
+                self.logger.info("Use system's default CA certificate store")
         self.logger.info(f"Connecting to MQTT broker at {self.mqtt_broker}:{self.mqtt_port}")
         try:
             self.mqtt_client.connect(self.mqtt_broker, self.mqtt_port, 60)
+            # TODO: Add TLS connect option
             self.logger.info("Connected to MQTT broker successfully")
         except Exception as e:
             self.logger.error(f"Failed to connect to MQTT broker: {e}")
