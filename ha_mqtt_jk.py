@@ -232,6 +232,9 @@ class HA_MQTT_JK:
             'wire_alarm':        ('', 'mdi:alert', 'null', 'measurement'),
             'user_alarm_1':      ('', 'mdi:alert', 'null', 'measurement'),
             'bms_time':          ('', 'mdi:calendar-clock', 'null', 'null'),
+            'charge_status_time': ('s', 'mdi:clock-time-eight-outline', 'duration', 'measurement'),
+            'charge_status': ('', 'mdi:battery-charging', 'null', 'null'),
+            'charge_status_text': ('', 'mdi:battery-charging', 'null', 'null'),
         }
 
         for key, (unit, icon, devclass, stateclass) in analog_defs.items():
@@ -261,6 +264,8 @@ class HA_MQTT_JK:
             'temp_sensor_bat3_ok': 'mdi:thermometer-check',
             'temp_sensor_bat4_ok': 'mdi:thermometer-check',
             'temp_sensor_bat5_ok': 'mdi:thermometer-check',
+            'dry1_contact': 'mdi:electric-switch',
+            'dry2_contact': 'mdi:electric-switch',
         }
         for key, icon in binary_defs.items():
             if key in pack:

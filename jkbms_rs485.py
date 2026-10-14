@@ -252,10 +252,15 @@ class JKBMS485:
     #   Charge MOS:         uint8    at 198
     #   Discharge MOS:      uint8    at 199
     #   Balance MOS:        uint8    at 200
+    #   Heating:            unit8    at 215
     #   Total voltage:      uint16le at 234 (/100 = V)
+    #   Heating current:    int16le  at 236 (/1000 = A)
     #   Temp sensor 3:      int16le  at 254 (/10 = °C)
     #   Temp sensor 4:      int16le  at 258 (/10 = °C)
+    #   Charge status time: unit16le at 278 (s)
     #   Fault record count: uint8    at 266
+    #   Charge Status:      unit8    at 280 (0x00 => Bulk, 0x01 => Absorption, 0x02 => Float)
+    #   Dry Contact Status: unit8    at 281 (Bit 2 Contact 1, Bit 3 Contact 2)
     # ---------------------------------------------------------------------------
 
     def parse_jkbms_55aa_frame(self, data):
@@ -481,6 +486,31 @@ class JKBMS485:
         # ---- PCLModuleSta (274) ----
         if 275 <= len(data):
             result['pcl_module_sta'] = int(data[274])
+
+        # ---- Charge Status Time (278-279) ----
+        if 279 <= len(data):
+            result['charge_status_time'] = struct.unpack_from('<H', data, 278)[0]
+
+        # ---- Charge Status (280) ----
+        if 280 <= len(data):
+            result['charge_status'] = int(data[280])
+            result['charge_status_text'] = "Unknown"
+            match result['charge_status']:
+                case 0:
+                    result['charge_status_text'] = "Bulk"
+                case 1:
+                    result['charge_status_text'] = "Absorption"
+                case 2:
+                    result['charge_status_text'] = "Float"
+        
+        # ---- Dry Contact 1 & 2 Status (281) ----
+        if 281 <= len(data):
+            drycontacts = int(data[281])
+            result['dry1_contact'] = 1 if (drycontacts & 0x02) else 0
+            result['dry2_contact'] = 1 if (drycontacts & 0x04) else 0
+            # result['dry1_contact'] = 'ON' if (drycontacts & 0x02) else 'OFF'
+            # result['dry2_contact'] = 'ON' if (drycontacts & 0x04) else 'OFF'
+
 
         self.logger.debug(f"Parsed 55AA frame: {result}")
         return result
@@ -1188,6 +1218,16 @@ class JKBMS485:
             if 'time_enter_sleep' in dynamic:
                 data['time_enter_sleep_h'] = round(dynamic['time_enter_sleep'] / 3600.0, 2)
             data['pcl_module_sta'] = bool(dynamic.get('pcl_module_sta', 0))
+            if 'charge_status_time' in dynamic:
+                data['charge_status_time'] = dynamic['charge_status_time']
+            if 'charge_status' in dynamic:
+                data['charge_status'] = dynamic['charge_status']
+                data['charge_status_text'] = dynamic['charge_status_text']
+            if 'dry1_contact' in dynamic:
+                data['dry1_contact'] = bool(dynamic['dry1_contact'])
+            if 'dry2_contact' in dynamic:
+                data['dry2_contact'] = bool(dynamic['dry2_contact'])
+
 
             # Setup / Config info
             if setup:
