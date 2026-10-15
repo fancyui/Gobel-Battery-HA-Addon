@@ -34,7 +34,7 @@ configuration:
     description: "Der für die Verbindung verwendete physische Port (rs232 oder rs485)."
   bms_type:
     name: "BMS-Typ"
-    description: "Der Typ/die Marke des BMS (PACE_LV, JK_PB, TDT oder PACE_LV_WIFI)."
+    description: "Der Typ/die Marke des BMS (PACE_LV, JK_PB, TDT oder PACE_LV_WIFI). Hinweis: TDT BMS ist möglicherweise nur mit bestimmten Versionen kompatibel und wird in Zukunft eventuell entfernt."
   bms_ip_address:
     name: "BMS IP-Adresse"
     description: "Die IP-Adresse des BMS (für Ethernet/WLAN-Verbindung)."

@@ -34,7 +34,7 @@ configuration:
     description: "连接 BMS 所使用的物理接口（rs232 或 rs485）。"
   bms_type:
     name: "BMS 类型"
-    description: "BMS 的品牌/类型（PACE_LV、JK_PB、TDT 或 PACE_LV_WIFI）。"
+    description: "BMS 的品牌/类型（PACE_LV、JK_PB、TDT 或 PACE_LV_WIFI）。注意：TDT BMS 可能仅兼容特定版本，未来可能会移除兼容支持。"
   bms_ip_address:
     name: "BMS IP 地址"
     description: "BMS 对应的 IP 地址（仅用于网络连接方式）。"
