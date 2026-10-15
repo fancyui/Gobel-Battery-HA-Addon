@@ -3,12 +3,13 @@ import logging
 
 class PACEBMS232:
 
-    def __init__(self, bms_comm, ha_comm, bms_type, data_refresh_interval, debug, if_random):
+    def __init__(self, bms_comm, ha_comm, bms_type, data_refresh_interval, debug, if_random, current_scale=100):
         self.bms_comm = bms_comm
         self.ha_comm = ha_comm
         self.bms_type = bms_type
         self.data_refresh_interval = data_refresh_interval
         self.if_random = if_random
+        self.current_scale = current_scale if (current_scale and current_scale > 0) else 100
 
         # Configure logging
         logging.basicConfig(level=logging.DEBUG if debug else logging.INFO,
@@ -502,7 +503,7 @@ class PACEBMS232:
     
             # Pack current
             pack_current = fields[offset] + fields[offset + 1]  # Combine two bytes for current
-            pack_current = self.hex_to_signed(pack_current) / 100
+            pack_current = self.hex_to_signed(pack_current) / self.current_scale
 
             offset += 2
             
@@ -698,7 +699,7 @@ class PACEBMS232:
     
             # Pack current
             pack_current = fields[offset] + fields[offset + 1]  # Combine two bytes for current
-            pack_current = self.hex_to_signed(pack_current) / 100
+            pack_current = self.hex_to_signed(pack_current) / self.current_scale
  
             offset += 2
             

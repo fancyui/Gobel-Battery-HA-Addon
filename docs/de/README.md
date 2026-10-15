@@ -14,7 +14,7 @@ Die ultimative Home Assistant-Integration für die intelligente Überwachung von
 Verbinden Sie Ihr Solarenergiespeichersystem (ESS) nahtlos mit Ihrem Heimautomatisierungsnetzwerk über Standardprotokolle wie MQTT, um den Batteriezustand, die einzelnen Zellspannungen, den Ladezustand (SoC) und Systemschutzfunktionen zu überwachen.
 
 ## Hauptmerkmale & Funktionen:
-* **Multi-BMS-Kompatibilität:** Native Unterstützung für Pace BMS, JK BMS (55AA-Protokoll) und TDT BMS.
+* **Multi-BMS-Kompatibilität:** Native Unterstützung für Pace BMS, JK BMS (55AA-Protokoll) und TDT BMS (*Hinweis: TDT BMS ist möglicherweise nur mit bestimmten Versionen kompatibel und die Unterstützung wird in zukünftigen Versionen eventuell entfernt*).
 * **Vielseitige Konnektivitätsoptionen:** Verbinden Sie Ihre Hardware über RS232-USB, RS232-zu-Ethernet, RS232-zu-WiFi, RS485-zu-Ethernet oder RS485-zu-WiFi.
 * **Umfassende Telemetrie:** Verfolgt Ladezustand (SoC), Batteriezustand (SoH), Gesamtspannung, Strom, individuellen Zellenausgleich, Temperaturen, Warnungen und Fehlerschutzfunktionen.
 * **Eine Verbindung für alle (Master-Slave):** Vereinfachen Sie Ihre Verkabelung. Verbinden Sie sich direkt mit dem Master-BMS, um automatisch alle parallel geschalteten Slave-Batteriepacks zu erkennen und deren Daten zu aggregieren.
@@ -39,6 +39,19 @@ Verbinden Sie Ihr Solarenergiespeichersystem (ESS) nahtlos mit Ihrem Heimautomat
 - **Anschlussport**: Verbinden Sie Home Assistant mit der **RS485B**- oder **RS485C**-Schnittstelle des JK BMS.
 - **Master-BMS**: Die Verbindung muss mit dem **Master-BMS** hergestellt werden.
 - **DIP-Schalter-Einstellungen**: Stellen Sie sicher, dass die DIP-Schalter (Wahlschalter) des Master-BMS auf **0000** eingestellt sind.
+
+## Wichtige Konfigurationshinweise:
+### MQTT-Discovery-Präfix (`host_name`)
+> [!IMPORTANT]
+> **Stellen Sie sicher, dass das MQTT-Discovery-Präfix (`host_name`) in den Add-on-Optionen korrekt konfiguriert ist:**
+>
+> * **Standardwert:** `homeassistant`
+> * **Muss mit Home Assistant übereinstimmen:** Diese Option bestimmt das Präfix für die MQTT-Auto-Discovery-Topics. Sie muss exakt mit dem in der Home Assistant MQTT-Integration eingestellten **Discovery-Präfix** übereinstimmen (**Einstellungen** > **Geräte & Dienste** > **MQTT** > **Konfigurieren**; Standard: `homeassistant`).
+> * **Keinen Betriebssystem-Hostnamen eintragen:** Tragen Sie hier **NICHT** den Hostnamen Ihres Rechners ein (z. B. `rpi5`, `homeassistant.local` usw.). Stimmt das Präfix nicht mit dem HA-Discovery-Präfix überein, empfängt der Broker zwar Nachrichten, Home Assistant erkennt die Batterie-Geräte und -Entitäten jedoch nicht (siehe [Issue #79](https://github.com/fancyui/Gobel-Battery-HA-Addon/issues/79)).
+
+### Hinweis zur TDT BMS-Kompatibilität
+> [!WARNING]
+> **Hinweis zur TDT BMS-Kompatibilität**: TDT BMS ist möglicherweise nur mit bestimmten Hardware-/Firmware-Versionen kompatibel. Bitte beachten Sie, dass die Unterstützung für TDT BMS in zukünftigen Versionen möglicherweise eingestellt oder entfernt wird.
 
 ## Installation:
 Klicken Sie auf die Schaltfläche, um das Add-on zu Home Assistant hinzuzufügen

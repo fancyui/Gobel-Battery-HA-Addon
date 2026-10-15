@@ -61,6 +61,7 @@ baud_rate = config.get('bms_baud_rate')
 data_refresh_interval = config.get('data_refresh_interval')
 debug = config.get('debug')
 if_random = config.get('if_random')
+pace_current_scale = config.get('pace_current_scale', 100)
 jk_display_index_start = str(config.get('jk_display_index_start', '01')).strip()
 jk_pack_index_start = 0 if jk_display_index_start in ['0', '00'] else 1
 
@@ -123,7 +124,7 @@ def run():
 
         if battery_port == 'rs232':
 
-            bms = PACEBMS232(bms_comm, ha_comm, bms_type, data_refresh_interval, debug, if_random)
+            bms = PACEBMS232(bms_comm, ha_comm, bms_type, data_refresh_interval, debug, if_random, pace_current_scale)
 
             logger.info("PACE_LV BMS Monitor Working...")
 
@@ -148,7 +149,7 @@ def run():
 
         if battery_port == 'rs485':
 
-            bms = PACEBMS485(bms_comm, ha_comm, data_refresh_interval, debug, if_random)
+            bms = PACEBMS485(bms_comm, ha_comm, data_refresh_interval, debug, if_random, pace_current_scale)
 
             logger.info("PACE_LV BMS Monitor Working...")
 
@@ -185,7 +186,7 @@ def run():
 
     elif bms_type == 'PACE_LV_WIFI':
 
-        bms = PACEBMSWIFI(bms_comm, ha_comm, bms_type, data_refresh_interval, debug, if_random)
+        bms = PACEBMSWIFI(bms_comm, ha_comm, bms_type, data_refresh_interval, debug, if_random, pace_current_scale)
 
         logger.info("PACE_LV_WIFI BMS Monitor Working...")
 

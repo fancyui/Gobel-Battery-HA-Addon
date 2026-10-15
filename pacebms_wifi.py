@@ -3,12 +3,13 @@ import time
 import socket
 
 class PACEBMSWIFI:
-    def __init__(self, bms_comm, ha_comm, bms_type, data_refresh_interval, debug, if_random):
+    def __init__(self, bms_comm, ha_comm, bms_type, data_refresh_interval, debug, if_random, current_scale=100):
         self.bms_comm = bms_comm
         self.ha_comm = ha_comm
         self.bms_type = bms_type
         self.data_refresh_interval = data_refresh_interval
         self.if_random = if_random
+        self.current_scale = current_scale if (current_scale and current_scale > 0) else 100
 
         # Configure logging
         logging.basicConfig(level=logging.DEBUG if debug else logging.INFO,
@@ -240,7 +241,7 @@ class PACEBMSWIFI:
             if offset + 1 >= len(fields):
                 break
             current_hex = fields[offset] + fields[offset + 1]
-            pack_current = self.hex_to_signed(current_hex) / 100.0
+            pack_current = self.hex_to_signed(current_hex) / float(self.current_scale)
             offset += 2
             pack_data['view_current'] = pack_current
 

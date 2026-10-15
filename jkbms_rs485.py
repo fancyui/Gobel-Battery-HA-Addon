@@ -925,14 +925,19 @@ class JKBMS485:
             if 'cell_resistances' in dynamic:
                 pack_data['cell_resistances'] = dynamic['cell_resistances']
 
-            # Temperatures (Protocol specifies Bat1-5 and MOS)
+            # Temperatures (battery NTCs)
             temps = []
-            for key in ['temp_bat1', 'temp_bat2', 'temp_bat3', 'temp_bat4', 'temp_bat5', 'temp_mos']:
+            for key in ['temp_bat1', 'temp_bat2', 'temp_bat3', 'temp_bat4', 'temp_bat5']:
                 val = dynamic.get(key)
                 if val is not None and -50 <= val <= 150:
                     temps.append(round(val, 1))
             pack_data['temperatures'] = temps
             pack_data['view_num_temps'] = len(temps)
+
+            # MOS temperature
+            mos_temp = dynamic.get('temp_mos')
+            if mos_temp is not None and -50 <= mos_temp <= 150:
+                pack_data['view_temp_mos'] = round(mos_temp, 1)
 
             # Current, Voltage, Power
             pack_data['view_current'] = dynamic.get('current_a', 0.0)
@@ -1321,6 +1326,7 @@ class JKBMS485:
             'view_SOH': '%',
             'view_SOC': '%',
             'view_balance_current': 'A',
+            'view_temp_mos': '°C',
             'hardware_version': '',
             'software_version': '',
         }
@@ -1362,6 +1368,7 @@ class JKBMS485:
             'view_SOC': 'mdi:battery-70',
             'random_number': 'mdi:battery-70',
             'view_balance_current': 'mdi:scale-balance',
+            'view_temp_mos': 'mdi:thermometer',
             'hardware_version': 'mdi:chip',
             'software_version': 'mdi:application-cog',
         }
@@ -1403,6 +1410,7 @@ class JKBMS485:
             'view_SOC': 'null',
             'random_number': 'null',
             'view_balance_current': 'current',
+            'view_temp_mos': 'temperature',
             'hardware_version': 'null',
             'software_version': 'null',
         }
@@ -1443,6 +1451,7 @@ class JKBMS485:
             'view_SOC': 'measurement',
             'random_number': 'measurement',
             'view_balance_current': 'measurement',
+            'view_temp_mos': 'measurement',
             'hardware_version': 'null',
             'software_version': 'null',
         }

@@ -18,7 +18,7 @@ The ultimate Home Assistant integration for smart energy storage monitoring. Thi
 Seamlessly bridge your solar energy storage system (ESS) with your home automation network using standard protocols like MQTT to monitor battery health, individual cell voltages, state of charge (SoC), and system protections.
 
 ## Key Features & Capabilities:
-* **Multi-BMS Compatibility:** Native support for Pace BMS, JK BMS (55AA protocol), and TDT BMS.
+* **Multi-BMS Compatibility:** Native support for Pace BMS, JK BMS (55AA protocol), and TDT BMS *(Note: TDT BMS may only be compatible with specific versions and support may be removed in future releases)*.
 * **Versatile Connectivity Options:** Connect your hardware via RS232-USB, RS232-to-Ethernet, RS232-to-WiFi, RS485-to-Ethernet, or RS485-to-WiFi.
 * **Comprehensive Telemetry:** Tracks state of charge (SoC), state of health (SoH), total voltage, current, individual cell balancing, temperatures, warnings, and fault protections.
 * **One Connection for All (Master-Slave):** Simplify your wiring. Connect directly to the Master BMS to automatically discover and aggregate data from all parallel-connected slave battery packs.
@@ -43,6 +43,19 @@ Seamlessly bridge your solar energy storage system (ESS) with your home automati
 - **Connection Port**: Connect Home Assistant to the **RS485B** or **RS485C** interface of the JK BMS.
 - **Master BMS**: The connection must be made to the **Master BMS**.
 - **DIP Switch Settings**: Ensure the DIP switch (Dial) of master BMS is set to **0000**.
+
+## Configuration Notes:
+### MQTT Discovery Prefix (`host_name`)
+> [!IMPORTANT]
+> **Correctly configure the MQTT Discovery Prefix (`host_name`) in the Add-on Options:**
+>
+> * **Default:** `homeassistant`
+> * **Must Match Home Assistant's Discovery Prefix:** This option sets the topic prefix under which MQTT discovery messages are published. It must exactly match the **Discovery prefix** set in your Home Assistant MQTT integration (navigate to **Settings** > **Devices & services** > **MQTT** > **Configure** > view options; default is `homeassistant`).
+> * **Do NOT Use Your Machine's Hostname:** Do **NOT** set this field to your computer's OS hostname (e.g. `rpi5`, `homeassistant.local`, etc.). If it does not match HA's Discovery Prefix, the MQTT broker will receive the battery data, but Home Assistant will not automatically discover or create the battery devices and sensors (see [Issue #79](https://github.com/fancyui/Gobel-Battery-HA-Addon/issues/79)).
+
+### TDT BMS Compatibility Notice
+> [!WARNING]
+> **TDT BMS Compatibility Notice**: TDT BMS support may only be compatible with specific hardware/firmware versions. Please note that support for TDT BMS may be deprecated or removed in future releases.
 
 ## Installation:
 Click the button to add the addon to Home Assistant
