@@ -5,6 +5,13 @@ description:
 # Changelog
 
 
+## 1.9.88
+
+-   [JKBMS] Fix signed power direction so discharge energy is accumulated separately from charged energy (thanks to @Arturo2869, Fixes #82, PR #83).
+
+---------------
+
+
 ## 1.9.87
 
 -   [PACE BMS RS485] Fix pack discovery failure on batteries that respond with short ACK frames (`LENID 000` / 0-byte DATAINFO) for CID2 90 pack-number requests.
