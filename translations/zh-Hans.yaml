@@ -14,6 +14,12 @@ configuration:
   mqtt_password:
     name: "MQTT 密码"
     description: "连接 MQTT 服务器所使用的密码。"
+  mqtt_tls:
+    name: "MQTT TLS 加密"
+    description: "启用与 MQTT 代理服务器之间的 TLS 加密连接。请使用代理服务器的 TLS 端口（通常为 8883）。"
+  mqtt_tls_ca_path:
+    name: "MQTT CA 证书文件路径"
+    description: "用于验证 MQTT 代理服务器 TLS 证书的 CA 证书文件路径。例如：/homeassistant/ca.crt 表示 Home Assistant 配置目录（/config）中的 ca.crt 文件，前提是该文件存在。如果此字段留空，则使用系统默认的 CA 证书存储库。"
   device_name:
     name: "设备名称"
     description: "在 Home Assistant 中显示的电池监控设备自定义名称。"

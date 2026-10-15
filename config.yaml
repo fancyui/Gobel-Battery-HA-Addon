@@ -16,6 +16,10 @@ arch:
 uart: true
 usb: true
 
+map:
+  - type: homeassistant_config
+  - type: ssl
+
 panel_icon: "mdi:home-battery"
 
 options:
@@ -25,6 +29,8 @@ options:
   mqtt_port: 1883
   mqtt_username: ""
   mqtt_password: ""
+  mqtt_tls: false
+  mqtt_tls_ca_path: ""
   device_name: "Gobel Monitor"
   battery_manufacturer: "Gobel Power"
   battery_model: "GP-SR1-PC200"
@@ -52,6 +58,8 @@ schema:
   mqtt_port: int
   mqtt_username: str
   mqtt_password: str
+  mqtt_tls: bool
+  mqtt_tls_ca_path: str
   device_name: str
   battery_manufacturer: str
   battery_model: str
