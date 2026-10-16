@@ -982,8 +982,6 @@ class JKBMS485:
 
             if 'balance_mos' in dynamic:
                 pack_data['balance_mos_state'] = dynamic['balance_mos']
-                pack_data['balance_action'] = dynamic['balance_action']
-                pack_data['balance_action_text'] = dynamic['balance_action_text']
 
             mappings = {
                 'cell_exist_state': 'view_cell_exist_state',
