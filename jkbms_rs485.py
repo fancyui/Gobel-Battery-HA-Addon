@@ -1158,6 +1158,8 @@ class JKBMS485:
             data['charge_mos'] = dynamic.get('charge_mos', False)
             data['discharge_mos'] = dynamic.get('discharge_mos', False)
             data['balance_mos'] = dynamic.get('balance_mos', False)
+            data['balance_action'] = dynamic.get('balance_action', 0)
+            data['balance_action_text'] = dynamic.get('balance_action_text', '')
 
             # Cumulative energy
             power_kw = dynamic.get('power_kw', 0.0)
