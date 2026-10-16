@@ -218,6 +218,8 @@ class HA_MQTT_JK:
             'design_capacity':   ('Ah', 'mdi:battery-high', 'null', 'measurement'),
             'cycle_count':       ('cycles', 'mdi:battery-sync', 'null', 'measurement'),
             'balance_current':   ('A', 'mdi:scale-balance', 'current', 'measurement'),
+            'balance_action':    ('', 'mdi:scale-balance', 'null', ''),
+            'balance_action_text': ('', 'mdi:scale-balance', '', ''),
             'energy_charged':    ('Wh', 'mdi:battery-positive', 'energy', 'total'),
             'energy_discharged': ('Wh', 'mdi:battery-negative', 'energy', 'total'),
             'hardware_version':  ('', 'mdi:chip', 'null', 'null'),

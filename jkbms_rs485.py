@@ -368,7 +368,17 @@ class JKBMS485:
 
         # ---- Battery state: uint8 at 172 ----
         if 173 <= len(data):
-            result['battery_state'] = int(data[172])
+            #result['battery_state'] = int(data[172])
+            result['balance_mos'] = (data[172] != 0)
+            result['balance_action'] = int(data[172])   # optional: 0=off, 1=charging, 2=discharging
+            result['balance_action_text'] = "Unknown"
+            match result['balance_action']:
+                case 0:
+                    result['balance_action_text'] = "Off"
+                case 1:
+                    result['balance_action_text'] = "Charging"
+                case 2:
+                    result['balance_action_text'] = "Discharging"
 
         # ---- SOC: uint8 at offset 173 (%) ----
         if 174 <= len(data):
@@ -420,7 +430,7 @@ class JKBMS485:
         if 201 < len(data):
             result['charge_mos'] = bool(data[198])
             result['discharge_mos'] = bool(data[199])
-            result['balance_mos'] = bool(data[200])
+            #result['balance_mos'] = bool(data[200]) # deprecated or wrong byte?
 
         # ---- Protect release delays (202-213) ----
         if 214 <= len(data):
@@ -968,6 +978,9 @@ class JKBMS485:
             if 'charge_mos' in dynamic:
                 pack_data['charge_mos_state'] = dynamic['charge_mos']
                 pack_data['discharge_mos_state'] = dynamic['discharge_mos']
+                #pack_data['balance_mos_state'] = dynamic['balance_mos']
+
+            if 'balance_mos' in dynamic:
                 pack_data['balance_mos_state'] = dynamic['balance_mos']
 
             mappings = {
@@ -1143,6 +1156,8 @@ class JKBMS485:
             data['charge_mos'] = dynamic.get('charge_mos', False)
             data['discharge_mos'] = dynamic.get('discharge_mos', False)
             data['balance_mos'] = dynamic.get('balance_mos', False)
+            data['balance_action'] = dynamic.get('balance_action', 0)
+            data['balance_action_text'] = dynamic.get('balance_action_text', '')
 
             # Cumulative energy
             power_kw = dynamic.get('power_kw', 0.0)
