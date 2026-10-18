@@ -14,6 +14,12 @@ configuration:
   mqtt_password:
     name: "MQTT-Passwort"
     description: "Das Passwort für die Authentifizierung am MQTT-Broker."
+  mqtt_tls:
+    name: "MQTT-TLS"
+    description: "Aktiviert eine verschlüsselte TLS-Verbindung zum MQTT-Broker. Verwende den TLS-Port des Brokers (häufig 8883)."
+  mqtt_tls_ca_path:
+    name: "Pfad zum MQTT-CA-Zertifikat"
+    description: "Pfad zur CA-Zertifikatsdatei, mit der das TLS-Zertifikat des MQTT-Brokers überprüft wird. Beispiel: /homeassistant/ca.crt verweist auf die Datei ca.crt im Home-Assistant-Konfigurationsordner (/config), sofern dort eine solche Datei vorhanden ist. Wenn du dieses Feld leer lässt, wird der standardmäßige CA-Zertifikatsspeicher des Systems verwendet."
   device_name:
     name: "Gerätename"
     description: "Der benutzerdefinierte Name des Batterieüberwachungsgeräts in Home Assistant."
