@@ -251,11 +251,15 @@ class JKBMS485:
     #   Total runtime:      uint32le at 194 (s)
     #   Charge MOS:         uint8    at 198
     #   Discharge MOS:      uint8    at 199
-    #   Balance MOS:        uint8    at 200
+    #   Heating state:      uint8    at 215
     #   Total voltage:      uint16le at 234 (/100 = V)
+    #   Heating current:    int16le  at 236 (/1000 = A)
     #   Temp sensor 3:      int16le  at 254 (/10 = °C)
     #   Temp sensor 4:      int16le  at 258 (/10 = °C)
     #   Fault record count: uint8    at 266
+    #   Charge status time: uint16le at 278 (s)
+    #   Charge status:      uint8    at 280 (0=Bulk, 1=Absorption, 2=Float)
+    #   Dry contact status: uint8    at 281 (bit1=Contact 1, bit2=Contact 2)
     # ---------------------------------------------------------------------------
 
     def parse_jkbms_55aa_frame(self, data):
@@ -487,6 +491,24 @@ class JKBMS485:
         # ---- PCLModuleSta (274) ----
         if 275 <= len(data):
             result['pcl_module_sta'] = int(data[274])
+
+        # ---- Charge Status Time (278-279) ----
+        if 280 <= len(data):
+            result['charge_status_time'] = struct.unpack_from('<H', data, 278)[0]
+
+        # ---- Charge Status (280) ----
+        if 281 <= len(data):
+            st_val = int(data[280])
+            result['charge_status'] = st_val
+            charge_names = {0: "Bulk", 1: "Absorption", 2: "Float"}
+            result['charge_status_text'] = charge_names.get(st_val, "Unknown")
+        
+        # ---- Dry Contact 1 & 2 Status (281) ----
+        if 282 <= len(data):
+            drycontacts = int(data[281])
+            result['dry1_contact'] = bool(drycontacts & 0x02)
+            result['dry2_contact'] = bool(drycontacts & 0x04)
+
 
         self.logger.debug(f"Parsed 55AA frame: {result}")
         return result
@@ -1205,6 +1227,16 @@ class JKBMS485:
             if 'time_enter_sleep' in dynamic:
                 data['time_enter_sleep_h'] = round(dynamic['time_enter_sleep'] / 3600.0, 2)
             data['pcl_module_sta'] = bool(dynamic.get('pcl_module_sta', 0))
+            if 'charge_status_time' in dynamic:
+                data['charge_status_time'] = dynamic['charge_status_time']
+            if 'charge_status' in dynamic:
+                data['charge_status'] = dynamic['charge_status']
+                data['charge_status_text'] = dynamic['charge_status_text']
+            if 'dry1_contact' in dynamic:
+                data['dry1_contact'] = bool(dynamic['dry1_contact'])
+            if 'dry2_contact' in dynamic:
+                data['dry2_contact'] = bool(dynamic['dry2_contact'])
+
 
             # Setup / Config info
             if setup:

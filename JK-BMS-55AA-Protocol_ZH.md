@@ -279,7 +279,12 @@
 | 270-273 | 4    | `E2 2B 01 00`  | UINT32le | 进入休眠时间          | 76770 s = 21.3 h     | TimeEnterSleep, reg 0x0108      |
 | 274     | 1    | `00`           | UINT8    | 并机限流模块状态       | 0 (关闭)             | PCLModuleSta: 1=打开, 0=关闭   |
 | 275     | 1    | `00`           | UINT8    | 保留                  | —                    | RVD, reg 0x010C                |
-| 276-299 | 24   | —              | —        | (保留/未知)           |                       |                                 |
+| 276-277 | 2    | —              | —        | (保留/未知)           | —                    |                                 |
+| 278-279 | 2    | `00 00`        | UINT16le | 充电状态计时          | 0 s                  | ChargeStatusTime, 单位 s, reg 0x0110 |
+| 280     | 1    | `00`           | UINT8    | 充电阶段状态          | 0 (Bulk)             | ChargeStatus: 0=Bulk, 1=Absorption, 2=Float, reg 0x0112 |
+| 281     | 1    | `00`           | UINT8    | 干接点状态            | 0                    | DryContactStatus: bit1(0x02)=干接点1, bit2(0x04)=干接点2, reg 0x0113 |
+| 282-299 | 18   | —              | —        | (保留/未知)           | —                    |                                 |
+
 
 ---
 

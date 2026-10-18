@@ -280,7 +280,12 @@
 | 270-273 | 4    | `E2 2B 01 00`  | UINT32le | Sleep Entry Time                    | 76770 s = 21.3 h       | TimeEnterSleep, reg 0x0108        |
 | 274     | 1    | `00`            | UINT8    | Parallel Current Limiting Module Status | 0 (Off)            | PCLModuleSta: 1=On, 0=Off        |
 | 275     | 1    | `00`            | UINT8    | Reserved                            | —                      | RVD, reg 0x010C                  |
-| 276-299 | 24   | —               | —        | (Reserved/Unknown)                  |                         |                                   |
+| 276-277 | 2    | —               | —        | (Reserved/Unknown)                  | —                      |                                  |
+| 278-279 | 2    | `00 00`         | UINT16le | Charge Status Timer                 | 0 s                    | ChargeStatusTime, unit s, reg 0x0110 |
+| 280     | 1    | `00`            | UINT8    | Charge Stage Status                 | 0 (Bulk)               | ChargeStatus: 0=Bulk, 1=Absorption, 2=Float, reg 0x0112 |
+| 281     | 1    | `00`            | UINT8    | Dry Contact Status                  | 0                      | DryContactStatus: bit1(0x02)=Contact 1, bit2(0x04)=Contact 2, reg 0x0113 |
+| 282-299 | 18   | —               | —        | (Reserved/Unknown)                  | —                      |                                  |
+
 
 ---
 

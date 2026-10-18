@@ -81,6 +81,60 @@ class JKBMSEnergyTest(unittest.TestCase):
         self.assertEqual(res['balance_action'], 0)
         self.assertEqual(res['battery_state'], 0)
 
+    def test_charge_status_and_dry_contacts(self):
+        frame = bytearray(300)
+        frame[0:2] = b"\x55\xaa"
+        struct.pack_into("<H", frame, 278, 3600)  # 1 hour
+        frame[280] = 0  # Bulk
+        frame[281] = 0x02  # Dry 1 on, Dry 2 off
+
+        res = self.bms.parse_jkbms_55aa_frame(frame)
+        self.assertEqual(res['charge_status_time'], 3600)
+        self.assertEqual(res['charge_status'], 0)
+        self.assertEqual(res['charge_status_text'], "Bulk")
+        self.assertTrue(res['dry1_contact'])
+        self.assertFalse(res['dry2_contact'])
+
+        # Absorption & Dry 2 on
+        frame[280] = 1
+        frame[281] = 0x04
+        res = self.bms.parse_jkbms_55aa_frame(frame)
+        self.assertEqual(res['charge_status'], 1)
+        self.assertEqual(res['charge_status_text'], "Absorption")
+        self.assertFalse(res['dry1_contact'])
+        self.assertTrue(res['dry2_contact'])
+
+        # Float & Both dry contacts on
+        frame[280] = 2
+        frame[281] = 0x06
+        res = self.bms.parse_jkbms_55aa_frame(frame)
+        self.assertEqual(res['charge_status'], 2)
+        self.assertEqual(res['charge_status_text'], "Float")
+        self.assertTrue(res['dry1_contact'])
+        self.assertTrue(res['dry2_contact'])
+
+        # Test boundary frame lengths do not throw IndexError/struct.error
+        short_frame_279 = bytearray(279)
+        short_frame_279[0:2] = b"\x55\xaa"
+        res279 = self.bms.parse_jkbms_55aa_frame(short_frame_279)
+        self.assertNotIn('charge_status_time', res279)
+        self.assertNotIn('charge_status', res279)
+        self.assertNotIn('dry1_contact', res279)
+
+        short_frame_280 = bytearray(280)
+        short_frame_280[0:2] = b"\x55\xaa"
+        res280 = self.bms.parse_jkbms_55aa_frame(short_frame_280)
+        self.assertIn('charge_status_time', res280)
+        self.assertNotIn('charge_status', res280)
+        self.assertNotIn('dry1_contact', res280)
+
+        short_frame_281 = bytearray(281)
+        short_frame_281[0:2] = b"\x55\xaa"
+        res281 = self.bms.parse_jkbms_55aa_frame(short_frame_281)
+        self.assertIn('charge_status_time', res281)
+        self.assertIn('charge_status', res281)
+        self.assertNotIn('dry1_contact', res281)
+
 
 if __name__ == "__main__":
     unittest.main()
