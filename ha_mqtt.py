@@ -12,7 +12,7 @@ class HA_MQTT:
         self.mqtt_user = mqtt_user
         self.mqtt_password = mqtt_password
         self.mqtt_tls = bool(mqtt_tls)
-        self.mqtt_tls_ca_path = mqtt_tls_ca_path or ""
+        self.mqtt_tls_ca_path = (mqtt_tls_ca_path or "").strip().strip('"').strip("'")
         self.host_name = host_name
         self.device_name = device_name
         self.device_info = device_info
@@ -42,24 +42,42 @@ class HA_MQTT:
         self.mqtt_client = mqtt.Client()
         self.mqtt_client.username_pw_set(self.mqtt_user, self.mqtt_password)
         if self.mqtt_tls:
-            if self.mqtt_tls_ca_path and os.path.isfile(self.mqtt_tls_ca_path):
-                self.mqtt_client.tls_set(ca_certs=self.mqtt_tls_ca_path)
-                self.logger.info(f"Using TLS CA file: {self.mqtt_tls_ca_path}")
-            elif self.mqtt_tls_ca_path:
-                self.logger.warning(f"Specified TLS CA file not found: {self.mqtt_tls_ca_path}, falling back to system default CA store")
-                self.mqtt_client.tls_set()
+            ca_path = self.mqtt_tls_ca_path
+            if ca_path:
+                # If path was configured as /config/... translate to /homeassistant/... if present
+                if not os.path.isfile(ca_path) and ca_path.startswith('/config/'):
+                    alt_path = '/homeassistant/' + ca_path[8:]
+                    if os.path.isfile(alt_path):
+                        self.logger.info(f"Resolved CA path '{ca_path}' to container mount '{alt_path}'")
+                        ca_path = alt_path
+
+                if os.path.isfile(ca_path):
+                    self.mqtt_client.tls_set(ca_certs=ca_path)
+                    self.logger.info(f"Using TLS CA file: {ca_path}")
+                else:
+                    self.logger.warning(f"Specified TLS CA file not found: {self.mqtt_tls_ca_path}, falling back to system default CA store")
+                    self.mqtt_client.tls_set()
             else:
                 self.mqtt_client.tls_set()
                 self.logger.info("TLS enabled, using system's default CA certificate store")
+
+            try:
+                if int(self.mqtt_port) == 1883:
+                    self.logger.warning("TLS is enabled but mqtt_port is set to 1883. Standard MQTT TLS port is 8883; verify your broker configuration if connection fails.")
+            except (ValueError, TypeError):
+                pass
+
             self.logger.info(f"Connecting to MQTT broker at {self.mqtt_broker}:{self.mqtt_port} (TLS)")
         else:
             self.logger.info(f"Connecting to MQTT broker at {self.mqtt_broker}:{self.mqtt_port}")
         try:
-            self.mqtt_client.connect(self.mqtt_broker, self.mqtt_port, 60)
+            self.mqtt_client.connect(self.mqtt_broker, int(self.mqtt_port), 60)
             self.logger.info("Connected to MQTT broker successfully")
+            return self.mqtt_client
         except Exception as e:
             self.logger.error(f"Failed to connect to MQTT broker: {e}")
-        return self.mqtt_client
+            self.mqtt_client = None
+            return None
 
     def publish_sensor_discovery(self, entity_id, unit, icon, deviceclass, stateclass, precision=None):
         main_topic = 'sensor'
