@@ -368,16 +368,12 @@ class JKBMS485:
         if 170 <= len(data):
             result['alarm_bits'] = struct.unpack_from('<I', data, 166)[0]
 
-        # ---- Balance action & MOS status: uint8 at 172 ----
+        # ---- Balance action & MOS status: uint8 at 172 (BalanSta) ----
         if 173 <= len(data):
             bal_action = int(data[172])
             result['battery_state'] = bal_action
             result['balance_action'] = bal_action
-            bal_active = (bal_action != 0)
-            # Fallback for legacy firmware versions reporting balance MOS state at byte 200
-            if not bal_active and len(data) > 200 and data[200] != 0:
-                bal_active = True
-            result['balance_mos'] = bal_active
+            result['balance_mos'] = (bal_action != 0)
             action_names = {0: "Off", 1: "Charging", 2: "Discharging"}
             result['balance_action_text'] = action_names.get(bal_action, "Unknown")
 

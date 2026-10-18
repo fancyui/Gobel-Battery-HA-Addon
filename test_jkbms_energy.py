@@ -73,11 +73,11 @@ class JKBMSEnergyTest(unittest.TestCase):
         self.assertEqual(res['balance_action_text'], 'Discharging')
         self.assertEqual(res['battery_state'], 2)
 
-        # Test legacy firmware fallback (byte 172 = 0, but byte 200 != 0)
+        # Test byte 200 (UserAlarm2) does not trigger balance_mos when balancer is off
         frame[172] = 0
         frame[200] = 1
         res = self.bms.parse_jkbms_55aa_frame(frame)
-        self.assertTrue(res['balance_mos'])
+        self.assertFalse(res['balance_mos'])
         self.assertEqual(res['balance_action'], 0)
         self.assertEqual(res['battery_state'], 0)
 

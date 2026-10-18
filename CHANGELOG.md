@@ -9,7 +9,7 @@ description:
 
 -   [JKBMS] Fix signed power direction so discharge energy is accumulated separately from charged energy (thanks to @Arturo2869, Fixes #82, PR #83).
 -   [MQTT] Add optional TLS connection support (`mqtt_tls`) and optional custom CA certificate path (`mqtt_tls_ca_path`) (thanks to @alex1702, PR #88).
--   [JKBMS] Fix balancer active status byte offset (172 instead of 200) with backward-compatible legacy fallback, and add balance action telemetry (thanks to @alex1702, Fixes #90, PR #91).
+-   [JKBMS] Fix balancer active status byte offset (172 instead of 200, which was UserAlarm2) and add balance action telemetry (thanks to @alex1702, Fixes #90, PR #91).
 
 ---------------
 
