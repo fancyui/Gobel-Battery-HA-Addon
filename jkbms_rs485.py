@@ -368,9 +368,18 @@ class JKBMS485:
         if 170 <= len(data):
             result['alarm_bits'] = struct.unpack_from('<I', data, 166)[0]
 
-        # ---- Battery state: uint8 at 172 ----
+        # ---- Balance action & MOS status: uint8 at 172 ----
         if 173 <= len(data):
-            result['battery_state'] = int(data[172])
+            bal_action = int(data[172])
+            result['battery_state'] = bal_action
+            result['balance_action'] = bal_action
+            bal_active = (bal_action != 0)
+            # Fallback for legacy firmware versions reporting balance MOS state at byte 200
+            if not bal_active and len(data) > 200 and data[200] != 0:
+                bal_active = True
+            result['balance_mos'] = bal_active
+            action_names = {0: "Off", 1: "Charging", 2: "Discharging"}
+            result['balance_action_text'] = action_names.get(bal_action, "Unknown")
 
         # ---- SOC: uint8 at offset 173 (%) ----
         if 174 <= len(data):
@@ -418,11 +427,10 @@ class JKBMS485:
             runtime = struct.unpack_from('<I', data, 194)[0]
             result['total_runtime_s'] = runtime
 
-        # ---- MOS status: uint8 at 198 (charge), 199 (discharge), 200 (balance) ----
-        if 201 < len(data):
+        # ---- MOS status: uint8 at 198 (charge), 199 (discharge) ----
+        if 200 <= len(data):
             result['charge_mos'] = bool(data[198])
             result['discharge_mos'] = bool(data[199])
-            result['balance_mos'] = bool(data[200])
 
         # ---- Protect release delays (202-213) ----
         if 214 <= len(data):
@@ -969,10 +977,14 @@ class JKBMS485:
 
             if 'charge_mos' in dynamic:
                 pack_data['charge_mos_state'] = dynamic['charge_mos']
+            if 'discharge_mos' in dynamic:
                 pack_data['discharge_mos_state'] = dynamic['discharge_mos']
+            if 'balance_mos' in dynamic:
                 pack_data['balance_mos_state'] = dynamic['balance_mos']
 
             mappings = {
+                'balance_action': 'view_balance_action',
+                'balance_action_text': 'view_balance_action_text',
                 'cell_exist_state': 'view_cell_exist_state',
                 'wire_alarm': 'view_wire_alarm',
                 'alarm_bits': 'view_alarm_bits',
@@ -1145,6 +1157,8 @@ class JKBMS485:
             data['charge_mos'] = dynamic.get('charge_mos', False)
             data['discharge_mos'] = dynamic.get('discharge_mos', False)
             data['balance_mos'] = dynamic.get('balance_mos', False)
+            data['balance_action'] = dynamic.get('balance_action', 0)
+            data['balance_action_text'] = dynamic.get('balance_action_text', '')
 
             # Cumulative energy
             power_kw = dynamic.get('power_kw', 0.0)

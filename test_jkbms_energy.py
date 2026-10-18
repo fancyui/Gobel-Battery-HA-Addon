@@ -41,6 +41,46 @@ class JKBMSEnergyTest(unittest.TestCase):
         self.assertEqual(charged, 0.0)
         self.assertAlmostEqual(discharged, 1000 / 60)
 
+    def test_balance_action_parsing(self):
+        # Test balancer off (0)
+        frame = bytearray(300)
+        frame[0:2] = b"\x55\xaa"
+        frame[172] = 0
+        frame[198] = 1  # charge_mos
+        frame[199] = 1  # discharge_mos
+        frame[200] = 0  # legacy byte 200
+        res = self.bms.parse_jkbms_55aa_frame(frame)
+        self.assertFalse(res['balance_mos'])
+        self.assertEqual(res['balance_action'], 0)
+        self.assertEqual(res['balance_action_text'], 'Off')
+        self.assertEqual(res['battery_state'], 0)
+        self.assertTrue(res['charge_mos'])
+        self.assertTrue(res['discharge_mos'])
+
+        # Test balancer charging (1)
+        frame[172] = 1
+        res = self.bms.parse_jkbms_55aa_frame(frame)
+        self.assertTrue(res['balance_mos'])
+        self.assertEqual(res['balance_action'], 1)
+        self.assertEqual(res['balance_action_text'], 'Charging')
+        self.assertEqual(res['battery_state'], 1)
+
+        # Test balancer discharging (2)
+        frame[172] = 2
+        res = self.bms.parse_jkbms_55aa_frame(frame)
+        self.assertTrue(res['balance_mos'])
+        self.assertEqual(res['balance_action'], 2)
+        self.assertEqual(res['balance_action_text'], 'Discharging')
+        self.assertEqual(res['battery_state'], 2)
+
+        # Test legacy firmware fallback (byte 172 = 0, but byte 200 != 0)
+        frame[172] = 0
+        frame[200] = 1
+        res = self.bms.parse_jkbms_55aa_frame(frame)
+        self.assertTrue(res['balance_mos'])
+        self.assertEqual(res['balance_action'], 0)
+        self.assertEqual(res['battery_state'], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

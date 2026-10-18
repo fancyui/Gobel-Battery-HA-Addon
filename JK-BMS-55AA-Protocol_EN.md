@@ -177,12 +177,12 @@
 | --------- | ------ | --------- | --------- | ---------- | ---------------- | ----------------------- |
 | 170-171 | 2    | `00 00` | INT16le | Balance Current | 0 mA = 0.000 A | BalanCurrent, unit mA |
 
-## 12. Battery Status & SOC (Offset 172-173)
+## 12. Balance Action & SOC (Offset 172-173)
 
 
 | Offset | Bytes | Example Value | Type  | Meaning       | Parsed Value          | Remarks                           |
 | ------ | ------ | -------- | ------- | -------------- | ----------------- | -------------------------------- |
-| 172  | 1    | `00`   | UINT8 | Battery Status     | 0 (Standby/Off) | BatSta: 0=Off, 1=Charge, 2=Discharge |
+| 172  | 1    | `00`   | UINT8 | Balance Action / MOS | 0 (Off)         | BalanAction: 0=Off, 1=Charging, 2=Discharging (Historically labeled BatSta) |
 | 173  | 1    | `61`   | UINT8 | Remaining SOC | 97 %            | SOCStateOfCharge               |
 
 ## 13. Capacity Data (Offset 174-189)
@@ -206,8 +206,7 @@
 | 194-197 | 4    | `72 D5 19 00` | UINT32le | Runtime              | 1693042 s = 470.3 h   | RunTime, unit seconds |
 | 198     | 1    | `01`          | UINT8    | Charge MOS           | ON (1)                | 0=Off, 1=On      |
 | 199     | 1    | `01`          | UINT8    | Discharge MOS        | ON (1)                | 0=Off, 1=On      |
-| 200     | 1    | `00`          | UINT8    | Balance MOS          | OFF (0)               | 0=Off, 1=On      |
-| 200-201 | 2    | `00 00`       | UINT16le | User Alarm Value 2   | 0                     | UserAlarm2       |
+| 200-201 | 2    | `00 00`       | UINT16le | User Alarm Value 2   | 0                     | UserAlarm2 (Historically misidentified as Balance MOS at byte 200) |
 
 ## 15. Protection Release Delay (Offset 202-213)
 
