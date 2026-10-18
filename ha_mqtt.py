@@ -1,16 +1,18 @@
 import paho.mqtt.client as mqtt
 import json
 import logging
+import os
+
 
 class HA_MQTT:
 
-    def __init__(self, mqtt_broker, mqtt_port, mqtt_user, mqtt_password, mqtt_tls, mqtt_tls_ca_path, host_name, device_name, device_info, debug):
+    def __init__(self, mqtt_broker, mqtt_port, mqtt_user, mqtt_password, host_name, device_name, device_info, debug, mqtt_tls=False, mqtt_tls_ca_path=""):
         self.mqtt_broker = mqtt_broker
         self.mqtt_port = mqtt_port
         self.mqtt_user = mqtt_user
         self.mqtt_password = mqtt_password
-        self.mqtt_tls = mqtt_tls
-        self.mqtt_tls_ca_path = mqtt_tls_ca_path
+        self.mqtt_tls = bool(mqtt_tls)
+        self.mqtt_tls_ca_path = mqtt_tls_ca_path or ""
         self.host_name = host_name
         self.device_name = device_name
         self.device_info = device_info
@@ -40,9 +42,12 @@ class HA_MQTT:
         self.mqtt_client = mqtt.Client()
         self.mqtt_client.username_pw_set(self.mqtt_user, self.mqtt_password)
         if self.mqtt_tls:
-            if self.mqtt_tls_ca_path:
+            if self.mqtt_tls_ca_path and os.path.isfile(self.mqtt_tls_ca_path):
                 self.mqtt_client.tls_set(ca_certs=self.mqtt_tls_ca_path)
                 self.logger.info(f"Using TLS CA file: {self.mqtt_tls_ca_path}")
+            elif self.mqtt_tls_ca_path:
+                self.logger.warning(f"Specified TLS CA file not found: {self.mqtt_tls_ca_path}, falling back to system default CA store")
+                self.mqtt_client.tls_set()
             else:
                 self.mqtt_client.tls_set()
                 self.logger.info("TLS enabled, using system's default CA certificate store")

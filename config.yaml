@@ -17,8 +17,8 @@ uart: true
 usb: true
 
 map:
-  - type: homeassistant_config
-  - type: ssl
+  - homeassistant_config:ro
+  - ssl:ro
 
 panel_icon: "mdi:home-battery"
 
